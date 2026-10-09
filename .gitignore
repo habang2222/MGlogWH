@@ -1,0 +1,26 @@
+# Generated Python/build artifacts
+__pycache__/
+*.py[cod]
+*.o
+*.a
+*.so
+*.exe
+build/
+.output/
+collector
+test_writer
+test_quarantine
+
+# Runtime evidence and generated reports
+*.raw
+*.sqlite
+*.sqlite-*
+*.log
+evidence.meta
+evidence.meta.commit
+mglogwh-data/
+mglogwh-experiments/
+runs/
+
+# Local distribution packages
+*.zip
