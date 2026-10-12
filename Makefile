@@ -1,6 +1,8 @@
-# Build against the user's pinned libbpf-bootstrap checkout; do not modify it.
-BOOTSTRAP ?= /home/ljw/libbpf-bootstrap
-BUILD ?= /home/ljw/mglogwh-build
+# Build against a pinned libbpf-bootstrap checkout beside this repository.
+# Both paths can be overridden for a different installation layout.
+BOOTSTRAP ?= $(abspath $(CURDIR)/../libbpf-bootstrap)
+BUILD ?= $(CURDIR)/build
+.DELETE_ON_ERROR:
 LIBDIR := $(BOOTSTRAP)/examples/c/.output
 BPFTOOL := $(LIBDIR)/bpftool/bootstrap/bpftool
 INC := -I$(LIBDIR) -I$(BOOTSTRAP)/libbpf/include/uapi -I$(BOOTSTRAP)/vmlinux.h/include/x86

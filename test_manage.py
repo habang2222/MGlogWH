@@ -1,4 +1,6 @@
+import contextlib
 import copy
+import io
 import json
 import os
 from pathlib import Path
@@ -284,6 +286,100 @@ class DataTests(unittest.TestCase):
         self.assertEqual(result['state'], 'FAILED_STORAGE_ENOSPC')
         self.assertEqual(result['failure_evidence']['evidence_sources'],
                          ['COLLECTOR_STDERR_ERRNO_28'])
+
+
+class PortabilityTests(unittest.TestCase):
+    def test_relative_override_is_based_on_source_directory(self):
+        with patch.dict(os.environ, {'MGLOGWH_DATA_DIR': 'local-state'}):
+            self.assertEqual(eq.setting_path('MGLOGWH_DATA_DIR', '/var/lib/mglogwh'),
+                             eq.ROOT / 'local-state')
+
+    def test_read_only_commands_do_not_create_data_or_build(self):
+        with tempfile.TemporaryDirectory(prefix='eq-readonly-') as folder:
+            data = Path(folder) / 'absent-state'
+            with (patch.object(eq, 'DATA', data),
+                  patch.object(eq, 'capability', return_value={'ready': True}),
+                  patch.object(eq.subprocess, 'run') as build):
+                for action in ('version', 'capability', 'validate', 'prepare', 'status'):
+                    with (self.subTest(action=action),
+                          patch('sys.argv', ['manage.py', action, '--config',
+                                             str(eq.ROOT / 'config.json')]),
+                          contextlib.redirect_stdout(io.StringIO())):
+                        eq.main()
+                    self.assertFalse(data.exists())
+                with (patch('sys.argv', ['manage.py', 'raw-search', '--match-path', '/tmp/file']),
+                      self.assertRaises(ValueError)):
+                    eq.main()
+                self.assertFalse(data.exists())
+                build.assert_not_called()
+
+    def test_atomic_json_does_not_follow_predictable_temp_symlink(self):
+        if os.name != 'posix':
+            self.skipTest('Linux symlink behavior')
+        with tempfile.TemporaryDirectory(prefix='eq-atomic-') as folder:
+            parent = Path(folder)
+            victim = parent / 'victim'
+            victim.write_text('keep')
+            (parent / 'value.json.tmp').symlink_to(victim)
+            eq.atomic_json(parent / 'value.json', {'ok': True})
+            self.assertEqual(victim.read_text(), 'keep')
+            self.assertEqual(json.loads((parent / 'value.json').read_text()), {'ok': True})
+
+    def test_data_directory_must_be_private_and_not_a_symlink(self):
+        if os.name != 'posix' or os.geteuid() == 0:
+            self.skipTest('unprivileged Linux directory check')
+        with tempfile.TemporaryDirectory(prefix='eq-state-') as folder:
+            parent = Path(folder)
+            state = parent / 'state'
+            with patch.object(eq, 'DATA', state):
+                eq.ensure_data_dir()
+                self.assertEqual(state.stat().st_mode & 0o777, 0o700)
+                state.chmod(0o755)
+                with self.assertRaisesRegex(RuntimeError, '0700'):
+                    eq.ensure_data_dir()
+            with patch.object(eq, 'DATA', parent / 'link'):
+                (parent / 'link').symlink_to(state, target_is_directory=True)
+                with self.assertRaisesRegex(RuntimeError, '디렉터리'):
+                    eq.ensure_data_dir()
+
+    def test_root_rejects_untrusted_data_parent(self):
+        if os.name != 'posix' or os.geteuid() != 0:
+            self.skipTest('root-only Linux parent check')
+        with tempfile.TemporaryDirectory(prefix='eq-state-') as folder:
+            with patch.object(eq, 'DATA', Path(folder) / 'state'):
+                with self.assertRaisesRegex(RuntimeError, '상위'):
+                    eq.ensure_data_dir()
+
+    def test_query_encodes_sqlite_uri_metacharacters(self):
+        if os.name != 'posix':
+            self.skipTest('Linux path with a question mark')
+        with tempfile.TemporaryDirectory(prefix='eq-uri-') as folder:
+            run = Path(folder) / 'space # question?'
+            run.mkdir()
+            with sqlite3.connect(run / 'index.sqlite') as db:
+                db.execute('CREATE TABLE events(payload BLOB, priority INTEGER, monotonic_ns INTEGER)')
+                db.execute('CREATE TABLE cursor(lane TEXT, offset INTEGER)')
+                db.execute('INSERT INTO events VALUES (?,?,?)', (record(), 1, 10))
+            self.assertEqual(eq.query(run)['records'][0]['path'], '/tmp/file')
+
+    def test_foreground_run_releases_control_but_keeps_collector_lock(self):
+        events = []
+        @contextlib.contextmanager
+        def tracked_lock(path):
+            events.append('enter ' + path.name)
+            try:
+                yield
+            finally:
+                events.append('exit ' + path.name)
+        with (patch('sys.argv', ['manage.py', 'run']),
+              patch.object(eq, 'config', return_value={}),
+              patch.object(eq, 'ensure_data_dir'),
+              patch.object(eq, 'lock', tracked_lock),
+              patch.object(eq, 'create_run', return_value=Path('/tmp/fake-run')),
+              patch.object(eq, 'serve', side_effect=lambda *args, **kwargs: events.append('serve'))):
+            eq.main()
+        self.assertEqual(events, ['enter control.lock', 'enter collector.lock',
+                                  'exit control.lock', 'serve', 'exit collector.lock'])
 
 
 if __name__ == '__main__': unittest.main()

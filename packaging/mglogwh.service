@@ -1,0 +1,27 @@
+[Unit]
+Description=MGlogWH eBPF log collector
+Documentation=file:/opt/mglogwh/README.md
+After=local-fs.target
+StartLimitIntervalSec=10min
+StartLimitBurst=3
+
+[Service]
+Type=simple
+User=root
+Group=root
+WorkingDirectory=/opt/mglogwh
+Environment=MGLOGWH_DATA_DIR=/var/lib/mglogwh
+Environment=MGLOGWH_BUILD_DIR=/opt/mglogwh/build
+ExecStartPre=/usr/bin/python3 /opt/mglogwh/manage.py validate --config /etc/mglogwh/config.json
+ExecStartPre=/usr/bin/python3 /opt/mglogwh/manage.py prepare --config /etc/mglogwh/config.json
+ExecStart=/usr/bin/python3 /opt/mglogwh/manage.py run --config /etc/mglogwh/config.json
+Restart=on-failure
+RestartSec=15s
+KillMode=mixed
+TimeoutStopSec=120s
+UMask=0077
+StateDirectory=mglogwh
+StateDirectoryMode=0700
+
+[Install]
+WantedBy=multi-user.target

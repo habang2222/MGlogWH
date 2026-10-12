@@ -1,0 +1,10 @@
+/var/lib/mglogwh/runs/*/collector.log /var/lib/mglogwh/runs/*/service.log /var/lib/mglogwh/runs/*/indexer.log {
+    daily
+    maxsize 10M
+    rotate 7
+    missingok
+    notifempty
+    compress
+    copytruncate
+    su root root
+}

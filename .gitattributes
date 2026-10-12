@@ -5,5 +5,8 @@
 *.md text eol=lf
 *.json text eol=lf
 Makefile text eol=lf
+*.sh text eol=lf
+*.service text eol=lf
+*.logrotate text eol=lf
 *.cmd text eol=crlf
 *.ps1 text eol=crlf

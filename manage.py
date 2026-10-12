@@ -16,17 +16,32 @@ import platform
 import signal
 import shutil
 import sqlite3
+import stat
 import struct
 import subprocess
 import sys
+import tempfile
 import time
 import uuid
 import zlib
 
 VERSION = '0.3.0'
 ROOT = Path(__file__).resolve().parent
-DATA = Path('/home/ljw/mglogwh-data')
-BINARY = Path('/home/ljw/mglogwh-build/collector')
+
+
+def setting_path(name, default):
+    """Resolve relative overrides against this program, not the caller's cwd."""
+    value = os.environ.get(name)
+    path = Path(value).expanduser() if value else Path(default)
+    return Path(os.path.abspath(path if path.is_absolute() else ROOT / path))
+
+
+DATA = setting_path('MGLOGWH_DATA_DIR', '/var/lib/mglogwh')
+BUILD = setting_path('MGLOGWH_BUILD_DIR', ROOT / 'build')
+DEFAULT_CONFIG = setting_path('MGLOGWH_CONFIG',
+                              '/etc/mglogwh/config.json' if ROOT == Path('/opt/mglogwh')
+                              else ROOT / 'config.json')
+BINARY = BUILD / 'collector'
 OBJECT = BINARY.with_name('sensor.bpf.o')
 EVENT = struct.Struct('<4Qq12I16s128s')
 RECORD_SIZE = EVENT.size + 8
@@ -91,18 +106,41 @@ def read_json(path, default=None):
 
 def atomic_json(path, value):
     path = Path(path)
-    temp = path.with_name(path.name + '.tmp')
-    with temp.open('w', encoding='utf-8') as file:
-        json.dump(value, file, ensure_ascii=False, indent=2)
-        file.write('\n')
-        file.flush()
-        os.fsync(file.fileno())
-    temp.replace(path)
-    fd = os.open(path.parent, os.O_RDONLY | os.O_DIRECTORY)
+    fd, temp = tempfile.mkstemp(prefix='.' + path.name + '.', suffix='.tmp', dir=path.parent)
     try:
-        os.fsync(fd)
+        with os.fdopen(fd, 'w', encoding='utf-8') as file:
+            json.dump(value, file, ensure_ascii=False, indent=2)
+            file.write('\n')
+            file.flush()
+            os.fsync(file.fileno())
+        os.replace(temp, path)
+        directory = os.open(path.parent, os.O_RDONLY | os.O_DIRECTORY)
+        try:
+            os.fsync(directory)
+        finally:
+            os.close(directory)
     finally:
-        os.close(fd)
+        try:
+            os.unlink(temp)
+        except FileNotFoundError:
+            pass
+
+
+def ensure_data_dir():
+    """Keep root-owned evidence out of directories controlled by other users."""
+    uid = os.geteuid()
+    for directory in reversed((DATA, *DATA.parents)):
+        try:
+            info = directory.lstat()
+        except FileNotFoundError:
+            directory.mkdir(mode=0o700)
+            info = directory.lstat()
+        if not stat.S_ISDIR(info.st_mode):
+            raise RuntimeError(f'데이터 경로가 디렉터리가 아닙니다: {directory}')
+        if uid == 0 and (info.st_uid != 0 or info.st_mode & 0o022):
+            raise RuntimeError(f'root가 신뢰할 수 없는 데이터 상위 경로입니다: {directory}')
+        if directory == DATA and (info.st_uid != uid or stat.S_IMODE(info.st_mode) != 0o700):
+            raise RuntimeError(f'데이터 폴더는 실행 계정 소유의 0700 권한이어야 합니다: {DATA}')
 
 
 def config(path):
@@ -375,7 +413,9 @@ def capability():
     return dict(checks=checks, ready=all(checks.values()), events=['exec_success', 'openat_enter_exit'],
                 all_uid=True, all_syscall=False, file_identity='EXACT_CAPTURED_ABSOLUTE_PATH_ONLY',
                 pid_namespace='HOST_INITIAL_PID_NAMESPACE', uid_namespace='HOST_INITIAL_USER_NAMESPACE',
-                observation_scope='SHARED_WSL_KERNEL_NOT_QEMU_VM',
+                observation_scope=('SHARED_WSL_KERNEL_NOT_QEMU_VM'
+                                   if 'microsoft' in platform.release().lower()
+                                   else 'HOST_LINUX_KERNEL'),
                 signing='UNSIGNED_CRC32_ONLY', independent_index_process=True,
                 remote_collector=False, metadata='BOUNDED_COMMITTED_JOURNAL_AND_AGGREGATE_COUNTERS',
                 critical_guard='PER_STREAM_QUARANTINE_WITH_ORIGINAL_PRIORITY_RETAINED',
@@ -384,7 +424,8 @@ def capability():
                 bpf_load_verified_only_after_start=True)
 
 
-def start(cfg):
+def create_run(cfg):
+    """Create and publish a run with control.lock and collector.lock held."""
     cap = capability()
     if not cap['ready']:
         raise RuntimeError('시작 조건 실패: ' + json.dumps(cap['checks']))
@@ -421,6 +462,14 @@ def start(cfg):
     os.chmod(run / 'config.json', 0o400)
     os.chmod(run / 'manifest.json', 0o400)
     atomic_json(DATA / 'current.json', dict(run_id=run.name))
+    return run
+
+
+def start(cfg):
+    # main() holds control.lock. Take collector.lock before publishing a run
+    # so an active foreground collector cannot be superseded.
+    with lock(DATA / 'collector.lock'):
+        run = create_run(cfg)
     with (run / 'service.log').open('ab') as log:
         process = subprocess.Popen([sys.executable, str(ROOT / 'manage.py'), 'serve', '--run', run.name],
                                    stdin=subprocess.DEVNULL, stdout=log, stderr=log, start_new_session=True)
@@ -435,7 +484,7 @@ def start(cfg):
     raise RuntimeError(f'시작 제한 시간 초과. {run}에서 실제 상태를 확인하세요.')
 
 
-def serve(run):
+def serve(run, collector_lock_held=False):
     quit_ = False
     def stop_handler(*_):
         nonlocal quit_
@@ -457,7 +506,8 @@ def serve(run):
     for rule in cfg['critical_rules']:
         collector_command.extend([str(rule['id']), '2' if rule['event_type'] == 'openat' else '1',
                                   '1' if rule['protected'] else '0', rule['path']])
-    with lock(DATA / 'collector.lock'), (run / 'collector.log').open('ab') as log:
+    collector_guard = contextlib.nullcontext() if collector_lock_held else lock(DATA / 'collector.lock')
+    with collector_guard, (run / 'collector.log').open('ab') as log:
         service = dict(supervisor=identity(), state='STARTING')
         atomic_json(run / 'service.json', service)
         child = subprocess.Popen(collector_command,
@@ -506,6 +556,8 @@ def serve(run):
                         pass
             service.update(state='STOPPED' if child.returncode == 0 else 'FAILED', collector_exit=child.returncode)
             atomic_json(run / 'service.json', service)
+    if child.returncode != 0:
+        raise RuntimeError(f'collector 비정상 종료: {child.returncode}; {run}/collector.log 확인')
 
 
 def stop_run(run):
@@ -701,7 +753,8 @@ def index_run(run, worker=False, max_seconds=INDEX_FINAL_CATCHUP_SECONDS):
 def query(run, critical=False, limit=30):
     if run is None or not (run / 'index.sqlite').exists():
         raise ValueError('아직 인덱스가 없습니다. 상태 확인 또는 인덱스 재개를 실행하세요.')
-    with sqlite3.connect(f'file:{run / "index.sqlite"}?mode=ro', uri=True, timeout=2) as db:
+    database_uri = (run / 'index.sqlite').resolve().as_uri() + '?mode=ro'
+    with sqlite3.connect(database_uri, uri=True, timeout=2) as db:
         db.execute('PRAGMA temp_store=MEMORY')
         db.execute('BEGIN')  # Cursor and search rows come from one SQLite read snapshot.
         offsets = dict(db.execute('SELECT lane,offset FROM cursor'))
@@ -776,9 +829,9 @@ def raw_search(run, path, limit=30, max_bytes=RAW_SEARCH_DEFAULT_MAX_BYTES, max_
 
 def main():
     parser = argparse.ArgumentParser(description='MGlogWH local sensor')
-    parser.add_argument('action', choices=['version', 'capability', 'validate', 'prepare', 'start', 'stop',
+    parser.add_argument('action', choices=['version', 'capability', 'validate', 'prepare', 'start', 'run', 'stop',
                          'status', 'path', 'query', 'critical', 'raw-search', 'index', 'serve', 'index-worker', 'recover'])
-    parser.add_argument('--config', default=str(ROOT / 'config.json'))
+    parser.add_argument('--config', default=str(DEFAULT_CONFIG))
     parser.add_argument('--run')
     parser.add_argument('--run-dir', type=Path, help='read-only recovery input (exported UUID directory)')
     parser.add_argument('--out', type=Path, help='recovery report JSON output; source is never repaired')
@@ -802,26 +855,19 @@ def main():
         print(json.dumps(report, ensure_ascii=False, indent=2))
         if report.get('status') == 'INVALID': sys.exit(2)
         return
-    DATA.mkdir(mode=0o700, parents=True, exist_ok=True)
-    if args.action == 'serve':
-        serve(current(args.run)); return
-    if args.action == 'index-worker':
-        index_run(current(args.run), worker=True); return
-    if args.action in ('validate', 'prepare', 'start'):
+    if args.action in ('validate', 'prepare', 'start', 'run'):
         cfg = config(args.config)
-    if args.action == 'prepare':
-        subprocess.run(['make', '-C', str(ROOT)], check=True)
-    with lock(DATA / 'control.lock'):
+    if args.action in ('capability', 'prepare'):
+        # Build explicitly as an unprivileged user. Do not execute Makefile
+        # recipes as root from a writable source checkout.
+        result = capability()
+        if not result['ready']:
+            raise RuntimeError(json.dumps(result))
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+        return
+    if args.action in ('validate', 'status', 'path', 'query', 'critical', 'raw-search'):
         run = current(args.run)
-        if args.action == 'start':
-            result = start(cfg)
-        elif args.action == 'stop':
-            result = stop_run(run)
-        elif args.action in ('capability', 'prepare'):
-            result = capability()
-            if not result['ready']:
-                raise RuntimeError(json.dumps(result))
-        elif args.action == 'validate':
+        if args.action == 'validate':
             before = read_json(run / 'config.json', {}) if run else {}
             diff = list(difflib.unified_diff(json.dumps(before, indent=2, sort_keys=True).splitlines(),
                                            json.dumps(cfg, indent=2, sort_keys=True).splitlines(),
@@ -837,6 +883,28 @@ def main():
             result = query(run, args.action == 'critical', args.limit)
         elif args.action == 'raw-search':
             result = raw_search(run, args.match_path, args.limit, args.max_bytes, args.max_seconds)
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+        return
+    ensure_data_dir()
+    if args.action == 'serve':
+        serve(current(args.run)); return
+    if args.action == 'index-worker':
+        index_run(current(args.run), worker=True); return
+    if args.action == 'run':
+        # Hold the collector lock from publication through foreground exit.
+        # Release control.lock while serving so `stop` can signal this process.
+        with contextlib.ExitStack() as held:
+            with lock(DATA / 'control.lock'):
+                held.enter_context(lock(DATA / 'collector.lock'))
+                run = create_run(cfg)
+            serve(run, collector_lock_held=True)
+        return
+    with lock(DATA / 'control.lock'):
+        run = current(args.run)
+        if args.action == 'start':
+            result = start(cfg)
+        elif args.action == 'stop':
+            result = stop_run(run)
         elif args.action == 'index':
             result = index_run(run)
         print(json.dumps(result, ensure_ascii=False, indent=2))

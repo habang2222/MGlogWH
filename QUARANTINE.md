@@ -1,5 +1,7 @@
 # Critical Quarantine / Priority Abuse Protection — v0.3
 
+아래 테스트 이력은 기능 제작 당시의 기록입니다. 여러 Ubuntu 서버에 설치하는 현재 명령과 최신 검증 범위는 [README](README.md)를 따릅니다.
+
 ## 기존 구조
 
 `event.h`가 BULK=0, NORMAL=1, CRITICAL=2를 정의한다. `sensor.bpf.c`는 openat entry/exit를 연결하고, 성공 exec과 openat을 수집한다. 기존 critical 조건은 `protected_path`의 정확한 절대 경로 문자열이다. BPF → critical/general ring → 전용 drain → 고정 큐 → lane writer → CRC raw → 파생 SQLite가 기본 경로다. `collector.c`의 별도 metadata writer는 checkpoint·userspace loss·seal을 저장하며 `ledger.py`가 committed fence까지만 복구한다. `health.json`이 기존 외부 상태·metrics 인터페이스다.
@@ -100,14 +102,14 @@ quarantine.raw와 general.raw는 기존 noncritical 저장 예산을 공유한�
 
 요청한 8개 시나리오를 synthetic fixture로 작성했다: 낮은 rate, 순간 초과, 지속 초과, A/rule1만 격리, Protected Critical 면제, cooldown 복구, sampling 합계, 사후 metadata. fixture는 가상 monotonic 시각을 쓰며 live BPF나 실제 workload를 시작하지 않는다. BPF object 컴파일·skeleton 생성과 collector·두 C fixture의 `-Wall -Wextra -Werror` 컴파일을 완료했고 수정한 Python·PowerShell 파일도 구문 검사를 통과했다. fixture 실행 결과는 아직 없다.
 
-사용자가 실행할 명령:
+현재 설치본에서 정책과 손실 원장을 확인할 명령:
 
 ```bash
-make                         # 컴파일만
-make test                    # 명시적으로 synthetic tests 실행
-sudo python3 manage.py start # 여기서부터 실제 BPF 수집
-sudo python3 manage.py stop
-python3 manage.py recover --run <UUID> --out /tmp/recovery-<UUID>.json
+make test
+sudo systemctl start mglogwh
+sudo systemctl stop mglogwh
+sudo /usr/bin/python3 /opt/mglogwh/manage.py recover \
+  --run-dir /var/lib/mglogwh/runs/REPLACE_WITH_RUN_UUID --out /tmp/recovery.json
 ```
 
 실제 부하 생성기와 분석기는 이 저장소에 포함하지 않는다. 본 문서의 정책 시험 절차는 수집기 synthetic fixture에 한정한다. 제작 당시의 컴파일·구문 검사는 실제 부하에서의 성능이나 손실률을 보장하지 않는다.
