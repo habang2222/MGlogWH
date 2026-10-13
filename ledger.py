@@ -27,6 +27,7 @@ Q_PERIODIC = 1 << 10
 Q_PROTECTED = 1 << 11
 Q_UNTRACKED = 1 << 12
 QUALITY_MASK = 0x00ff1f03
+QUALITY_MASK_V3 = 0xffff7f03
 QUARANTINE_METRIC_ALIASES = ('active_quarantined_streams', 'critical_events_total',
                              'quarantined_events_total', 'peak_critical_rate')
 MAX_FRAME = 4 * 1024 * 1024
@@ -100,6 +101,18 @@ def _lineage(run):
     config_hash = hashlib.sha256(canonical).hexdigest()
     if config_hash != manifest.get('config_sha256'):
         raise LedgerError('config/manifest SHA256 mismatch')
+    if manifest.get('raw_schema') == 3:
+        if manifest.get('rule_engine_schema_version') != 1 or manifest.get('policy_version') != 1:
+            raise LedgerError('schema 3 policy version mismatch')
+        if 'event_rules' in config:
+            if (not isinstance(manifest.get('rules_bin_sha256'), str) or
+                    _digest(run / 'rules.bin') != manifest['rules_bin_sha256']):
+                raise LedgerError('schema 3 rules.bin/manifest policy lineage mismatch')
+        elif 'critical_rules' in config:
+            if 'rules_bin_sha256' in manifest:
+                raise LedgerError('legacy rules must not claim a compiled rule file')
+        else:
+            raise LedgerError('schema 3 configuration has no rules')
     return dict(run_id=run.name, boot_id=manifest['boot_id'],
                 config_sha256=config_hash, manifest_sha256=_digest(run / 'manifest.json'))
 
@@ -125,14 +138,25 @@ def _policy(schema, quality, priority, lane):
         if quality & ~3 or lane == 'quarantine':
             raise LedgerError('legacy quality/lane mismatch')
         flags, rule_id = 0, 0
-    elif schema == 2:
-        if quality & ~QUALITY_MASK:
+    elif schema in (2, 3):
+        if quality & ~(QUALITY_MASK if schema == 2 else QUALITY_MASK_V3):
             raise LedgerError('unknown raw policy/quality bits')
         flags, rule_id = quality & 0x1f00, (quality >> 16) & 255
-        if (flags or rule_id) and priority != 2:
-            raise LedgerError('raw rule/policy requires original critical priority')
-        if priority == 2 and not rule_id:
-            raise LedgerError('schema 2 critical requires rule_id')
+        if schema == 2:
+            if (flags or rule_id) and priority != 2:
+                raise LedgerError('raw rule/policy requires original critical priority')
+            if priority == 2 and not rule_id:
+                raise LedgerError('schema 2 critical requires rule_id')
+        else:
+            configured_policy = (quality >> 13) & 3
+            rule_version, policy_version = (quality >> 24) & 15, (quality >> 28) & 15
+            if (configured_policy == 3 or rule_version != 1 or policy_version != 1 or
+                    (priority == 2 and not rule_id) or
+                    (priority != 2 and (configured_policy != 0 or flags)) or
+                    (configured_policy == 0 and flags) or
+                    (configured_policy == 1 and flags & Q_PROTECTED) or
+                    (configured_policy == 2 and not flags & Q_PROTECTED)):
+                raise LedgerError('schema 3 rule/policy/version mismatch')
         if flags & Q_INITIAL and flags & Q_PERIODIC:
             raise LedgerError('raw initial/periodic policy conflict')
         if flags & (Q_INITIAL | Q_PERIODIC) and not flags & Q_QUARANTINE:
@@ -241,6 +265,36 @@ def _snapshot(value, previous=None):
             raise LedgerError('quarantine_global object required')
         for key, item in global_.items():
             _integer(item, 'global quarantine counter ' + key)
+    if 'rule_stats' in value:
+        rows = value['rule_stats']
+        if (not isinstance(rows, list) or not 1 <= len(rows) <= 8 or
+                type(value.get('rule_stats_snapshot_complete')) is not bool or
+                not isinstance(value.get('rule_stats_scope'), str) or not value['rule_stats_scope']):
+            raise LedgerError('rule_stats snapshot/scope mismatch')
+        seen = set()
+        scalar_counters = ('evaluated', 'matched', 'unknown', 'selected', 'ring_submitted',
+                           'quarantine_summarized', 'ring_failed', 'bulk_budget_suppressed',
+                           'bulk_budget_contention')
+        lane_counters = ('collector_observed', 'collector_appended', 'collector_durable',
+                         'collector_queue_rejected', 'collector_quota_rejected')
+        for row in rows:
+            if not isinstance(row, dict):
+                raise LedgerError('rule_stats row must be object')
+            rid = _integer(row.get('rule_id'), 'rule_stats rule_id', 1, 255)
+            if rid in seen:
+                raise LedgerError('duplicate rule_stats rule_id')
+            seen.add(rid)
+            _integer(row.get('priority'), 'rule_stats priority', 0, 2)
+            _integer(row.get('configured_policy'), 'rule_stats configured_policy', 0, 2)
+            _integer(row.get('precedence'), 'rule_stats precedence', 0, 1000)
+            for key in scalar_counters:
+                _integer(row.get(key), 'rule_stats ' + key)
+            for key in lane_counters:
+                counts = row.get(key)
+                if not isinstance(counts, list) or len(counts) != 3:
+                    raise LedgerError('rule_stats ' + key + ' requires three lane counters')
+                for count in counts:
+                    _integer(count, 'rule_stats ' + key)
     return value
 
 
@@ -326,12 +380,11 @@ def _loss_witness(value, lane):
         raise LedgerError('loss witness field set mismatch')
     if type(witness['version']) is not int or witness['version'] != 1 or witness['source'] != 'USERSPACE_RING_CALLBACK':
         raise LedgerError('unsupported loss witness version/source')
-    if _integer(witness['event_schema'], 'loss event_schema', 2, 2) != 2:
-        raise LedgerError('loss witness raw schema mismatch')
+    schema = _integer(witness['event_schema'], 'loss event_schema', 2, 3)
     _integer(witness['kind'], 'loss kind', 1, 2)
     priority = _integer(witness['priority'], 'loss priority', 0, 2)
     quality = _integer(witness['quality'], 'loss quality', 0, 0xffffffff)
-    policy = _policy(2, quality, priority, lane)
+    policy = _policy(schema, quality, priority, lane)
     if _integer(witness['rule_id'], 'loss rule_id', 0, 255) != policy['rule_id']:
         raise LedgerError('loss witness rule_id/quality mismatch')
     for key in ('pid', 'tid', 'uid', 'op_flags'):
@@ -440,7 +493,7 @@ def _read_raw(run, snapshot, db, report):
                 if reserved or zlib.crc32(raw[:-8]) != checksum:
                     raise LedgerError(f'{lane}.raw:{offset}: CRC32/reserved mismatch')
                 event = EVENT.unpack(raw[:-8])
-                if event[5] != 0x31514F45 or event[6] not in (1, 2) or event[7] not in (1, 2) or event[8] not in (0, 1, 2):
+                if event[5] != 0x31514F45 or event[6] not in (1, 2, 3) or event[7] not in (1, 2) or event[8] not in (0, 1, 2):
                     raise LedgerError('raw magic/schema/kind/priority mismatch')
                 policy = _policy(event[6], event[16], event[8], lane)
                 if event[15] > 127:
@@ -752,6 +805,61 @@ def _quarantine_report(db, snapshot, report):
     report['critical_quarantine'] = result
 
 
+def _rule_evidence(db, snapshot, report):
+    """Keep durable raw counts distinct from pre-sequence aggregate counters."""
+    run = Path(report['run_path'])
+    config = _object(run / 'config.json')
+    manifest = _object(run / 'manifest.json')
+    rules = config.get('event_rules', config.get('critical_rules', []))
+    actual = {rid: count for rid, count in db.execute(
+        'SELECT rule_id,count(*) FROM durable GROUP BY rule_id')}
+    stats = snapshot.get('rule_stats') if snapshot else None
+    stats_by_id = {row['rule_id']: row for row in stats} if stats else {}
+    if stats is not None and set(stats_by_id) != {rule['id'] for rule in rules}:
+        raise LedgerError('rule_stats/config rule ID set mismatch')
+    rows = []
+    for rule in rules:
+        rid = rule['id']
+        counters = stats_by_id.get(rid)
+        if counters:
+            expected_priority = {'BULK': 0, 'NORMAL': 1, 'CRITICAL': 2}.get(
+                rule.get('priority', 'CRITICAL'))
+            expected_policy = {'NORMAL_COLLECTION': 0, 'QUARANTINE': 1, 'QUARANTINE_EXEMPT': 2}.get(
+                rule.get('overload_policy', 'QUARANTINE_EXEMPT' if rule.get('protected') else 'QUARANTINE'))
+            if (counters['priority'] != expected_priority or
+                    counters['configured_policy'] != expected_policy or
+                    counters['precedence'] != rule.get('precedence', 0)):
+                raise LedgerError('rule_stats/config policy mismatch')
+        durable = actual.pop(rid, 0)
+        declared_durable = sum(counters['collector_durable']) if counters else None
+        reconciled = declared_durable == durable if counters else None
+        rows.append(dict(rule_id=rid, priority=rule.get('priority', 'CRITICAL'),
+                         configured_policy=rule.get('overload_policy',
+                             'QUARANTINE_EXEMPT' if rule.get('protected') else 'QUARANTINE'),
+                         raw_durable_count=durable,
+                         checkpoint_counters=counters,
+                         collector_durable_matches_raw=reconciled,
+                         counter_scope='COMMITTED_CHECKPOINT_AGGREGATE' if counters else 'NOT_AVAILABLE',
+                         complete_to_durable=bool(report['clean_seal'] and
+                             snapshot.get('rule_stats_snapshot_complete') is True and reconciled) if snapshot else False,
+                         per_rule_unobserved_event_count=None,
+                         per_rule_loss_attribution_complete=False))
+    report['rule_evidence'] = dict(
+        policy_version=manifest.get('policy_version'),
+        rule_engine_schema_version=manifest.get('rule_engine_schema_version'),
+        config_sha256=manifest.get('config_sha256'),
+        rules_bin_sha256=manifest.get('rules_bin_sha256'),
+        snapshot_scope=snapshot.get('rule_stats_scope') if snapshot else None,
+        snapshot_complete=snapshot.get('rule_stats_snapshot_complete') if snapshot else None,
+        source='COMMITTED_CHECKPOINT_AND_DURABLE_RAW' if snapshot else 'DURABLE_RAW_ONLY',
+        matched_means='ALL_MATCHING_RULES_INCLUDING_NON_WINNERS',
+        selected_means='FINAL_WINNER_ONLY_PRE_SEQUENCE_AGGREGATE',
+        pre_sequence_and_kernel_losses_cannot_be_assigned_to_rule=True,
+        unmatched_or_legacy_raw_count=actual.pop(0, 0),
+        unknown_rule_raw_counts=actual,
+        rules=rows)
+
+
 def _witness_entry(lineage, row):
     cgroup, seq, lane, reason, timestamp, payload = row
     witness = _json(payload)
@@ -858,6 +966,7 @@ def _summarize(db, snapshot, report):
     if report['clean_seal'] and not report['absence_set_complete']:
         report['warnings'].append('SEQUENCE_BOUNDARY_INCOMPLETE: clean stop lacks a complete sequence snapshot')
     _quarantine_report(db, snapshot, report)
+    _rule_evidence(db, snapshot, report)
 
 
 def recover(run, out=None):
@@ -867,7 +976,7 @@ def recover(run, out=None):
     lacking a commit fence have explicit unsupported/uncommitted states.
     """
     run = Path(run).resolve()
-    report = dict(schema=1, program='MGlogWHLedger', version='0.3.0', run_path=str(run),
+    report = dict(schema=1, program='MGlogWHLedger', version='0.4.0', run_path=str(run),
                   status='INVALID', errors=[], warnings=[], journal={}, raw={},
                   clean_seal=False, absence_set_complete=False, raw_recovery_supported=False, durable_records=0,
                   durable_unique_events=0, duplicate_loss_records=0,
@@ -931,7 +1040,7 @@ def recover(run, out=None):
         for key in ('last_trusted_checkpoint', 'exact_userspace_losses', 'exact_userspace_loss_count', 'tenant_evidence',
                     'checkpoint_userspace_loss_reason_coverage_complete', 'unsequenced_faults', 'sequenced_aggregate_faults',
                     'pre_sequence_policy_faults', 'critical_quarantine', 'partial_quarantine_controls', 'committed_quarantine_control_count',
-                    'exact_userspace_loss_witnesses'):
+                    'exact_userspace_loss_witnesses', 'rule_evidence'):
             report.pop(key, None)
         report['durable_unique_events'] = 0
         report['durable_records'] = 0

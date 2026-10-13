@@ -1,6 +1,6 @@
-# Critical Quarantine / Priority Abuse Protection — v0.3
+# Critical Quarantine / Priority Abuse Protection — v0.3 설계 이력
 
-아래 테스트 이력은 기능 제작 당시의 기록입니다. 여러 Ubuntu 서버에 설치하는 현재 명령과 최신 검증 범위는 [README](README.md)를 따릅니다.
+이 문서는 v0.3 Quarantine 설계 이력과 원장 의미를 설명합니다. v0.4의 사용자 정의 규칙, Priority와 보존 정책 분리, 규칙별 임계치, 충돌 순서는 [RULES.md](RULES.md)를 따릅니다. 아래 테스트 이력은 기능 제작 당시의 기록입니다. 여러 Ubuntu 서버에 설치하는 현재 명령과 최신 검증 범위는 [README](README.md)를 따릅니다.
 
 ## 기존 구조
 
@@ -12,9 +12,9 @@
 
 quarantine 판단을 **BPF의 ring reserve 앞**에 넣었다. collector에서만 거르면 이미 critical ring을 점유한 뒤이므로 다른 critical을 보호하기 어렵기 때문이다. stream key는 `(cgroup_id, rule_id, event_kind)`다. tenant 전체를 바꾸지 않는다.
 
-`critical_rules`는 최대 8개의 정확한 경로 규칙을 지원한다. 현재 관찰 가능한 종류는 `openat`과 성공 `exec`이다. 같은 종류·경로의 중복 규칙과 중복 ID는 거부한다. 규칙마다 `protected=true`를 지정할 수 있다. 이는 해당 규칙의 quarantine 면제이며 cgroup 예약이나 새 탐지 엔진을 뜻하지 않는다. credential 변경·kernel integrity·collector tampering을 새로 탐지한 것으로 해석하지 않는다.
+`critical_rules`는 v0.3부터 지원하는 최대 8개의 정확한 경로 규칙이다. 현재 관찰 가능한 종류는 `openat`과 성공 `exec`이다. 같은 종류·경로의 중복 규칙과 중복 ID는 거부한다. 규칙마다 `protected=true`를 지정할 수 있으며 해당 규칙의 quarantine 면제다. v0.4의 `event_rules`는 조건식과 Priority·정책을 별도로 설정하며, 두 규칙 키를 동시에 쓰지 않는다. credential 변경·kernel integrity·collector tampering을 새로 탐지한 것으로 해석하지 않는다.
 
-priority 값은 계속 CRITICAL이다. 232바이트 이벤트와 240바이트 CRC record 크기는 그대로이며 schema 2의 quality에 rule ID·effective policy·sample 종류를 담는다. capture 오류는 하위 2비트로 별도 검사한다. schema 1의 과거 원본도 reader와 indexer가 지원한다. 이전 reader는 schema 2를 사용하기 전에 업데이트해야 한다.
+레거시 `critical_rules`의 Priority는 CRITICAL이다. v0.4 `event_rules`는 BULK·NORMAL·CRITICAL 중 하나를 선택한다. 232바이트 이벤트와 240바이트 CRC record 크기는 그대로다. 과거 raw schema 1·2를 reader가 지원하며 새 규칙은 schema 3에 rule ID·정책·버전을 기록한다. capture 오류는 하위 2비트로 별도 검사한다. 이전 reader로 새 run을 해석하지 않는다.
 
 격리되지 않은 critical과 Protected Critical은 기존 critical ring·FIFO·writer로 간다. 격리된 초기 원본과 주기적 샘플은 별도 quarantine ring·512건 FIFO·writer·`quarantine.raw`로 간다. NORMAL로 덮어쓰거나 general.raw에 섞지 않는다. 큐마다 writer가 자신의 파일을 동기화하며 disk I/O는 ring callback에서 수행하지 않는다.
 

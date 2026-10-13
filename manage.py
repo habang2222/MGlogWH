@@ -25,7 +25,7 @@ import time
 import uuid
 import zlib
 
-VERSION = '0.3.0'
+VERSION = '0.4.0'
 ROOT = Path(__file__).resolve().parent
 
 
@@ -58,6 +58,10 @@ INDEX_PRESSURE_RESUME_EXTRA_BYTES = 8 * 1024**2
 Q_QUARANTINED, Q_INITIAL, Q_PERIODIC = 1 << 8, 1 << 9, 1 << 10
 Q_PROTECTED, Q_UNTRACKED = 1 << 11, 1 << 12
 QUALITY_MASK = 0x00ff1f03
+QUALITY_MASK_V3 = 0xffff7f03
+Q_POLICY_SHIFT = 13
+Q_RULE_VERSION_SHIFT = 24
+Q_POLICY_VERSION_SHIFT = 28
 REQUIRED_KEYS = {'bulk_rate', 'bulk_burst', 'protected_path', 'max_raw_mib',
         'critical_reserve_mib', 'max_index_mib', 'minimum_free_mib'}
 POLICY_DEFAULTS = dict(critical_rate_threshold=10000, critical_rate_duration_seconds=3,
@@ -65,6 +69,29 @@ POLICY_DEFAULTS = dict(critical_rate_threshold=10000, critical_rate_duration_sec
                       quarantine_initial_full_events=8, quarantine_sample_interval_ms=100,
                       quarantine_max_mib=16, metadata_max_mib=16)
 KEYS = REQUIRED_KEYS | POLICY_DEFAULTS.keys() | {'critical_rules'}
+
+
+MAX_CONFIG_BYTES = 64 * 1024
+RULE_FILE_MAGIC = 0x3147524d
+RULE_FILE_VERSION = 1
+RULE_PROGRAM_SIZE = 2256
+RULE_FIELDS = {'event_type': 1, 'success': 2, 'result': 3, 'access_mode': 4,
+               'create': 5, 'truncate': 6, 'path': 7, 'uid': 8, 'pid': 9,
+               'comm': 10, 'cgroup_id': 11, 'root': 12, 'write_access': 13}
+RULE_OPERATORS = {'eq': 1, 'ne': 2, 'in': 3, 'not_in': 4, 'prefix': 5,
+                  'gt': 6, 'ge': 7, 'lt': 8, 'le': 9}
+RULE_PRIORITIES = {'BULK': 0, 'NORMAL': 1, 'CRITICAL': 2}
+RULE_POLICIES = {'NORMAL_COLLECTION': 0, 'QUARANTINE': 1, 'QUARANTINE_EXEMPT': 2}
+RULE_QUARANTINE_KEYS = ('critical_rate_threshold', 'critical_rate_duration_seconds',
+                        'critical_recovery_threshold', 'critical_recovery_duration_seconds',
+                        'quarantine_initial_full_events', 'quarantine_sample_interval_ms')
+RULE_INTEGER_LIMITS = {'result': (-(1 << 63), (1 << 63) - 1), 'uid': (0, (1 << 32) - 1),
+                       'pid': (0, (1 << 32) - 1), 'cgroup_id': (0, (1 << 63) - 1)}
+RULE_ENUMS = {'event_type': {'exec': 1, 'openat': 2},
+              'access_mode': {'read': 0, 'write': 1, 'read_write': 2}}
+RULE_BOOLEAN_FIELDS = {'success', 'create', 'truncate', 'root', 'write_access'}
+RULE_STRING_FIELDS = {'path', 'comm'}
+KEYS |= {'event_rules'}
 
 
 def validate_rules(rules):
@@ -87,6 +114,246 @@ def validate_rules(rules):
             raise ValueError('critical_rules: 동일 종류·경로를 중복 지정할 수 없습니다.')
         ids.add(rule['id']); targets.add(target)
     return rules
+
+
+def _rule_string(field, value, prefix=False):
+    if not isinstance(value, str) or not value or any(ord(c) < 32 or ord(c) == 127 for c in value):
+        raise ValueError(f'{field}: 비어 있지 않은 제어문자 없는 문자열이 필요합니다.')
+    size = len(value.encode('utf-8'))
+    if field == 'path':
+        if not value.startswith('/') or size > 126 or '..' in value.split('/'):
+            raise ValueError('path: 126바이트 이하의 Linux 절대 경로가 필요합니다.')
+        if prefix and not value.endswith('/'):
+            raise ValueError('path prefix: 디렉터리 경계 /로 끝나야 합니다.')
+    elif size > 15:
+        raise ValueError('comm: 15바이트 이하여야 합니다.')
+    return value
+
+
+def _rule_value(field, value, prefix=False):
+    if field in RULE_BOOLEAN_FIELDS:
+        if type(value) is not bool:
+            raise ValueError(f'{field}: boolean이 필요합니다.')
+        return value
+    if field in RULE_ENUMS:
+        if type(value) is not str or value not in RULE_ENUMS[field]:
+            raise ValueError(f'{field}: {", ".join(RULE_ENUMS[field])} 중 하나여야 합니다.')
+        return value
+    if field in RULE_STRING_FIELDS:
+        return _rule_string(field, value, prefix)
+    low, high = RULE_INTEGER_LIMITS[field]
+    if type(value) is not int or not low <= value <= high:
+        raise ValueError(f'{field}: 정수 {low}..{high} 범위가 필요합니다.')
+    return value
+
+
+def _validate_when(node, depth=1, budget=None):
+    if budget is None:
+        budget = [0]
+    budget[0] += 1
+    if depth > 4 or budget[0] > 24 or not isinstance(node, dict):
+        raise ValueError('when: 깊이 4, 노드 24개 이하의 조건 객체가 필요합니다.')
+    if set(node) == {'all'} or set(node) == {'any'}:
+        op = next(iter(node))
+        children = node[op]
+        if not isinstance(children, list) or not 2 <= len(children) <= 8:
+            raise ValueError(f'when.{op}: 2..8개의 하위 조건이 필요합니다.')
+        return {op: [_validate_when(child, depth + 1, budget) for child in children]}
+    if set(node) == {'not'}:
+        return {'not': _validate_when(node['not'], depth + 1, budget)}
+    if set(node) != {'field', 'op', 'value'}:
+        raise ValueError('when: all/any/not 또는 field/op/value만 허용합니다.')
+    field, op, value = node['field'], node['op'], node['value']
+    if type(field) is not str or field not in RULE_FIELDS or type(op) is not str or op not in RULE_OPERATORS:
+        raise ValueError('when: 지원하지 않는 필드 또는 연산자입니다.')
+    if op == 'prefix' and field not in RULE_STRING_FIELDS:
+        raise ValueError('prefix: path 또는 comm 필드에만 사용할 수 있습니다.')
+    if op in ('gt', 'ge', 'lt', 'le') and field not in RULE_INTEGER_LIMITS:
+        raise ValueError(f'{op}: 정수 필드에만 사용할 수 있습니다.')
+    if op in ('in', 'not_in'):
+        if not isinstance(value, list) or not 1 <= len(value) <= 4:
+            raise ValueError(f'{op}: 1..4개 값의 목록이 필요합니다.')
+        values = [_rule_value(field, item) for item in value]
+        if len({(type(item), item) for item in values}) != len(values):
+            raise ValueError(f'{op}: 중복 값은 허용하지 않습니다.')
+        value = values
+    else:
+        value = _rule_value(field, value, prefix=op == 'prefix')
+    return dict(field=field, op=op, value=value)
+
+
+def _rule_comparison(actual, op, expected):
+    if op == 'eq': return actual == expected
+    if op == 'ne': return actual != expected
+    if op == 'in': return actual in expected
+    if op == 'not_in': return actual not in expected
+    if op == 'prefix': return actual.startswith(expected)
+    if op == 'gt': return actual > expected
+    if op == 'ge': return actual >= expected
+    if op == 'lt': return actual < expected
+    if op == 'le': return actual <= expected
+    raise ValueError('알 수 없는 연산자')
+
+
+def _could_match_kind(node, kind):
+    """Reject plainly impossible exec-failure rules without guessing unknown fields."""
+    if 'all' in node:
+        outcomes = [_could_match_kind(child, kind) for child in node['all']]
+        return False if False in outcomes else None if None in outcomes else True
+    if 'any' in node:
+        outcomes = [_could_match_kind(child, kind) for child in node['any']]
+        return True if True in outcomes else None if None in outcomes else False
+    if 'not' in node:
+        outcome = _could_match_kind(node['not'], kind)
+        return None if outcome is None else not outcome
+    known = {'event_type': kind}
+    if kind == 'exec':
+        known.update(success=True, result=0)
+    if node['field'] not in known:
+        return None
+    return _rule_comparison(known[node['field']], node['op'], node['value'])
+
+
+def _rule_tokens(node):
+    if 'all' in node or 'any' in node:
+        op = 'all' if 'all' in node else 'any'
+        children = node[op]
+        tokens = _rule_tokens(children[0])
+        for child in children[1:]:
+            tokens.extend(_rule_tokens(child))
+            tokens.append((2 if op == 'all' else 3, 0, 0, []))
+        return tokens
+    if 'not' in node:
+        return _rule_tokens(node['not']) + [(4, 0, 0, [])]
+    values = node['value'] if node['op'] in ('in', 'not_in') else [node['value']]
+    return [(1, RULE_FIELDS[node['field']], RULE_OPERATORS[node['op']], values)]
+
+
+def validate_event_rules(rules, cfg):
+    if not isinstance(rules, list) or not 1 <= len(rules) <= 8:
+        raise ValueError('event_rules: 1..8개의 규칙이 필요합니다.')
+    ids, normalized = set(), []
+    for rule in rules:
+        if not isinstance(rule, dict) or not {'id', 'when', 'priority', 'overload_policy'} <= set(rule) or \
+                set(rule) - {'id', 'enabled', 'precedence', 'when', 'priority', 'overload_policy', 'quarantine'}:
+            raise ValueError('event_rules: id, when, priority, overload_policy 및 허용된 선택 키만 필요합니다.')
+        rid = rule['id']
+        if type(rid) is not int or not 1 <= rid <= 255 or rid in ids:
+            raise ValueError('event_rules.id: 중복 없는 정수 1..255가 필요합니다.')
+        ids.add(rid)
+        enabled = rule.get('enabled', True)
+        precedence = rule.get('precedence', 0)
+        if type(enabled) is not bool or type(precedence) is not int or not 0 <= precedence <= 1000:
+            raise ValueError('event_rules: enabled boolean과 precedence 정수 0..1000이 필요합니다.')
+        priority, policy = rule['priority'], rule['overload_policy']
+        if type(priority) is not str or priority not in RULE_PRIORITIES or \
+                type(policy) is not str or policy not in RULE_POLICIES:
+            raise ValueError('event_rules: 지원하지 않는 priority/overload_policy입니다.')
+        if priority != 'CRITICAL' and policy != 'NORMAL_COLLECTION':
+            raise ValueError('BULK/NORMAL은 NORMAL_COLLECTION만 지원합니다.')
+        when = _validate_when(rule['when'])
+        if len(_rule_tokens(when)) > 24:
+            raise ValueError('when: postfix 실행 토큰은 24개 이하여야 합니다.')
+        if _could_match_kind(when, 'openat') is False and _could_match_kind(when, 'exec') is False:
+            raise ValueError('when: 관측 가능한 openat/성공 exec와 일치할 수 없습니다.')
+        result = dict(id=rid, enabled=enabled, precedence=precedence, when=when,
+                      priority=priority, overload_policy=policy)
+        if 'quarantine' in rule:
+            override = rule['quarantine']
+            if policy != 'QUARANTINE' or not isinstance(override, dict) or not override or \
+                    set(override) - set(RULE_QUARANTINE_KEYS):
+                raise ValueError('quarantine: CRITICAL+QUARANTINE 규칙의 유효한 override 객체가 필요합니다.')
+            limits = {'critical_rate_threshold': (1, 1000000),
+                      'critical_rate_duration_seconds': (1, 60),
+                      'critical_recovery_threshold': (0, 999999),
+                      'critical_recovery_duration_seconds': (1, 600),
+                      'quarantine_initial_full_events': (0, 64),
+                      'quarantine_sample_interval_ms': (10, 60000)}
+            for key, value in override.items():
+                low, high = limits[key]
+                if type(value) is not int or not low <= value <= high:
+                    raise ValueError(f'quarantine.{key}: 정수 {low}..{high}가 필요합니다.')
+            if override.get('critical_recovery_threshold', cfg['critical_recovery_threshold']) >= \
+                    override.get('critical_rate_threshold', cfg['critical_rate_threshold']):
+                raise ValueError('quarantine: 복구 EPS는 진입 EPS보다 작아야 합니다.')
+            result['quarantine'] = override
+        normalized.append(result)
+    return normalized
+
+
+def compile_rule_file(cfg):
+    """Encode bounded postfix programs for the collector's fixed-size ABI."""
+    if 'event_rules' not in cfg:
+        raise ValueError('event_rules 설정이 필요합니다.')
+    field_names = {number: name for name, number in RULE_FIELDS.items()}
+    programs = []
+    for rule in cfg['event_rules']:
+        strings = bytearray()
+        string_offsets = {}
+        token_bytes = bytearray()
+        tokens = _rule_tokens(rule['when'])
+        if not 1 <= len(tokens) <= 24:
+            raise ValueError('규칙 실행 토큰은 1..24개여야 합니다.')
+        for opcode, field_id, comparator, values in tokens:
+            encoded = []
+            for value in values:
+                field = field_names[field_id]
+                if field in RULE_STRING_FIELDS:
+                    raw = value.encode('utf-8') + b'\0'
+                    if raw not in string_offsets:
+                        string_offsets[raw] = len(strings)
+                        strings.extend(raw)
+                    # bpf_strncmp consumes an explicit byte length. Keep the
+                    # fixed 48-byte token ABI: high 32 bits are UTF-8 bytes,
+                    # low 32 bits are the NUL-terminated pool offset.
+                    encoded.append(((len(raw) - 1) << 32) | string_offsets[raw])
+                elif field in RULE_ENUMS:
+                    encoded.append(RULE_ENUMS[field][value])
+                elif field in RULE_BOOLEAN_FIELDS:
+                    encoded.append(int(value))
+                else:
+                    encoded.append(value)
+            token_bytes.extend(struct.pack('<4I4q', opcode, field_id, comparator,
+                                           len(encoded), *(encoded + [0] * (4 - len(encoded)))))
+        if len(strings) > 1024:
+            raise ValueError('규칙 문자열 풀은 1024바이트 이하여야 합니다.')
+        policy = cfg | rule.get('quarantine', {})
+        quarantine_values = (policy['critical_rate_threshold'],
+                             policy['critical_rate_duration_seconds'] * 1000,
+                             policy['critical_recovery_threshold'],
+                             policy['critical_recovery_duration_seconds'] * 1000,
+                             policy['quarantine_initial_full_events'],
+                             policy['quarantine_sample_interval_ms'])
+        program = (struct.pack('<8I6Q', rule['id'], int(rule['enabled']), rule['precedence'],
+                               RULE_PRIORITIES[rule['priority']], RULE_POLICIES[rule['overload_policy']],
+                               len(tokens), len(strings), 0, *quarantine_values) +
+                   bytes(token_bytes).ljust(24 * 48, b'\0') + bytes(strings).ljust(1024, b'\0'))
+        if len(program) != RULE_PROGRAM_SIZE:
+            raise AssertionError('규칙 ABI 크기 불일치')
+        programs.append(program)
+    payload = b''.join(programs)
+    header = struct.pack('<5I', RULE_FILE_MAGIC, RULE_FILE_VERSION, len(programs),
+                         RULE_PROGRAM_SIZE, zlib.crc32(payload))
+    return header + payload
+
+
+def atomic_bytes(path, value):
+    path = Path(path)
+    fd, temp = tempfile.mkstemp(prefix='.' + path.name + '.', suffix='.tmp', dir=path.parent)
+    try:
+        with os.fdopen(fd, 'wb') as file:
+            file.write(value)
+            file.flush()
+            os.fsync(file.fileno())
+        os.replace(temp, path)
+        directory_fd = os.open(path.parent, os.O_RDONLY | os.O_DIRECTORY)
+        try:
+            os.fsync(directory_fd)
+        finally:
+            os.close(directory_fd)
+    finally:
+        if os.path.exists(temp):
+            os.unlink(temp)
 
 
 def raw_lanes(health):
@@ -145,9 +412,9 @@ def ensure_data_dir():
 
 def config(path):
     with Path(path).open('rb') as file:
-        raw = file.read(8193)
-    if len(raw) > 8192:
-        raise ValueError('설정 파일은 8 KiB 이하여야 합니다.')
+        raw = file.read(MAX_CONFIG_BYTES + 1)
+    if len(raw) > MAX_CONFIG_BYTES:
+        raise ValueError('설정 파일은 64 KiB 이하여야 합니다.')
     def unique(pairs):
         result = {}
         for key, value in pairs:
@@ -179,10 +446,16 @@ def config(path):
             len(target.encode()) > 126 or any(ord(c) < 32 for c in target) or
             '..' in Path(target).parts):
         raise ValueError('protected_path: 126바이트 이하의 Linux 절대 경로가 필요합니다.')
-    rules = value.get('critical_rules')
-    if rules == [] or 'critical_rules' not in value:
-        rules = [dict(id=1, event_type='openat', path=target, protected=False)]
-    value['critical_rules'] = validate_rules(rules)
+    if 'event_rules' in value and 'critical_rules' in value:
+        raise ValueError('event_rules와 critical_rules는 동시에 설정할 수 없습니다.')
+    if 'event_rules' in value:
+        value['event_rules'] = validate_event_rules(value['event_rules'], value)
+        compile_rule_file(value)
+    else:
+        rules = value.get('critical_rules')
+        if rules == [] or 'critical_rules' not in value:
+            rules = [dict(id=1, event_type='openat', path=target, protected=False)]
+        value['critical_rules'] = validate_rules(rules)
     return value
 
 
@@ -375,6 +648,7 @@ def status(run):
         return dict(state='UNCONFIGURED', version=VERSION)
     service = read_json(run / 'service.json', {})
     index = read_json(run / 'index-health.json', {})
+    manifest = read_json(run / 'manifest.json', {})
     # Read the published raw boundary after index health: a concurrent writer
     # can advance health between reads, but this order cannot invent coverage.
     health = read_json(run / 'health.json', {})
@@ -400,7 +674,13 @@ def status(run):
     return dict(version=VERSION, run_id=run.name, run_path=str(run), state=state,
                 collector=health, index=dict(index, **coverage, state=index_state, alive=index_alive), service=service,
                 storage=storage_usage(run), failure_evidence=failure_evidence,
-                evidence_metadata=health.get('metadata', {'state': 'LEGACY_NOT_AVAILABLE'}))
+                evidence_metadata=health.get('metadata', {'state': 'LEGACY_NOT_AVAILABLE'}),
+                rule_engine_schema_version=manifest.get('rule_engine_schema_version'),
+                policy_version=manifest.get('policy_version'),
+                config_sha256=manifest.get('config_sha256'),
+                rule_stats=health.get('rule_stats'),
+                rule_stats_scope=health.get('rule_stats_scope'),
+                rule_stats_snapshot_complete=health.get('rule_stats_snapshot_complete'))
 
 
 def capability():
@@ -440,8 +720,15 @@ def create_run(cfg):
     run = DATA / 'runs' / str(uuid.uuid4())
     run.mkdir(parents=True, mode=0o700)
     canonical = json.dumps(cfg, sort_keys=True, separators=(',', ':')).encode()
-    manifest = dict(version=VERSION, schema=1, raw_schema=2, raw_record_size=240,
-                    quality_extension='RULE_ID_AND_CRITICAL_POLICY_V1',
+    advanced_rules = 'event_rules' in cfg
+    rule_file = compile_rule_file(cfg) if advanced_rules else None
+    if rule_file is not None:
+        atomic_bytes(run / 'rules.bin', rule_file)
+        os.chmod(run / 'rules.bin', 0o400)
+    manifest = dict(version=VERSION, schema=1, raw_schema=3,
+                    raw_record_size=240,
+                    quality_extension='RULE_ID_POLICY_AND_VERSIONS_V1',
+                    rule_engine_schema_version=1, policy_version=1,
                     run_id=run.name, created_utc=dt.datetime.now(dt.UTC).isoformat(),
                     clock_anchor=dict(monotonic_ns=time.monotonic_ns(), realtime_ns=time.time_ns(),
                                       precision='SEQUENTIAL_READS_APPROXIMATE_NOT_CLOCK_STEP_PROOF'),
@@ -457,6 +744,8 @@ def create_run(cfg):
                         external_writers_can_exhaust_filesystem=True,
                         sqlite_journal_not_hard_capped=True, sqlite_temp_store='MEMORY'),
                     capability=cap, ordering='PER_CGROUP_SEQUENCE_NOT_GLOBAL_CAUSAL_ORDER')
+    if rule_file is not None:
+        manifest['rules_bin_sha256'] = hashlib.sha256(rule_file).hexdigest()
     atomic_json(run / 'config.json', cfg)
     atomic_json(run / 'manifest.json', manifest)
     os.chmod(run / 'config.json', 0o400)
@@ -493,6 +782,9 @@ def serve(run, collector_lock_held=False):
     signal.signal(signal.SIGINT, stop_handler)
     cfg = read_json(run / 'config.json')
     manifest = read_json(run / 'manifest.json')
+    advanced_rules = 'event_rules' in cfg
+    if advanced_rules and fingerprint(run / 'rules.bin') != manifest.get('rules_bin_sha256'):
+        raise ValueError('규칙 바이너리와 manifest 해시가 다릅니다.')
     child_env = os.environ.copy()
     child_env.update(MGLOGWH_RUN_ID=run.name, MGLOGWH_MANIFEST_SHA256=fingerprint(run / 'manifest.json'),
                      MGLOGWH_CONFIG_SHA256=manifest['config_sha256'], MGLOGWH_BOOT_ID=manifest['boot_id'])
@@ -501,11 +793,14 @@ def serve(run, collector_lock_held=False):
                          str(cfg['metadata_max_mib']), str(cfg['quarantine_max_mib']),
                          str(cfg['critical_rate_threshold']), str(cfg['critical_rate_duration_seconds'] * 1000),
                          str(cfg['critical_recovery_threshold']), str(cfg['critical_recovery_duration_seconds'] * 1000),
-                         str(cfg['quarantine_initial_full_events']), str(cfg['quarantine_sample_interval_ms']),
-                         str(len(cfg['critical_rules']))]
-    for rule in cfg['critical_rules']:
-        collector_command.extend([str(rule['id']), '2' if rule['event_type'] == 'openat' else '1',
-                                  '1' if rule['protected'] else '0', rule['path']])
+                         str(cfg['quarantine_initial_full_events']), str(cfg['quarantine_sample_interval_ms'])]
+    if advanced_rules:
+        collector_command.extend(['--rules-file', str(run / 'rules.bin')])
+    else:
+        collector_command.append(str(len(cfg['critical_rules'])))
+        for rule in cfg['critical_rules']:
+            collector_command.extend([str(rule['id']), '2' if rule['event_type'] == 'openat' else '1',
+                                      '1' if rule['protected'] else '0', rule['path']])
     collector_guard = contextlib.nullcontext() if collector_lock_held else lock(DATA / 'collector.lock')
     with collector_guard, (run / 'collector.log').open('ab') as log:
         service = dict(supervisor=identity(), state='STARTING')
@@ -587,22 +882,43 @@ def decode_record(raw):
     if reserved or zlib.crc32(payload) != checksum:
         raise ValueError('CRC32 불일치 또는 예약 필드 손상')
     value = dict(zip(FIELDS, EVENT.unpack(payload)))
-    if value['magic'] != 0x31514f45 or value['schema'] not in (1, 2) or value['kind'] not in (1, 2) or value['priority'] not in (0, 1, 2):
+    if value['magic'] != 0x31514f45 or value['schema'] not in (1, 2, 3) or value['kind'] not in (1, 2) or value['priority'] not in (0, 1, 2):
         raise ValueError('지원하지 않는 schema/event')
     quality = value['quality']
-    if quality & ~(3 if value['schema'] == 1 else QUALITY_MASK):
+    allowed = 3 if value['schema'] == 1 else QUALITY_MASK if value['schema'] == 2 else QUALITY_MASK_V3
+    if quality & ~allowed:
         raise ValueError('지원하지 않는 quality/policy')
     q, protected = bool(quality & Q_QUARANTINED), bool(quality & Q_PROTECTED)
     initial, periodic = bool(quality & Q_INITIAL), bool(quality & Q_PERIODIC)
-    rule_id = (quality >> 16) & 255
+    rule_id = (quality >> 16) & 255 if value['schema'] >= 2 else None
     if value['schema'] == 2 and ((value['priority'] == 2) != bool(rule_id) or
             (q and protected) or (q and initial == periodic) or
             (not q and (initial or periodic or (quality & Q_UNTRACKED and not protected))) or
             (value['priority'] != 2 and (q or protected))):
         raise ValueError('priority·rule·effective policy 불일치')
+    policy = (quality >> Q_POLICY_SHIFT) & 3 if value['schema'] == 3 else None
+    rule_version = (quality >> Q_RULE_VERSION_SHIFT) & 15 if value['schema'] == 3 else None
+    policy_version = (quality >> Q_POLICY_VERSION_SHIFT) & 15 if value['schema'] == 3 else None
+    if value['schema'] == 3 and (rule_version != 1 or policy_version != 1 or policy == 3 or
+            (value['priority'] == 2 and not rule_id) or
+            (value['priority'] != 2 and (policy != 0 or q or protected or initial or periodic or quality & Q_UNTRACKED)) or
+            (policy == 0 and (q or protected or initial or periodic or quality & Q_UNTRACKED)) or
+            (policy == 1 and protected) or (policy == 2 and (not protected or q)) or
+            (q and initial == periodic) or (not q and (initial or periodic)) or
+            (quality & Q_UNTRACKED and not (q or protected))):
+        raise ValueError('schema 3 규칙·priority·policy·버전 불일치')
+    configured_policy = (('NORMAL_COLLECTION', 'QUARANTINE', 'QUARANTINE_EXEMPT')[policy]
+                         if value['schema'] == 3 else None)
+    effective_policy = ('QUARANTINE' if q else 'QUARANTINE_EXEMPT' if protected else
+                        'CRITICAL' if value['priority'] == 2 else
+                        'NORMAL' if value['priority'] == 1 else 'BULK') if value['schema'] == 3 else (
+                        'QUARANTINE' if q else 'PROTECTED_CRITICAL' if protected else
+                        'CRITICAL' if value['priority'] == 2 else 'NORMAL' if value['priority'] == 1 else 'BULK')
     value.update(original_priority=value['priority'], rule_id=rule_id, capture_quality=quality & 3,
-                 effective_policy='QUARANTINE' if q else 'PROTECTED_CRITICAL' if protected else
-                 'CRITICAL' if value['priority'] == 2 else 'NORMAL' if value['priority'] == 1 else 'BULK',
+                 priority_name=('BULK', 'NORMAL', 'CRITICAL')[value['priority']],
+                 configured_overload_policy=configured_policy,
+                 rule_version=rule_version, policy_version=policy_version,
+                 effective_policy=effective_policy,
                  quarantine_sample_kind='INITIAL_FULL' if initial else 'PERIODIC_SAMPLE' if periodic else None,
                  stream_tracking_complete=not bool(quality & Q_UNTRACKED),
                  quarantine_tracking_complete=not bool(quality & Q_UNTRACKED))
@@ -866,22 +1182,33 @@ def main():
         print(json.dumps(result, ensure_ascii=False, indent=2))
         return
     if args.action in ('validate', 'status', 'path', 'query', 'critical', 'raw-search'):
-        run = current(args.run)
         if args.action == 'validate':
-            before = read_json(run / 'config.json', {}) if run else {}
+            try:
+                run = current(args.run)
+                before = read_json(run / 'config.json', {}) if run else {}
+                active_run_access = 'READABLE' if run else 'NOT_CONFIGURED'
+            except PermissionError:
+                # Configuration validation is read-only and must still work for
+                # operators who cannot inspect a root-owned active run.
+                before, active_run_access = {}, 'PERMISSION_DENIED'
             diff = list(difflib.unified_diff(json.dumps(before, indent=2, sort_keys=True).splitlines(),
                                            json.dumps(cfg, indent=2, sort_keys=True).splitlines(),
                                            fromfile='active_run', tofile='next_run', lineterm=''))
-            result = dict(valid=True, applies='NEXT_START_ONLY', config=cfg, diff=diff)
+            result = dict(valid=True, applies='NEXT_START_ONLY', config=cfg, diff=diff,
+                          active_run_access=active_run_access)
         elif args.action == 'status':
+            run = current(args.run)
             result = status(run)
         elif args.action == 'path':
+            run = current(args.run)
             if run is None: raise ValueError('저장된 run이 없습니다.')
             if status(run)['state'] != 'STOPPED': raise ValueError('중지 완료 후 저장하세요.')
             print(run); return
         elif args.action in ('query', 'critical'):
+            run = current(args.run)
             result = query(run, args.action == 'critical', args.limit)
         elif args.action == 'raw-search':
+            run = current(args.run)
             result = raw_search(run, args.match_path, args.limit, args.max_bytes, args.max_seconds)
         print(json.dumps(result, ensure_ascii=False, indent=2))
         return

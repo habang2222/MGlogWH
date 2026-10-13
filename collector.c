@@ -22,10 +22,15 @@
 #include "event.h"
 #include "tenant.h"
 #include "quarantine.h"
+#include "rules.h"
 #include "sensor.skel.h"
 
 _Static_assert(sizeof(struct eq_event) == 232, "event ABI");
 _Static_assert(sizeof(struct eq_record) == 240, "record ABI");
+_Static_assert(sizeof(struct eq_rule_token) == 48, "rule token ABI");
+_Static_assert(sizeof(struct eq_rule_program) == 2256, "rule program ABI");
+_Static_assert(sizeof(struct eq_rule_file_header) == 20, "rule file ABI");
+_Static_assert(sizeof(struct eq_rule_trie_key) == 134, "rule trie key ABI");
 #define LANE_COUNT 3
 #define RING_COUNT 4
 #define META_QUEUE_CAP 4096
@@ -75,6 +80,11 @@ struct stream_storage {
 static struct stream_storage stream_storage[EQ_STREAMS], fallback_storage;
 static uint64_t stream_storage_overflow;
 static int stream_storage_complete = 1;
+struct rule_storage {
+    uint64_t observed[LANE_COUNT], appended[LANE_COUNT], durable[LANE_COUNT];
+    uint64_t queue_rejected[LANE_COUNT], quota_rejected[LANE_COUNT];
+};
+static struct rule_storage rule_storage[256];
 static unsigned rule_id(const struct eq_event *event) {
     return (event->quality & EQ_RULE_MASK) >> EQ_RULE_SHIFT;
 }
@@ -118,6 +128,18 @@ static void json_storage(FILE *out, const struct stream_storage *storage) {
         (unsigned long long)storage->appended[2], (unsigned long long)storage->durable[2],
         (unsigned long long)storage->queue_rejected[0], (unsigned long long)storage->queue_rejected[1],
         (unsigned long long)storage->storage_rejected[0], (unsigned long long)storage->storage_rejected[1]);
+}
+static void json_rule_storage(FILE *out, const struct rule_storage *storage) {
+#define RULE_ARRAY(name, field) do { fputs(",\"" name "\":[", out); \
+    for (int lane = 0; lane < LANE_COUNT; lane++) \
+        fprintf(out, "%s%llu", lane ? "," : "", (unsigned long long)storage->field[lane]); \
+    fputc(']', out); } while (0)
+    RULE_ARRAY("collector_observed", observed);
+    RULE_ARRAY("collector_appended", appended);
+    RULE_ARRAY("collector_durable", durable);
+    RULE_ARRAY("collector_queue_rejected", queue_rejected);
+    RULE_ARRAY("collector_quota_rejected", quota_rejected);
+#undef RULE_ARRAY
 }
 static void stop(int sig) { stopping = 1; }
 static uint64_t now_ms(void) {
@@ -237,9 +259,8 @@ static int meta_write(const struct meta_item *item) {
     const char *body = item->payload;
     size_t body_length = item->length;
     if (item->loss) {
-        /* Hex keeps the captured bytes exact without putting untrusted path
-         * text into JSON. This runs on the metadata writer, not the ring
-         * callback; the callback only copies a bounded eq_event. */
+        /* Preserve the observed bytes without interpreting the path. Metadata
+         * work runs on the writer thread, outside the ring callback. */
         char path_hex[EQ_PATH * 2 + 1];
         static const char hex[] = "0123456789abcdef";
         for (unsigned n = 0; n < item->event.captured_len; n++) {
@@ -432,9 +453,18 @@ static int save_event(void *ctx, void *data, size_t size) {
         (event.kind != EQ_EXEC && event.kind != EQ_OPEN) || event.priority > EQ_CRITICAL ||
         index < 0 || index >= LANE_COUNT ||
         (event.quality & ~(EQ_CAPTURE_QUALITY_MASK | EQ_QUARANTINED | EQ_Q_INITIAL | EQ_Q_PERIODIC |
-            EQ_Q_PROTECTED | EQ_Q_UNTRACKED | EQ_RULE_MASK))) return fail(EPROTO, 0);
+            EQ_Q_PROTECTED | EQ_Q_UNTRACKED | EQ_CONFIGURED_POLICY_MASK | EQ_RULE_MASK |
+            EQ_RULE_VERSION_MASK | EQ_POLICY_VERSION_MASK))) return fail(EPROTO, 0);
     int quarantined = (event.quality & EQ_QUARANTINED) != 0;
-    if (!!rule_id(&event) != (event.priority == EQ_CRITICAL) || event.captured_len >= EQ_PATH ||
+    unsigned policy = (event.quality & EQ_CONFIGURED_POLICY_MASK) >> EQ_CONFIGURED_POLICY_SHIFT;
+    if ((event.quality & EQ_RULE_VERSION_MASK) != EQ_RULE_VERSION_V1 ||
+        (event.quality & EQ_POLICY_VERSION_MASK) != EQ_POLICY_VERSION_V1 ||
+        policy > EQ_POLICY_EXEMPT ||
+        (event.priority == EQ_CRITICAL && !rule_id(&event)) ||
+        (event.priority != EQ_CRITICAL && policy != EQ_COLLECTION) ||
+        (policy == EQ_POLICY_EXEMPT) != !!(event.quality & EQ_Q_PROTECTED) ||
+        (quarantined && policy != EQ_POLICY_QUARANTINE) ||
+        event.captured_len >= EQ_PATH ||
         (index == 1 && (event.priority == EQ_CRITICAL || quarantined ||
             (event.quality & (EQ_Q_PROTECTED | EQ_Q_UNTRACKED)))) ||
         (index != 1 && event.priority != EQ_CRITICAL) || quarantined != (index == 2) ||
@@ -449,29 +479,34 @@ static int save_event(void *ctx, void *data, size_t size) {
         return -error;
     }
     lane->observed++;
+    rule_storage[rule_id(&event)].observed[index]++;
     struct stream_storage *storage = index == 1 ? NULL : storage_for(&event);
     unsigned class = storage_class(&event), sample_class = class == 1 ? 0 : 1;
     uint64_t noncritical = (lanes[1].admitted + lanes[2].admitted + 1) * sizeof(struct eq_record);
     uint64_t total = (lanes[0].admitted + lanes[1].admitted + lanes[2].admitted + 1) * sizeof(struct eq_record);
     if (index == 2 && ((lane->admitted + 1) * sizeof(struct eq_record) > quarantine_limit ||
         noncritical > general_limit || total > max_bytes)) {
+        rule_storage[rule_id(&event)].quota_rejected[index]++;
         quarantine_storage_drop++; storage->storage_rejected[sample_class]++;
         loss_locked(&event, Q_STORAGE_LIMIT, index);
         pthread_mutex_unlock(&state_lock); return 0;
     }
     if (index == 1 && noncritical > general_limit) {
+        rule_storage[rule_id(&event)].quota_rejected[index]++;
         general_quota_drop++;
         loss_locked(&event, GENERAL_QUOTA, index);
         pthread_mutex_unlock(&state_lock);
         return 0; /* Explicit quota loss; continue servicing the critical reserve. */
     }
     if (total > max_bytes) {
+        rule_storage[rule_id(&event)].quota_rejected[index]++;
         persist_failed++; failure = EFBIG;
         loss_locked(&event, RAW_QUOTA, index);
         pthread_mutex_unlock(&state_lock);
         return -EFBIG;
     }
     if (lane->count >= lane->capacity) {
+        rule_storage[rule_id(&event)].queue_rejected[index]++;
         lane->queue_overflow++;
         if (index == 2) storage->queue_rejected[sample_class]++;
         loss_locked(&event, QUEUE_FULL, index);
@@ -494,6 +529,8 @@ static int sync_lane(struct lane *lane) {
     pthread_mutex_lock(&state_lock);
     lane->durable = lane->received * sizeof(struct eq_record);
     int index = lane - lanes;
+    for (unsigned id = 0; id < 256; id++)
+        rule_storage[id].durable[index] = rule_storage[id].appended[index];
     for (size_t n = 0; n <= EQ_STREAMS; n++) {
         struct stream_storage *storage = n == EQ_STREAMS ? &fallback_storage : &stream_storage[n];
         if (index == 0) storage->durable[0] = storage->appended[0];
@@ -534,6 +571,7 @@ static void *write_lane(void *ctx) {
             lane->in_flight = 0;
             if (!error) {
                 lane->received++;
+                rule_storage[rule_id(&record.event)].appended[lane - lanes]++;
                 if (lane != &lanes[1]) storage_for(&record.event)->appended[storage_class(&record.event)]++;
             }
             pthread_mutex_unlock(&state_lock);
@@ -607,6 +645,8 @@ static int snapshot(struct sensor_bpf *skel, const char *state, int journal) {
     } view[LANE_COUNT];
     struct stream_storage *storage_view = calloc(EQ_STREAMS, sizeof(*storage_view));
     if (!storage_view) { errno = ENOMEM; return -1; }
+    struct rule_storage *rule_storage_view = malloc(sizeof(rule_storage));
+    if (!rule_storage_view) { free(storage_view); errno = ENOMEM; return -1; }
     pthread_mutex_lock(&state_lock);
     for (int i = 0; i < LANE_COUNT; i++) {
         view[i].appended = lanes[i].received; view[i].durable = lanes[i].durable;
@@ -615,6 +655,7 @@ static int snapshot(struct sensor_bpf *skel, const char *state, int journal) {
         view[i].queued = lanes[i].count; view[i].in_flight = lanes[i].in_flight; view[i].capacity = lanes[i].capacity;
     }
     memcpy(storage_view, stream_storage, EQ_STREAMS * sizeof(*storage_view));
+    memcpy(rule_storage_view, rule_storage, sizeof(rule_storage));
     struct stream_storage fallback_view = fallback_storage;
     uint64_t storage_overflow = stream_storage_overflow; int storage_complete = stream_storage_complete;
     int snapshot_failure = failure;
@@ -626,14 +667,16 @@ static int snapshot(struct sensor_bpf *skel, const char *state, int journal) {
     pthread_mutex_unlock(&state_lock);
     char *payload = NULL; size_t payload_length = 0;
     FILE *out = open_memstream(&payload, &payload_length);
-    if (!out) { free(storage_view); return -1; }
+    if (!out) { free(storage_view); free(rule_storage_view); return -1; }
     struct rusage usage = {}; getrusage(RUSAGE_SELF, &usage);
-    fprintf(out, "{\"record_type\":\"%s\",\"version\":\"0.3.0\",\"raw_schema\":2,\"state\":\"%s\",\"pid\":%d,"
+    fprintf(out, "{\"record_type\":\"%s\",\"version\":\"0.4.0\",\"raw_schema\":3,\"state\":\"%s\",\"pid\":%d,"
+        "\"config_sha256\":\"%s\",\"rule_version\":1,\"policy_version\":1,"
         "\"monotonic_ms\":%llu,\"error_errno\":%d,\"persist_failed\":%llu,\"record_size\":240,"
         "\"general_quota_drop\":%llu,\"quarantine_storage_drop\":%llu,\"writer_threads\":3,"
         "\"dedicated_drain_thread\":true,\"critical_scheduler\":\"FIFO\","
         "\"cpu_seconds\":%.6f,\"max_rss_kib\":%ld,\"summary_kind\":\"AGGREGATE_ONLY\",",
-        !strcmp(state, "RUNNING") ? "checkpoint" : "seal", state, getpid(), (unsigned long long)now_ms(),
+        !strcmp(state, "RUNNING") ? "checkpoint" : "seal", state, getpid(), config_sha256,
+        (unsigned long long)now_ms(),
         snapshot_failure, (unsigned long long)snapshot_persist_failed, (unsigned long long)quota_drop,
         (unsigned long long)q_quota_drop, usage.ru_utime.tv_sec + usage.ru_utime.tv_usec / 1e6 +
         usage.ru_stime.tv_sec + usage.ru_stime.tv_usec / 1e6, usage.ru_maxrss);
@@ -761,18 +804,48 @@ static int snapshot(struct sensor_bpf *skel, const char *state, int journal) {
         accounting_final ? "true" : "false", (unsigned long long)not_durable,
         (unsigned long long)(view[2].admitted >= full_saved + sample_saved ? view[2].admitted - full_saved - sample_saved : 0));
     if (accounting_final) fprintf(out, "%llu", (unsigned long long)not_durable); else fputs("null", out);
+    fputs(",\"rule_stats\":[", out);
+    int rule_stats_complete = 1;
+    for (unsigned slot = 0; slot < skel->rodata->rule_count; slot++) {
+        unsigned key = slot;
+        struct eq_rule_stats stats = {};
+        int available = !bpf_map_lookup_elem(bpf_map__fd(skel->maps.rule_stats), &key, &stats);
+        if (!available) rule_stats_complete = 0;
+        unsigned id = skel->rodata->event_rules[slot].id;
+        fprintf(out, "%s{\"rule_id\":%u,\"priority\":%u,\"configured_policy\":%u,"
+            "\"precedence\":%u,\"enabled\":%s,\"stats_available\":%s",
+            slot ? "," : "", id, skel->rodata->event_rules[slot].priority,
+            skel->rodata->event_rules[slot].overload_policy,
+            skel->rodata->event_rules[slot].precedence,
+            skel->rodata->event_rules[slot].enabled ? "true" : "false",
+            available ? "true" : "false");
+#define RULE_STAT(name, field) do { fputs(",\"" name "\":", out); \
+    if (available) fprintf(out, "%llu", (unsigned long long)stats.field); \
+    else fputs("null", out); } while (0)
+        RULE_STAT("evaluated", evaluated); RULE_STAT("matched", matched);
+        RULE_STAT("unknown", unknown); RULE_STAT("selected", selected);
+        RULE_STAT("ring_submitted", submitted); RULE_STAT("quarantine_summarized", summarized);
+        RULE_STAT("ring_failed", ring_failed); RULE_STAT("bulk_budget_suppressed", budget_suppress);
+        RULE_STAT("bulk_budget_contention", budget_contention);
+#undef RULE_STAT
+        json_rule_storage(out, &rule_storage_view[id]);
+        fputc('}', out);
+    }
+    fprintf(out, "],\"rule_stats_snapshot_complete\":%s,"
+        "\"rule_stats_scope\":\"AGGREGATE_SELECTED_ATTEMPTS_AND_DURABLE_WRITES; PRE_SEQUENCE_AND_KERNEL_LOSS_NOT_EVENT_IDENTIFIABLE\"",
+        rule_stats_complete ? "true" : "false");
     fputs(",\"faults\":[", out);
     int cpus = libbpf_num_possible_cpus(); uint64_t *values = cpus > 0 ? calloc(cpus, sizeof(*values)) : NULL;
-    if (!values) { fclose(out); free(payload); free(storage_view); errno = ENOMEM; return -1; }
+    if (!values) { fclose(out); free(payload); free(storage_view); free(rule_storage_view); errno = ENOMEM; return -1; }
     for (unsigned i = 0; i < 4; i++) {
         uint64_t sum = 0;
         if (bpf_map_lookup_elem(bpf_map__fd(skel->maps.faults), &i, values)) {
-            free(values); fclose(out); free(payload); free(storage_view); return -1;
+            free(values); fclose(out); free(payload); free(storage_view); free(rule_storage_view); return -1;
         }
         for (int c = 0; c < cpus; c++) sum += values[c];
         fprintf(out, "%s%llu", i ? "," : "", (unsigned long long)sum);
     }
-    free(values); free(storage_view);
+    free(values); free(storage_view); free(rule_storage_view);
     fprintf(out, "],\"sequence_snapshot_complete\":%s,\"fault_snapshot_complete\":true}\n", sequence_complete ? "true" : "false");
     int bad = ferror(out); if (fclose(out)) bad = 1;
     if (bad) { free(payload); return -1; }
@@ -795,40 +868,191 @@ static int copy_identity(char *dest, size_t capacity, const char *name, int uuid
     }
     memcpy(dest, value, wanted + 1); return 0;
 }
+static int rule_program_valid(const struct eq_rule_program *program) {
+    if (!program->id || program->id > 255 || program->enabled > 1 ||
+        program->precedence > 1000 || program->priority > EQ_CRITICAL ||
+        program->overload_policy > EQ_POLICY_EXEMPT ||
+        (program->priority != EQ_CRITICAL && program->overload_policy != EQ_COLLECTION) ||
+        !program->token_count || program->token_count > EQ_RULE_TOKENS ||
+        program->string_bytes > EQ_RULE_STRINGS || program->reserved) return 0;
+    const struct eq_quarantine_config *q = &program->quarantine;
+    if (!q->threshold_eps || q->threshold_eps > 1000000 ||
+        q->duration_ms < 1000 || q->duration_ms > 60000 ||
+        q->recovery_eps >= q->threshold_eps || q->cooldown_ms < 1000 ||
+        q->cooldown_ms > 600000 || q->initial_full > 64 ||
+        q->sample_interval_ms < 10 || q->sample_interval_ms > 60000) return 0;
+    unsigned depth = 0;
+    for (unsigned i = 0; i < program->token_count; i++) {
+        const struct eq_rule_token *token = &program->tokens[i];
+        if (token->opcode == EQ_TEST) {
+            if (token->field < EQ_FIELD_KIND || token->field > EQ_FIELD_WRITE_ACCESS ||
+                token->comparison < EQ_OP_EQ || token->comparison > EQ_OP_LE ||
+                !token->value_count || token->value_count > EQ_RULE_VALUES ||
+                (token->comparison != EQ_OP_IN && token->comparison != EQ_OP_NOT_IN &&
+                 token->value_count != 1)) return 0;
+            int string = token->field == EQ_FIELD_PATH || token->field == EQ_FIELD_COMM;
+            if (string ? token->comparison != EQ_OP_EQ && token->comparison != EQ_OP_NE &&
+                         token->comparison != EQ_OP_IN && token->comparison != EQ_OP_NOT_IN &&
+                         token->comparison != EQ_OP_PREFIX : token->comparison == EQ_OP_PREFIX) return 0;
+            if (token->comparison == EQ_OP_PREFIX && token->value_count != 1) return 0;
+            for (unsigned n = 0; n < token->value_count; n++) {
+                long long value = token->values[n];
+                if (string) {
+                    if (value < 0) return 0;
+                    uint64_t encoded = (uint64_t)value;
+                    uint32_t offset = (uint32_t)encoded;
+                    uint32_t length = encoded >> 32;
+                    if (!length || offset >= program->string_bytes) return 0;
+                    const char *start = program->strings + offset;
+                    size_t maximum = program->string_bytes - (size_t)offset;
+                    const char *end = memchr(start, 0, maximum);
+                    if (!end || (size_t)(end - start) != length ||
+                        (token->field == EQ_FIELD_PATH &&
+                         (start[0] != '/' || (size_t)(end - start) > EQ_PATH - 2)) ||
+                        (token->field == EQ_FIELD_COMM && (size_t)(end - start) > 15)) return 0;
+                } else if ((token->field == EQ_FIELD_KIND && (value < EQ_EXEC || value > EQ_OPEN)) ||
+                           (token->field == EQ_FIELD_ACCESS_MODE && (value < 0 || value > 2)) ||
+                           ((token->field == EQ_FIELD_SUCCESS || token->field == EQ_FIELD_CREATE ||
+                             token->field == EQ_FIELD_TRUNCATE || token->field == EQ_FIELD_ROOT ||
+                             token->field == EQ_FIELD_WRITE_ACCESS) && (value < 0 || value > 1)) ||
+                           ((token->field == EQ_FIELD_UID || token->field == EQ_FIELD_PID) &&
+                            (value < 0 || value > UINT32_MAX)) ||
+                           (token->field == EQ_FIELD_CGROUP && value < 0)) return 0;
+            }
+            if (++depth > EQ_RULE_TOKENS) return 0;
+        } else if (token->opcode == EQ_NOT) {
+            if (depth < 1 || token->field || token->comparison || token->value_count) return 0;
+        } else if (token->opcode == EQ_ALL || token->opcode == EQ_ANY) {
+            if (depth < 2 || token->field || token->comparison || token->value_count) return 0;
+            depth--;
+        } else return 0;
+    }
+    return depth == 1;
+}
+static int read_rules_file(const char *name, struct eq_rule_program *programs,
+                           unsigned *count) {
+    int fd = open(name, O_RDONLY | O_CLOEXEC | O_NOFOLLOW);
+    if (fd < 0) return -1;
+    struct stat info;
+    if (fstat(fd, &info) || !S_ISREG(info.st_mode) || info.st_size < (off_t)sizeof(struct eq_rule_file_header) ||
+        info.st_size > (off_t)(sizeof(struct eq_rule_file_header) + EQ_RULES * sizeof(*programs)) ||
+        (info.st_mode & 0022)) { close(fd); errno = EINVAL; return -1; }
+    size_t length = info.st_size;
+    unsigned char *buffer = malloc(length);
+    if (!buffer) { close(fd); return -1; }
+    size_t offset = 0;
+    while (offset < length) {
+        ssize_t got = read(fd, buffer + offset, length - offset);
+        if (got < 0 && errno == EINTR) continue;
+        if (got <= 0) { free(buffer); close(fd); errno = EIO; return -1; }
+        offset += got;
+    }
+    close(fd);
+    struct eq_rule_file_header header;
+    memcpy(&header, buffer, sizeof(header));
+    size_t payload_length = length - sizeof(header);
+    if (header.magic != EQ_RULE_FILE_MAGIC || header.version != EQ_RULE_FILE_VERSION ||
+        !header.count || header.count > EQ_RULES || header.program_size != sizeof(*programs) ||
+        payload_length != header.count * sizeof(*programs) ||
+        crc32(0, buffer + sizeof(header), payload_length) != header.payload_crc32) {
+        free(buffer); errno = EPROTO; return -1;
+    }
+    memcpy(programs, buffer + sizeof(header), payload_length);
+    free(buffer);
+    for (unsigned i = 0; i < header.count; i++) {
+        if (!rule_program_valid(&programs[i])) { errno = EPROTO; return -1; }
+        for (unsigned j = 0; j < i; j++)
+            if (programs[i].id == programs[j].id) { errno = EPROTO; return -1; }
+    }
+    *count = header.count;
+    return 0;
+}
+static void legacy_program(struct eq_rule_program *program, unsigned id, unsigned kind,
+                           unsigned protected_rule, const char *path,
+                           const struct eq_quarantine_config *config) {
+    memset(program, 0, sizeof(*program));
+    program->id = id; program->enabled = 1; program->priority = EQ_CRITICAL;
+    program->overload_policy = protected_rule ? EQ_POLICY_EXEMPT : EQ_POLICY_QUARANTINE;
+    program->quarantine = *config;
+    program->token_count = 3; program->string_bytes = strlen(path) + 1;
+    memcpy(program->strings, path, program->string_bytes);
+    program->tokens[0] = (struct eq_rule_token){.opcode = EQ_TEST, .field = EQ_FIELD_KIND,
+        .comparison = EQ_OP_EQ, .value_count = 1, .values = {kind}};
+    program->tokens[1] = (struct eq_rule_token){.opcode = EQ_TEST, .field = EQ_FIELD_PATH,
+        .comparison = EQ_OP_EQ, .value_count = 1,
+        .values = {(long long)strlen(path) << 32}};
+    program->tokens[2] = (struct eq_rule_token){.opcode = EQ_ALL};
+}
+static int install_rule_strings(struct sensor_bpf *skel,
+                                const struct eq_rule_program *rules, unsigned count) {
+    int fd = bpf_map__fd(skel->maps.rule_strings);
+    if (fd < 0) { errno = EINVAL; return -1; }
+    for (unsigned slot = 0; slot < count; slot++) {
+        const struct eq_rule_program *program = &rules[slot];
+        if (!program->enabled) continue;
+        for (unsigned t = 0; t < program->token_count; t++) {
+            const struct eq_rule_token *token = &program->tokens[t];
+            if (token->opcode != EQ_TEST ||
+                (token->field != EQ_FIELD_PATH && token->field != EQ_FIELD_COMM)) continue;
+            for (unsigned v = 0; v < token->value_count; v++) {
+                uint64_t encoded = (uint64_t)token->values[v];
+                unsigned offset = (unsigned)encoded, length = (unsigned)(encoded >> 32);
+                struct eq_rule_trie_key key = {.rule_slot = slot, .token_slot = t};
+                int prefix = token->comparison == EQ_OP_PREFIX;
+                key.prefixlen = EQ_RULE_TRIE_META_BITS + 8u * (length + !prefix);
+                memcpy(key.text, program->strings + offset, length + !prefix);
+                unsigned char present = 1;
+                if (bpf_map_update_elem(fd, &key, &present, BPF_ANY)) return -1;
+            }
+        }
+    }
+    return 0;
+}
 int main(int argc, char **argv) {
     pid_t parent = getppid();
     if (prctl(PR_SET_PDEATHSIG, SIGTERM) || getppid() != parent) return 1;
-    if (argc != 7 && argc < 20) {
-        fprintf(stderr, "usage: collector DIR RATE BURST PATH MAX_MIB RESERVE_MIB [META_MIB Q_MIB THRESHOLD DURATION_MS RECOVERY_THRESHOLD COOLDOWN_MS INITIAL_FULL SAMPLE_INTERVAL_MS RULE_COUNT ID KIND PROTECTED PATH ...]\n"); return 2;
+    int compiled_rules = argc == 17 && !strcmp(argv[15], "--rules-file");
+    if (argc != 7 && !compiled_rules && argc < 20) {
+        fprintf(stderr, "usage: collector DIR RATE BURST PATH MAX_MIB RESERVE_MIB [META_MIB Q_MIB THRESHOLD DURATION_MS RECOVERY_THRESHOLD COOLDOWN_MS INITIAL_FULL SAMPLE_INTERVAL_MS {RULE_COUNT ID KIND PROTECTED PATH ...|--rules-file FILE}]\n"); return 2;
     }
     uint64_t rate, burst, max_mib, reserve, meta_mib = 16, q_mib = 16, count = 1;
     struct eq_quarantine_config q_config = {.threshold_eps = 10000, .duration_ms = 3000,
         .recovery_eps = 2000, .cooldown_ms = 10000, .initial_full = 8, .sample_interval_ms = 100};
-    struct eq_quarantine_rule rules[EQ_RULES] = {{.id = 1, .kind = EQ_OPEN, .enabled = 1}};
+    struct eq_rule_program *rules = calloc(EQ_RULES, sizeof(*rules));
+    if (!rules) return 1;
     if (parse_number(argv[2], 1, 1000000, &rate) || parse_number(argv[3], 1, 1000000, &burst) ||
         parse_number(argv[5], 16, 1024, &max_mib) || parse_number(argv[6], 0, 1023, &reserve) ||
         reserve >= max_mib || strlen(argv[4]) > EQ_PATH - 2 || argv[4][0] != '/') return 2;
-    strcpy(rules[0].path, argv[4]);
     if (argc != 7) {
         uint64_t threshold, duration, recovery, cooldown, initial, interval;
         if (parse_number(argv[7], 8, 64, &meta_mib) || parse_number(argv[8], 1, 256, &q_mib) ||
             parse_number(argv[9], 1, 1000000, &threshold) || parse_number(argv[10], 1000, 60000, &duration) ||
             parse_number(argv[11], 0, 999999, &recovery) || parse_number(argv[12], 1000, 600000, &cooldown) ||
             parse_number(argv[13], 0, 64, &initial) || parse_number(argv[14], 10, 60000, &interval) ||
-            parse_number(argv[15], 1, EQ_RULES, &count) || argc != 16 + 4 * (int)count || recovery >= threshold) return 2;
+            recovery >= threshold) return 2;
         q_config = (struct eq_quarantine_config){.threshold_eps = threshold, .duration_ms = duration,
             .recovery_eps = recovery, .cooldown_ms = cooldown, .initial_full = initial, .sample_interval_ms = interval};
-        memset(rules, 0, sizeof(rules));
-        for (unsigned n = 0; n < count; n++) {
-            int base = 16 + 4 * n; uint64_t id, kind, protected_rule;
-            if (parse_number(argv[base], 1, 255, &id) || parse_number(argv[base + 1], EQ_EXEC, EQ_OPEN, &kind) ||
-                parse_number(argv[base + 2], 0, 1, &protected_rule) || argv[base + 3][0] != '/' ||
-                strlen(argv[base + 3]) > EQ_PATH - 2) return 2;
-            for (unsigned previous = 0; previous < n; previous++) if (rules[previous].id == id) return 2;
-            rules[n] = (struct eq_quarantine_rule){.id = id, .kind = kind, .protected_rule = protected_rule, .enabled = 1};
-            strcpy(rules[n].path, argv[base + 3]);
+        if (compiled_rules) {
+            unsigned loaded = 0;
+            if (read_rules_file(argv[16], rules, &loaded)) {
+                perror("compiled rules"); return 2;
+            }
+            count = loaded;
+        } else {
+            if (parse_number(argv[15], 1, EQ_RULES, &count) || argc != 16 + 4 * (int)count) return 2;
+            for (unsigned n = 0; n < count; n++) {
+                int base = 16 + 4 * n; uint64_t id, kind, protected_rule;
+                if (parse_number(argv[base], 1, 255, &id) || parse_number(argv[base + 1], EQ_EXEC, EQ_OPEN, &kind) ||
+                    parse_number(argv[base + 2], 0, 1, &protected_rule) || argv[base + 3][0] != '/' ||
+                    strlen(argv[base + 3]) > EQ_PATH - 2) return 2;
+                for (unsigned previous = 0; previous < n; previous++) if (rules[previous].id == id) return 2;
+                legacy_program(&rules[n], id, kind, protected_rule, argv[base + 3], &q_config);
+            }
         }
-    } else if (q_mib > max_mib - reserve) q_mib = max_mib - reserve;
+    } else {
+        if (q_mib > max_mib - reserve) q_mib = max_mib - reserve;
+        legacy_program(&rules[0], 1, EQ_OPEN, 0, argv[4], &q_config);
+    }
     if (q_mib > max_mib - reserve) return 2;
     if (copy_identity(run_id, sizeof(run_id), "MGLOGWH_RUN_ID", 1) ||
         copy_identity(manifest_sha256, sizeof(manifest_sha256), "MGLOGWH_MANIFEST_SHA256", 0) ||
@@ -855,13 +1079,14 @@ int main(int argc, char **argv) {
     if (!skel) { failure = EINVAL; goto done; }
     skel->rodata->bulk_rate = rate; skel->rodata->bulk_burst = burst;
     skel->rodata->quarantine_config = q_config; skel->rodata->rule_count = count;
-    memcpy((void *)skel->rodata->critical_rules, rules, sizeof(rules));
+    memcpy((void *)skel->rodata->event_rules, rules, EQ_RULES * sizeof(*rules));
     skel->rodata->self_pid = getpid();
     struct stat ns;
     if (stat("/proc/self/ns/pid", &ns)) { failure = errno; goto done; }
     skel->rodata->self_ns_dev = ns.st_dev; skel->rodata->self_ns_ino = ns.st_ino;
     if (sensor_bpf__load(skel)) { failure = EINVAL; goto done; }
     loaded = 1;
+    if (install_rule_strings(skel, rules, count)) { failure = errno; goto done; }
     const char *names[] = {"critical.raw", "general.raw", "quarantine.raw"};
     for (int i = 0; i < LANE_COUNT; i++) {
         int file = open(names[i], O_CREAT | O_EXCL | O_WRONLY | O_CLOEXEC, 0600);
@@ -933,6 +1158,7 @@ done:
         queue_destroy(&lanes[i]);
     }
     sensor_bpf__destroy(skel);
+    free(rules);
     if (dirfd_ >= 0) close(dirfd_);
     if (failure) fprintf(stderr, "collector failed: %s (%d)\n", strerror(failure), failure);
     return failure ? 1 : 0;

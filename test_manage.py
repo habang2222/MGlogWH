@@ -190,6 +190,184 @@ class DataTests(unittest.TestCase):
             with self.subTest(rules=rules), self.assertRaises(ValueError):
                 eq.config(self.run / 'config.json')
 
+    def advanced_config(self, when=None, **changes):
+        cfg = dict(self.cfg)
+        cfg.pop('critical_rules', None)
+        rule = dict(id=7, priority='CRITICAL', overload_policy='QUARANTINE',
+                    when=when or {'all': [
+                        dict(field='event_type', op='eq', value='openat'),
+                        dict(field='path', op='prefix', value='/etc/')]})
+        rule.update(changes)
+        cfg['event_rules'] = [rule]
+        eq.atomic_json(self.run / 'config.json', cfg)
+        return cfg
+
+
+    def test_advanced_rules_compile_fixed_abi_and_normalize_defaults(self):
+        self.advanced_config(quarantine=dict(critical_rate_threshold=9000))
+        cfg = eq.config(self.run / 'config.json')
+        rule = cfg['event_rules'][0]
+        self.assertTrue(rule['enabled'])
+        self.assertEqual(rule['precedence'], 0)
+        blob = eq.compile_rule_file(cfg)
+        magic, version, count, size, checksum = struct.unpack('<5I', blob[:20])
+        self.assertEqual((magic, version, count, size),
+                         (eq.RULE_FILE_MAGIC, 1, 1, 2256))
+        self.assertEqual(checksum, zlib.crc32(blob[20:]))
+        values = struct.unpack('<8I6Q', blob[20:100])
+        self.assertEqual(values[:6], (7, 1, 0, 2, 1, 3))
+        self.assertEqual(values[8:10], (9000, 3000))
+        path_token = struct.unpack('<4I4q', blob[20 + 80 + 48:20 + 80 + 96])
+        self.assertEqual(path_token[:4], (1, eq.RULE_FIELDS['path'], eq.RULE_OPERATORS['prefix'], 1))
+        self.assertEqual(path_token[4], len('/etc/'.encode()) << 32)
+        self.assertEqual(len(blob), 2276)
+
+    def test_string_operands_encode_utf8_length_and_pool_offset(self):
+        when = {'all': [dict(field='path', op='in', value=['/etc/passwd', '/etc/shadow']),
+                        dict(field='comm', op='ne', value='bash')]}
+        self.advanced_config(when)
+        blob = eq.compile_rule_file(eq.config(self.run / 'config.json'))
+        token0 = struct.unpack('<4I4q', blob[20 + 80:20 + 128])
+        token1 = struct.unpack('<4I4q', blob[20 + 128:20 + 176])
+        self.assertEqual(token0[:4], (1, eq.RULE_FIELDS['path'], eq.RULE_OPERATORS['in'], 2))
+        self.assertEqual(token0[4:6], ((11 << 32), (11 << 32) | 12))
+        self.assertEqual(token1[:4], (1, eq.RULE_FIELDS['comm'], eq.RULE_OPERATORS['ne'], 1))
+        self.assertEqual(token1[4], (4 << 32) | 24)
+
+
+    def test_advanced_boolean_numeric_string_and_logic(self):
+        when = {'all': [
+            dict(field='event_type', op='eq', value='openat'),
+            {'any': [dict(field='comm', op='in', value=['bash', 'python3']),
+                     dict(field='uid', op='gt', value=0)]},
+            {'not': dict(field='path', op='prefix', value='/tmp/')},
+            dict(field='success', op='eq', value=True),
+            dict(field='access_mode', op='in', value=['write', 'read_write']),
+            dict(field='write_access', op='eq', value=True)]}
+        self.advanced_config(when)
+        cfg = eq.config(self.run / 'config.json')
+        self.assertEqual(cfg['event_rules'][0]['when'], when)
+        for leaf in (dict(field='create', op='eq', value=False),
+                     dict(field='truncate', op='ne', value=True),
+                     dict(field='root', op='eq', value=False),
+                     dict(field='pid', op='ge', value=1),
+                     dict(field='cgroup_id', op='ne', value=0),
+                     dict(field='result', op='lt', value=5)):
+            with self.subTest(leaf=leaf):
+                self.advanced_config(leaf)
+                eq.config(self.run / 'config.json')
+
+
+    def test_advanced_rules_reject_unknown_types_and_unobservable_exec_failure(self):
+        bad_conditions = [
+            dict(field='uid', op='prefix', value=1),
+            dict(field='path', op='prefix', value='/etc'),
+            dict(field='path', op='eq', value='relative'),
+            dict(field='comm', op='eq', value='abcdefghijklmnop'),
+            dict(field='uid', op='eq', value=True),
+            dict(field='success', op='eq', value=1),
+            dict(field='uid', op='in', value=[1, 1]),
+            dict(field='cgroup_id', op='eq', value=1 << 63),
+            dict(field='unavailable', op='eq', value=1),
+            {'all': [dict(field='event_type', op='eq', value='exec'),
+                     dict(field='success', op='eq', value=False)]},
+            {'all': [dict(field='event_type', op='eq', value='exec'),
+                     dict(field='result', op='lt', value=0)]},
+        ]
+        for when in bad_conditions:
+            with self.subTest(when=when):
+                self.advanced_config(when)
+                with self.assertRaises(ValueError):
+                    eq.config(self.run / 'config.json')
+
+
+    def test_advanced_rule_limits_and_legacy_exclusion(self):
+        cfg = self.advanced_config()
+        cfg['critical_rules'] = self.cfg['critical_rules']
+        eq.atomic_json(self.run / 'config.json', cfg)
+        with self.assertRaisesRegex(ValueError, '동시에'):
+            eq.config(self.run / 'config.json')
+        cfg.pop('critical_rules')
+        cfg['event_rules'] = cfg['event_rules'] * 9
+        eq.atomic_json(self.run / 'config.json', cfg)
+        with self.assertRaises(ValueError): eq.config(self.run / 'config.json')
+        cfg['event_rules'] = cfg['event_rules'][:1]
+        cfg['event_rules'][0]['when'] = {'not': {'not': {'not': {'not':
+            dict(field='uid', op='eq', value=0)}}}}
+        eq.atomic_json(self.run / 'config.json', cfg)
+        with self.assertRaises(ValueError): eq.config(self.run / 'config.json')
+
+
+    def test_advanced_policy_and_quarantine_constraints(self):
+        for changes in (dict(priority='NORMAL', overload_policy='QUARANTINE'),
+                        dict(overload_policy='NORMAL_COLLECTION', quarantine=dict(critical_rate_threshold=2)),
+                        dict(quarantine=dict(critical_recovery_threshold=10000)),
+                        dict(enabled=1), dict(precedence=1001)):
+            with self.subTest(changes=changes):
+                self.advanced_config(**changes)
+                with self.assertRaises(ValueError): eq.config(self.run / 'config.json')
+
+
+    def test_schema3_noncritical_rule_and_policy_versions(self):
+        quality = (1 << 24) | (1 << 28) | (7 << 16)
+        value = eq.decode_record(record(priority=1, schema=3, quality=quality))
+        self.assertEqual((value['rule_id'], value['rule_version'], value['policy_version']), (7, 1, 1))
+        self.assertEqual(value['configured_overload_policy'], 'NORMAL_COLLECTION')
+        self.assertEqual(value['effective_policy'], 'NORMAL')
+        for bad in (quality & ~(1 << 28), quality | (1 << 15), quality | (1 << 13)):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                eq.decode_record(record(priority=1, schema=3, quality=bad))
+
+    def test_older_raw_does_not_claim_rule_or_policy_version(self):
+        for schema in (1, 2):
+            with self.subTest(schema=schema):
+                event = eq.decode_record(record(priority=1, schema=schema))
+                self.assertIsNone(event['rule_version'])
+                self.assertIsNone(event['policy_version'])
+                self.assertEqual(event['rule_id'], None if schema == 1 else 0)
+
+
+    def test_schema3_exempt_and_quarantine_raw_lane(self):
+        common = (1 << 24) | (1 << 28) | (7 << 16)
+        exempt = eq.decode_record(record(priority=2, schema=3,
+                                         quality=common | (2 << 13) | eq.Q_PROTECTED))
+        self.assertEqual(exempt['configured_overload_policy'], 'QUARANTINE_EXEMPT')
+        self.assertEqual(exempt['effective_policy'], 'QUARANTINE_EXEMPT')
+        raw = record(2, priority=2, schema=3,
+                     quality=common | (1 << 13) | eq.Q_QUARANTINED | eq.Q_PERIODIC)
+        (self.run / 'quarantine.raw').write_bytes(raw)
+        self.health['durable']['quarantine.raw'] = 240
+        self.save_health()
+        eq.index_batch(self.run)
+        self.assertEqual(eq.query(self.run, critical=True)['records'][0]['rule_id'], 7)
+
+
+    def test_documented_advanced_examples_validate(self):
+        for path in sorted((eq.ROOT / 'examples').glob('*.json')):
+            with self.subTest(path=path.name):
+                cfg = eq.config(path)
+                self.assertEqual(struct.unpack('<I', eq.compile_rule_file(cfg)[:4])[0],
+                                 eq.RULE_FILE_MAGIC)
+
+    def test_new_run_manifest_matches_schema3_collector_for_both_rule_formats(self):
+        (self.run / 'runs').mkdir()
+        self.advanced_config()
+        advanced = eq.config(self.run / 'config.json')
+        with (patch.object(eq, 'DATA', self.run),
+              patch.object(eq, 'capability', return_value={'ready': True}),
+              patch.object(eq, 'current', return_value=None),
+              patch.object(eq, 'filesystem_free_bytes', return_value=1 << 40),
+              patch.object(eq, 'fingerprint', return_value='a' * 64)):
+            for cfg, has_binary in ((self.cfg, False), (advanced, True)):
+                with self.subTest(has_binary=has_binary):
+                    run = eq.create_run(cfg)
+                    manifest = eq.read_json(run / 'manifest.json')
+                    self.assertEqual((manifest['raw_schema'], manifest['rule_engine_schema_version'],
+                                      manifest['policy_version']), (3, 1, 1))
+                    self.assertEqual((run / 'rules.bin').exists(), has_binary)
+                    self.assertEqual('rules_bin_sha256' in manifest, has_binary)
+
+
     def test_quarantine_original_priority_and_index_lane(self):
         flags = (7 << 16) | eq.Q_QUARANTINED | eq.Q_PERIODIC
         raw = record(2, priority=2, schema=2, quality=flags)
@@ -289,6 +467,17 @@ class DataTests(unittest.TestCase):
 
 
 class PortabilityTests(unittest.TestCase):
+    def test_validate_config_when_active_run_is_root_owned(self):
+        output = io.StringIO()
+        with (patch('sys.argv', ['manage.py', 'validate', '--config',
+                                 str(eq.ROOT / 'examples' / 'A-nonroot-etc-write.json')]),
+              patch.object(eq, 'current', side_effect=PermissionError('root owned')),
+              contextlib.redirect_stdout(output)):
+            eq.main()
+        result = json.loads(output.getvalue())
+        self.assertTrue(result['valid'])
+        self.assertEqual(result['active_run_access'], 'PERMISSION_DENIED')
+
     def test_relative_override_is_based_on_source_directory(self):
         with patch.dict(os.environ, {'MGLOGWH_DATA_DIR': 'local-state'}):
             self.assertEqual(eq.setting_path('MGLOGWH_DATA_DIR', '/var/lib/mglogwh'),

@@ -33,7 +33,7 @@ if [[ -d /run/systemd/system ]] && systemctl is-active --quiet mglogwh.service; 
   exit 1
 fi
 
-for directory in /opt/mglogwh /opt/mglogwh/build /opt/mglogwh/licenses \
+for directory in /opt/mglogwh /opt/mglogwh/build /opt/mglogwh/licenses /opt/mglogwh/examples \
                  /etc/mglogwh /var/lib/mglogwh; do
   if [[ -L $directory ]]; then
     echo "Refusing symlinked install directory: $directory" >&2
@@ -52,7 +52,7 @@ for directory in /opt/mglogwh /opt/mglogwh/build /opt/mglogwh/licenses \
   fi
 done
 source_files=(manage.py ledger.py collector.c sensor.bpf.c event.h tenant.h
-              quarantine.h Makefile README.md LEDGER.md QUARANTINE.md
+              quarantine.h rules.h Makefile README.md RULES.md LEDGER.md QUARANTINE.md
               THIRD_PARTY.md)
 for name in "${source_files[@]}"; do
   destination=/opt/mglogwh/$name
@@ -82,6 +82,20 @@ for source in "$source_dir/config.json" "$source_dir/packaging/mglogwh.service" 
     exit 1
   fi
 done
+examples=("$source_dir"/examples/*.json)
+if (( ${#examples[@]} != 4 )); then
+  echo "Expected four validated rule examples in examples/." >&2
+  exit 1
+fi
+for example in "${examples[@]}"; do
+  destination=/opt/mglogwh/examples/${example##*/}
+  if [[ ! -f $example || -L $example || -L $destination ||
+        ( -e $destination &&
+          ( ! -f $destination || $(stat -c %u "$destination") != 0 ) ) ]]; then
+    echo "Missing or unsafe rule example: ${example##*/}" >&2
+    exit 1
+  fi
+done
 for destination in /etc/mglogwh/config.json /etc/systemd/system/mglogwh.service \
                    /etc/logrotate.d/mglogwh /opt/mglogwh/build/collector \
                    /opt/mglogwh/build/sensor.bpf.o; do
@@ -92,7 +106,7 @@ for destination in /etc/mglogwh/config.json /etc/systemd/system/mglogwh.service 
   fi
 done
 
-install -d -o root -g root -m 0755 /opt/mglogwh /opt/mglogwh/build /opt/mglogwh/licenses
+install -d -o root -g root -m 0755 /opt/mglogwh /opt/mglogwh/build /opt/mglogwh/licenses /opt/mglogwh/examples
 install -d -o root -g root -m 0700 /etc/mglogwh /var/lib/mglogwh
 # Also reject a manually started collector before replacing installed code.
 exec {collector_lock_fd}>/var/lib/mglogwh/collector.lock
@@ -106,6 +120,9 @@ for name in "${source_files[@]}"; do
 done
 for license in "${licenses[@]}"; do
   install -o root -g root -m 0644 "$license" /opt/mglogwh/licenses/
+done
+for example in "${examples[@]}"; do
+  install -o root -g root -m 0644 "$example" /opt/mglogwh/examples/
 done
 install -o root -g root -m 0755 "$build_dir/collector" /opt/mglogwh/build/collector
 install -o root -g root -m 0644 "$build_dir/sensor.bpf.o" /opt/mglogwh/build/sensor.bpf.o

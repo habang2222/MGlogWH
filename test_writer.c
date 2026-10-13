@@ -7,7 +7,9 @@
 static struct eq_event event_for(int lane, uint64_t sequence) {
     struct eq_event event = {.magic = EQ_MAGIC, .schema = EQ_SCHEMA, .kind = EQ_OPEN,
         .priority = lane == 1 ? EQ_NORMAL : EQ_CRITICAL, .sequence = sequence,
-        .quality = lane == 1 ? 0 : (1u << EQ_RULE_SHIFT)};
+        .quality = EQ_RULE_VERSION_V1 | EQ_POLICY_VERSION_V1 |
+            (lane == 1 ? 0 : (1u << EQ_RULE_SHIFT) |
+             (EQ_POLICY_QUARANTINE << EQ_CONFIGURED_POLICY_SHIFT))};
     if (lane == 2) event.quality |= EQ_QUARANTINED | EQ_Q_PERIODIC;
     return event;
 }
@@ -30,6 +32,7 @@ static void reset(void) {
     failure = input_done = 0;
     persist_failed = general_quota_drop = 0;
     quarantine_storage_drop = stream_storage_overflow = 0; quarantine_limit = 0; stream_storage_complete = 1; memset(stream_storage, 0, sizeof(stream_storage)); memset(&fallback_storage, 0, sizeof(fallback_storage));
+    memset(rule_storage, 0, sizeof(rule_storage));
 }
 static void start_writers(pthread_t workers[LANE_COUNT]) {
     for (int i = 0; i < LANE_COUNT; i++) assert(!pthread_create(&workers[i], NULL, write_lane, &lanes[i]));
@@ -204,6 +207,25 @@ static void test_quarantine_counts_sync_boundary(void) {
     rewind(lanes[2].file); expect_record(2, 1); expect_record(2, 2);
     reset();
 }
+static void test_rule_identity_and_durable_counts(void) {
+    setup(4);
+    struct eq_event normal = event_for(1, 1);
+    normal.quality |= 7u << EQ_RULE_SHIFT;
+    struct eq_event critical = event_for(0, 2);
+    critical.quality &= ~EQ_CONFIGURED_POLICY_MASK;
+    assert(!save_event(&lanes[1], &normal, sizeof(normal)));
+    assert(!save_event(&lanes[0], &critical, sizeof(critical)));
+    assert(rule_storage[7].observed[1] == 1 && rule_storage[1].observed[0] == 1);
+    pthread_t workers[LANE_COUNT]; start_writers(workers); finish_writers(workers);
+    assert(rule_storage[7].appended[1] == 1 && rule_storage[7].durable[1] == 1);
+    assert(rule_storage[1].appended[0] == 1 && rule_storage[1].durable[0] == 1);
+    reset();
+    setup(2);
+    critical = event_for(0, 1);
+    critical.quality &= ~EQ_RULE_VERSION_MASK;
+    assert(save_event(&lanes[0], &critical, sizeof(critical)) == -EPROTO);
+    reset();
+}
 static uint32_t little_u32(const unsigned char *bytes) {
     return (uint32_t)bytes[0] | (uint32_t)bytes[1] << 8 | (uint32_t)bytes[2] << 16 | (uint32_t)bytes[3] << 24;
 }
@@ -288,6 +310,7 @@ int main(void) {
     test_independent_writers_and_sync_failure();
     test_quarantine_limits_preserve_critical();
     test_quarantine_counts_sync_boundary();
+    test_rule_identity_and_durable_counts();
     test_metadata_fence_crc_and_overflow();
     puts("writer FIFO/quotas/quarantine isolation/durability/control CRC/fence/overflow checks: OK");
     return 0;

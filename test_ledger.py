@@ -80,6 +80,117 @@ class RecoveryTests(unittest.TestCase):
                                     7, 7, 1000, 1, 0, 0, len(path), quality, comm, path)
         return payload + struct.pack('<II', zlib.crc32(payload), 0)
 
+    def advanced_lineage(self):
+        config = dict(event_rules=[dict(id=7, priority='CRITICAL',
+                                        overload_policy='NORMAL_COLLECTION')])
+        self.write_json('config.json', config)
+        binary = b'bounded-test-rule-program'
+        (self.run / 'rules.bin').write_bytes(binary)
+        manifest = json.loads((self.run / 'manifest.json').read_text())
+        manifest.update(raw_schema=3, rule_engine_schema_version=1, policy_version=1,
+                        rules_bin_sha256=hashlib.sha256(binary).hexdigest(),
+                        config_sha256=hashlib.sha256(json.dumps(config, sort_keys=True,
+                            separators=(',', ':')).encode()).hexdigest())
+        self.write_json('manifest.json', manifest)
+        self.lineage.update(config_sha256=manifest['config_sha256'],
+                            manifest_sha256=hashlib.sha256((self.run / 'manifest.json').read_bytes()).hexdigest())
+
+
+    def advanced_stats(self, durable=1):
+        return dict(rule_id=7, priority=2, configured_policy=0, precedence=0,
+                    evaluated=1, matched=1, unknown=0, selected=1, ring_submitted=1,
+                    quarantine_summarized=0, ring_failed=0, bulk_budget_suppressed=0,
+                    bulk_budget_contention=0, collector_observed=[1, 0, 0],
+                    collector_appended=[1, 0, 0], collector_durable=[durable, 0, 0],
+                    collector_queue_rejected=[0, 0, 0], collector_quota_rejected=[0, 0, 0])
+
+
+    def test_schema3_committed_rule_statistics_reconcile_with_raw(self):
+        self.advanced_lineage()
+        raw = self.raw(schema=3, quality=(1 << 24) | (1 << 28) | (7 << 16))
+        (self.run / 'critical.raw').write_bytes(raw)
+        self.checkpoint(sequence=1, critical=len(raw), seal=True,
+                        rule_stats=[self.advanced_stats()],
+                        rule_stats_snapshot_complete=True,
+                        rule_stats_scope='AGGREGATE_SELECTED_ATTEMPTS_AND_DURABLE_WRITES')
+        self.commit()
+        value = self.report()
+        self.assertEqual('RECOVERED', value['status'])
+        row = value['rule_evidence']['rules'][0]
+        self.assertEqual(row['raw_durable_count'], 1)
+        self.assertTrue(row['collector_durable_matches_raw'])
+        self.assertTrue(row['complete_to_durable'])
+        self.assertFalse(row['per_rule_loss_attribution_complete'])
+
+
+    def test_schema3_rule_file_tamper_invalidates_lineage(self):
+        self.advanced_lineage()
+        self.checkpoint(sequence=0, seal=True)
+        self.commit()
+        (self.run / 'rules.bin').write_bytes(b'tampered')
+        value = self.report()
+        self.assertEqual('INVALID', value['status'])
+        self.assertNotIn('rule_evidence', value)
+
+
+    def test_schema3_statistics_mismatch_is_explicitly_incomplete(self):
+        self.advanced_lineage()
+        raw = self.raw(schema=3, quality=(1 << 24) | (1 << 28) | (7 << 16))
+        (self.run / 'critical.raw').write_bytes(raw)
+        self.checkpoint(sequence=1, critical=len(raw), seal=True,
+                        rule_stats=[self.advanced_stats(durable=0)],
+                        rule_stats_snapshot_complete=True,
+                        rule_stats_scope='AGGREGATE_SELECTED_ATTEMPTS_AND_DURABLE_WRITES')
+        self.commit()
+        row = self.report()['rule_evidence']['rules'][0]
+        self.assertFalse(row['collector_durable_matches_raw'])
+        self.assertFalse(row['complete_to_durable'])
+
+    def test_schema3_stats_policy_must_match_config(self):
+        self.advanced_lineage()
+        stats = self.advanced_stats()
+        stats['configured_policy'] = 2
+        self.checkpoint(sequence=0, seal=True, rule_stats=[stats],
+                        rule_stats_snapshot_complete=True,
+                        rule_stats_scope='AGGREGATE_SELECTED_ATTEMPTS_AND_DURABLE_WRITES')
+        self.commit()
+        report = self.report()
+        self.assertEqual(report['status'], 'INVALID')
+        self.assertIn('rule_stats/config policy mismatch', report['errors'][0])
+
+    def test_schema3_legacy_rule_has_no_compiled_file(self):
+        config = dict(critical_rules=[dict(id=1, event_type='openat',
+                                          path='/tmp/protected', protected=False)])
+        self.write_json('config.json', config)
+        manifest = json.loads((self.run / 'manifest.json').read_text())
+        manifest.update(raw_schema=3, rule_engine_schema_version=1, policy_version=1,
+                        config_sha256=hashlib.sha256(json.dumps(config, sort_keys=True,
+                            separators=(',', ':')).encode()).hexdigest())
+        self.write_json('manifest.json', manifest)
+        self.lineage.update(config_sha256=manifest['config_sha256'],
+                            manifest_sha256=hashlib.sha256((self.run / 'manifest.json').read_bytes()).hexdigest())
+        raw = self.raw(schema=3, quality=(1 << 24) | (1 << 28) | (1 << 16) | (1 << 13))
+        (self.run / 'critical.raw').write_bytes(raw)
+        self.checkpoint(sequence=1, critical=len(raw), seal=True)
+        self.commit()
+        report = self.report()
+        self.assertEqual(report['status'], 'RECOVERED')
+        self.assertEqual(report['rule_evidence']['rules'][0]['raw_durable_count'], 1)
+
+    def test_schema3_userspace_loss_witness_is_accepted(self):
+        self.advanced_lineage()
+        witness = self.loss_witness()
+        witness.update(event_schema=3, rule_id=7,
+                       quality=(1 << 24) | (1 << 28) | (7 << 16))
+        self.loss(seq=2, witness=witness)
+        self.checkpoint(sequence=2, seal=True)
+        self.commit()
+        report = self.report()
+        self.assertEqual(report['status'], 'RECOVERED')
+        entry = report['exact_userspace_loss_witnesses']['entries'][0]
+        self.assertEqual(entry['witness']['event_schema'], 3)
+
+
     def report(self):
         return ledger.recover(self.run)
 

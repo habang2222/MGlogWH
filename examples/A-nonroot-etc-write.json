@@ -1,0 +1,33 @@
+{
+  "bulk_rate": 500,
+  "bulk_burst": 1000,
+  "protected_path": "/tmp/mglogwh-decoy.txt",
+  "max_raw_mib": 512,
+  "critical_reserve_mib": 64,
+  "max_index_mib": 256,
+  "minimum_free_mib": 1024,
+  "metadata_max_mib": 16,
+  "critical_rate_threshold": 10000,
+  "critical_rate_duration_seconds": 3,
+  "critical_recovery_threshold": 2000,
+  "critical_recovery_duration_seconds": 10,
+  "quarantine_initial_full_events": 8,
+  "quarantine_sample_interval_ms": 100,
+  "quarantine_max_mib": 16,
+  "event_rules": [
+    {
+      "id": 1,
+      "priority": "CRITICAL",
+      "overload_policy": "QUARANTINE",
+      "when": {
+        "all": [
+          {"field": "event_type", "op": "eq", "value": "openat"},
+          {"field": "path", "op": "prefix", "value": "/etc/"},
+          {"field": "uid", "op": "ne", "value": 0},
+          {"field": "write_access", "op": "eq", "value": true},
+          {"field": "success", "op": "eq", "value": true}
+        ]
+      }
+    }
+  ]
+}

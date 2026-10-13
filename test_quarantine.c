@@ -162,7 +162,7 @@ static void test_control_metadata_accuracy(void) {
     assert(e->tracking_complete && e->threshold_eps == 10000 && e->duration_ms == 3000);
     unsigned quality = EQ_TRUNCATED | EQ_QUARANTINED | EQ_Q_INITIAL | (77u << EQ_RULE_SHIFT);
     assert((quality & EQ_CAPTURE_QUALITY_MASK) == EQ_TRUNCATED);
-    assert(((quality & EQ_RULE_MASK) >> EQ_RULE_SHIFT) == 77 && EQ_SCHEMA == 2);
+    assert(((quality & EQ_RULE_MASK) >> EQ_RULE_SHIFT) == 77 && EQ_SCHEMA == 3);
 }
 int main(void) {
     test_low_rate_stays_critical();
