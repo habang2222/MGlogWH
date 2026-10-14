@@ -1,0 +1,1082 @@
+{
+  "command": [
+    "/tmp/mglogwh-perf-eb9c888-build/bench_workload",
+    "/tmp/mglogwh-perf-2026-10-14-decoy/bulk-missing",
+    "/tmp/mglogwh-perf-2026-10-14-decoy/critical",
+    "/tmp/mglogwh-perf-2026-10-14-decoy/normal",
+    "5",
+    "15000",
+    "100",
+    "250"
+  ],
+  "condition": "rule1",
+  "config_file": "/mnt/c/Users/victo/Desktop/MGlogWH-github-update/validation/2026-10-14/configs/rule1.json",
+  "config_file_sha256": "9dd1dcc0c160ba2cf5f9f7d674a818d3952809b3b9b12a7fd21d016e8ea81f68",
+  "critical_count_difference": 240,
+  "critical_durable_count": 260,
+  "critical_durable_recall": 0.52,
+  "critical_truth_count": 500,
+  "health": {
+    "active_quarantined_streams": 1,
+    "admitted": [
+      260,
+      77267,
+      240
+    ],
+    "appended": [
+      260,
+      77267,
+      240
+    ],
+    "config_sha256": "cd2f2637173bb954cec9257ff98143cd1e1a87a82d904a25bf222578fbaf696f",
+    "cpu_seconds": 1.066711,
+    "critical_events_total": 500,
+    "critical_scheduler": "FIFO",
+    "critical_seen_total": 500,
+    "dedicated_drain_thread": true,
+    "durable": {
+      "critical.raw": 62400,
+      "general.raw": 18544080,
+      "quarantine.raw": 57600
+    },
+    "durable_offsets": {
+      "critical": 62400,
+      "general": 18544080,
+      "quarantine": 57600
+    },
+    "error_errno": 0,
+    "exact_loss_available": true,
+    "exact_loss_scope": "USERSPACE_REJECTIONS",
+    "fault_snapshot_complete": true,
+    "faults": [
+      0,
+      0,
+      12,
+      0
+    ],
+    "general_quota_drop": 0,
+    "max_rss_kib": 22528,
+    "metadata": {
+      "checkpoint_coalesced": 0,
+      "committed_offset": 55703,
+      "committed_seq": 13,
+      "dropped": 0,
+      "overflow": 0,
+      "persist_failed": 0,
+      "queue_capacity": 4096,
+      "queue_depth": 0,
+      "queue_high_water": 1,
+      "state": "STOPPED"
+    },
+    "metadata_dropped": 0,
+    "metadata_failed": false,
+    "metadata_overflow": 0,
+    "monotonic_ms": 43020991,
+    "peak_critical_rate": 100,
+    "peak_critical_rate_scope": "MAX_TRACKED_STREAM_ONE_SECOND_EPS",
+    "persist_failed": 0,
+    "pid": 24246,
+    "policy_version": 1,
+    "protected_critical_seen_total": 0,
+    "quarantine_accounting_final": true,
+    "quarantine_by_reason": {
+      "CRITICAL_RATE_EXCEEDED": 3,
+      "CRITICAL_RATE_RECOVERED": 2
+    },
+    "quarantine_by_reason_scope": "TRANSITIONS",
+    "quarantine_dropped_total": 0,
+    "quarantine_enter_total": 3,
+    "quarantine_exit_total": 2,
+    "quarantine_full_appended_total": 0,
+    "quarantine_full_saved_total": 0,
+    "quarantine_full_selected_total": 0,
+    "quarantine_full_submitted_total": 0,
+    "quarantine_global": {
+      "critical_events_total": 500,
+      "protected_events_total": 0,
+      "quarantined_events_total": 240,
+      "state_contention": 0,
+      "stream_map_full": 0,
+      "transition_ring_failed": 0,
+      "untracked_protected": 0,
+      "untracked_protected_ring_failed": 0,
+      "untracked_protected_submitted": 0,
+      "untracked_ring_failed": 0,
+      "untracked_seen": 0,
+      "untracked_selected": 0,
+      "untracked_submitted": 0,
+      "untracked_summarized": 0
+    },
+    "quarantine_not_stored_observed_total": 0,
+    "quarantine_pending_total": 0,
+    "quarantine_ring_failed_total": 0,
+    "quarantine_sample_appended_total": 240,
+    "quarantine_sample_selected_total": 240,
+    "quarantine_sample_submitted_total": 240,
+    "quarantine_sampled_total": 240,
+    "quarantine_seen_total": 240,
+    "quarantine_storage_drop": 0,
+    "quarantine_summarized_total": 0,
+    "quarantine_tracking_complete": true,
+    "quarantined_events_total": 240,
+    "quarantined_streams": 1,
+    "queue_capacity": [
+      8192,
+      16384,
+      512
+    ],
+    "queue_depth": [
+      0,
+      0,
+      0
+    ],
+    "queue_high_water": [
+      1,
+      827,
+      4
+    ],
+    "queue_in_flight": [
+      0,
+      0,
+      0
+    ],
+    "queue_overflow": [
+      0,
+      0,
+      0
+    ],
+    "raw_schema": 3,
+    "received": [
+      260,
+      77267,
+      240
+    ],
+    "record_size": 240,
+    "record_type": "seal",
+    "rule_stats": [
+      {
+        "bulk_budget_contention": 0,
+        "bulk_budget_suppressed": 0,
+        "collector_appended": [
+          260,
+          0,
+          240
+        ],
+        "collector_durable": [
+          260,
+          0,
+          240
+        ],
+        "collector_observed": [
+          260,
+          0,
+          240
+        ],
+        "collector_queue_rejected": [
+          0,
+          0,
+          0
+        ],
+        "collector_quota_rejected": [
+          0,
+          0,
+          0
+        ],
+        "configured_policy": 1,
+        "enabled": true,
+        "evaluated": 77767,
+        "matched": 500,
+        "precedence": 100,
+        "priority": 2,
+        "quarantine_summarized": 0,
+        "ring_failed": 0,
+        "ring_submitted": 500,
+        "rule_id": 1,
+        "selected": 500,
+        "stats_available": true,
+        "unknown": 203
+      }
+    ],
+    "rule_stats_scope": "AGGREGATE_SELECTED_ATTEMPTS_AND_DURABLE_WRITES; PRE_SEQUENCE_AND_KERNEL_LOSS_NOT_EVENT_IDENTIFIABLE",
+    "rule_stats_snapshot_complete": true,
+    "rule_version": 1,
+    "sequence_snapshot_complete": true,
+    "state": "STOPPED",
+    "stream_snapshot_complete": true,
+    "stream_storage_complete": true,
+    "stream_storage_overflow": 0,
+    "streams": [
+      {
+        "cgroup_id": 21,
+        "collector": {
+          "full_appended": 0,
+          "full_durable": 0,
+          "normal_appended": 260,
+          "normal_durable": 260,
+          "queue_rejected_full": 0,
+          "queue_rejected_sample": 0,
+          "sample_appended": 240,
+          "sample_durable": 240,
+          "storage_rejected_full": 0,
+          "storage_rejected_sample": 0
+        },
+        "critical_ring_failed": 0,
+        "critical_submitted": 260,
+        "engine": {
+          "accounted_seen": 500,
+          "burst_start_ns": 43016000000000,
+          "current": {
+            "burst_start_ns": 43016000000000,
+            "duration_ms": 0,
+            "end_ns": 0,
+            "episode_id": 71051,
+            "first_pid": 25445,
+            "first_sequence": 71051,
+            "first_uid": 0,
+            "full_selected": 0,
+            "full_submitted": 0,
+            "high_rate_duration_ms": 4000,
+            "last_event_ns": 43020395174921,
+            "last_pid": 25445,
+            "last_sequence": 77085,
+            "last_uid": 0,
+            "observed_eps": 100,
+            "peak_rate_eps": 100,
+            "ring_failed": 0,
+            "sample_selected": 40,
+            "sample_submitted": 40,
+            "seen": 40,
+            "start_ns": 43020004956267,
+            "summarized": 0,
+            "threshold_eps": 0,
+            "tracking_complete": 1,
+            "tracking_failed_end": 0,
+            "tracking_failed_start": 0,
+            "unique_pid_lower_bound": 1,
+            "unique_uid_lower_bound": 1
+          },
+          "current_rate_eps": 100,
+          "enter_count": 3,
+          "exit_count": 2,
+          "full_selected": 0,
+          "full_submitted": 0,
+          "high_windows": 4,
+          "initialized": 1,
+          "last": {
+            "burst_start_ns": 43016000000000,
+            "duration_ms": 0,
+            "end_ns": 43019005017932,
+            "episode_id": 40140,
+            "first_pid": 25445,
+            "first_sequence": 40140,
+            "first_uid": 0,
+            "full_selected": 0,
+            "full_submitted": 0,
+            "high_rate_duration_ms": 3000,
+            "last_event_ns": 43018994930347,
+            "last_pid": 25445,
+            "last_sequence": 55438,
+            "last_uid": 0,
+            "observed_eps": 100,
+            "peak_rate_eps": 100,
+            "ring_failed": 0,
+            "sample_selected": 100,
+            "sample_submitted": 100,
+            "seen": 100,
+            "start_ns": 43018004999756,
+            "summarized": 0,
+            "threshold_eps": 0,
+            "tracking_complete": 1,
+            "tracking_failed_end": 0,
+            "tracking_failed_start": 0,
+            "unique_pid_lower_bound": 1,
+            "unique_uid_lower_bound": 1
+          },
+          "low_windows": 0,
+          "next_sample_ns": 43020395174921,
+          "peak_rate_eps": 100,
+          "q_seen": 240,
+          "quarantined": 1,
+          "ring_failed": 0,
+          "sample_selected": 240,
+          "sample_submitted": 240,
+          "summarized": 0,
+          "window_complete": 1,
+          "window_count": 40,
+          "window_start_ns": 43020000000000
+        },
+        "kind": 2,
+        "protected_seen": 0,
+        "rule_id": 1,
+        "seen": 500,
+        "tracking_failed": 0,
+        "transition_ring_failed": 0,
+        "untracked_ring_failed": 0,
+        "untracked_seen": 0,
+        "untracked_selected": 0,
+        "untracked_submitted": 0,
+        "untracked_summarized": 0
+      }
+    ],
+    "summary_kind": "AGGREGATE_ONLY",
+    "tenants": [
+      {
+        "budget_contention": 0,
+        "budget_suppress": 0,
+        "cgroup_id": 21,
+        "critical_full": 0,
+        "general_full": 0,
+        "quarantine_full": 0,
+        "quarantine_submitted": 240,
+        "quarantine_summarized": 0,
+        "sequence": 77365,
+        "stream_contention": 0,
+        "stream_map_full": 0,
+        "submitted": [
+          75012,
+          1853,
+          500
+        ]
+      },
+      {
+        "budget_contention": 0,
+        "budget_suppress": 0,
+        "cgroup_id": 1451,
+        "critical_full": 0,
+        "general_full": 0,
+        "quarantine_full": 0,
+        "quarantine_submitted": 0,
+        "quarantine_summarized": 0,
+        "sequence": 402,
+        "stream_contention": 0,
+        "stream_map_full": 0,
+        "submitted": [
+          24,
+          378,
+          0
+        ]
+      }
+    ],
+    "untracked_collector": {
+      "full_appended": 0,
+      "full_durable": 0,
+      "normal_appended": 0,
+      "normal_durable": 0,
+      "queue_rejected_full": 0,
+      "queue_rejected_sample": 0,
+      "sample_appended": 0,
+      "sample_durable": 0,
+      "storage_rejected_full": 0,
+      "storage_rejected_sample": 0
+    },
+    "version": "0.4.0",
+    "writer_threads": 3
+  },
+  "index_file_bytes": 32538624,
+  "index_health": {
+    "complete_to_durable": true,
+    "config_sha256": "cd2f2637173bb954cec9257ff98143cd1e1a87a82d904a25bf222578fbaf696f",
+    "coverage_state": "INDEX_COMPLETE",
+    "durable_offsets": {
+      "critical.raw": 62400,
+      "general.raw": 18544080,
+      "quarantine.raw": 57600
+    },
+    "indexed_offsets": {
+      "critical.raw": 62400,
+      "general.raw": 18544080,
+      "quarantine.raw": 57600
+    },
+    "indexed_records": 77767,
+    "lag_bytes": 0,
+    "lag_records": 0,
+    "lane_coverage": {
+      "critical.raw": {
+        "durable_offset": 62400,
+        "indexed_offset": 62400,
+        "lag_bytes": 0,
+        "lag_records": 0
+      },
+      "general.raw": {
+        "durable_offset": 18544080,
+        "indexed_offset": 18544080,
+        "lag_bytes": 0,
+        "lag_records": 0
+      },
+      "quarantine.raw": {
+        "durable_offset": 57600,
+        "indexed_offset": 57600,
+        "lag_bytes": 0,
+        "lag_records": 0
+      }
+    },
+    "last_progress_monotonic_ns": 43036203305827,
+    "offsets": {
+      "critical.raw": 62400,
+      "general.raw": 18544080,
+      "quarantine.raw": 57600
+    },
+    "state": "INDEX_COMPLETE",
+    "updated_monotonic_ns": 43036203305827,
+    "updated_utc": "2026-10-14T02:20:24.044751+00:00"
+  },
+  "label": "rule1-r3",
+  "manifest_sha256": "704ec0cdc1f95bbdb455cf06cf5a8cf1280d525009ca1c198b91b0c358abd2da",
+  "normalized_config_sha256": "cd2f2637173bb954cec9257ff98143cd1e1a87a82d904a25bf222578fbaf696f",
+  "raw": {
+    "by_lane": {
+      "critical.raw": 260,
+      "general.raw": 77267,
+      "quarantine.raw": 240
+    },
+    "by_path": {
+      "/tmp/mglogwh-perf-2026-10-14-decoy/bulk-missing": {
+        "lanes": {
+          "general.raw": 75000
+        },
+        "priorities": {
+          "BULK": 75000
+        },
+        "rule_ids": {
+          "0": 75000
+        },
+        "total": 75000
+      },
+      "/tmp/mglogwh-perf-2026-10-14-decoy/critical": {
+        "lanes": {
+          "critical.raw": 260,
+          "quarantine.raw": 240
+        },
+        "priorities": {
+          "CRITICAL": 500
+        },
+        "rule_ids": {
+          "1": 500
+        },
+        "total": 500
+      },
+      "/tmp/mglogwh-perf-2026-10-14-decoy/normal": {
+        "lanes": {
+          "general.raw": 1250
+        },
+        "priorities": {
+          "NORMAL": 1250
+        },
+        "rule_ids": {
+          "0": 1250
+        },
+        "total": 1250
+      }
+    },
+    "crc_and_schema_valid": true,
+    "errors": [],
+    "records_total": 77767
+  },
+  "raw_file_bytes": {
+    "critical.raw": 62400,
+    "general.raw": 18544080,
+    "quarantine.raw": 57600
+  },
+  "recover_error": "command ['/usr/bin/python3', '/tmp/mglogwh-perf-eb9c888-source/manage.py', 'recover', '--run-dir', '/root/mglogwh-perf-2026-10-14/data/runs/644e7eba-130d-4520-bb8e-53215b5306a7'] exited 2:  ence_set_complete\": false,\n  \"raw_recovery_supported\": false,\n  \"durable_records\": 0,\n  \"durable_unique_events\": 0,\n  \"duplicate_loss_records\": 0,\n  \"duplicate_quarantine_controls\": 0,\n  \"source_modified\": false,\n  \"recovery_policy\": \"COMMITTED_FENCE_ONLY_NO_TAIL_PROMOTION\",\n  \"verification_progress\": {\n    \"scope\": \"DIAGNOSTIC_ONLY_NOT_PARTIAL_RECOVERY\",\n    \"journal_committed_boundary_bytes\": 55703,\n    \"journal_verified_prefix_bytes\": 0,\n    \"journal_verified_frames\": 0,\n    \"raw_verified_prefix_bytes\": {}\n  },\n  \"counter_reason_policy\": \"AGGREGATE_ONLY_NEVER_ASSIGN_TO_GAPS\",\n  \"lineage\": {\n    \"run_id\": \"644e7eba-130d-4520-bb8e-53215b5306a7\",\n    \"boot_id\": \"73dba5d7-f8c5-4b40-a8b9-53afc395871e\",\n    \"config_sha256\": \"cd2f2637173bb954cec9257ff98143cd1e1a87a82d904a25bf222578fbaf696f\",\n    \"manifest_sha256\": \"704ec0cdc1f95bbdb455cf06cf5a8cf1280d525009ca1c198b91b0c358abd2da\"\n  },\n  \"userspace_loss_reason_coverage_complete\": false,\n  \"userspace_loss_witness_coverage_complete\": false\n}\n",
+  "repeat": 3,
+  "resources_after": {
+    "filesystem_free_bytes": 1003397099520,
+    "filesystem_total_bytes": 1081101176832,
+    "memory_available_kib": 6908780
+  },
+  "resources_before": {
+    "filesystem_free_bytes": 1003448418304,
+    "filesystem_total_bytes": 1081101176832,
+    "memory_available_kib": 6911084
+  },
+  "rules_bin_sha256": "983bc8fbc99bc1ecab1c8c91201eb654c832aadf770273b1fe9d611162917e3e",
+  "run_dir": "/root/mglogwh-perf-2026-10-14/data/runs/644e7eba-130d-4520-bb8e-53215b5306a7",
+  "run_id": "644e7eba-130d-4520-bb8e-53215b5306a7",
+  "start_state": "RUNNING",
+  "started_utc": "2026-10-14T02:20:01Z",
+  "stop_status": {
+    "collector": {
+      "active_quarantined_streams": 1,
+      "admitted": [
+        260,
+        77267,
+        240
+      ],
+      "appended": [
+        260,
+        77267,
+        240
+      ],
+      "config_sha256": "cd2f2637173bb954cec9257ff98143cd1e1a87a82d904a25bf222578fbaf696f",
+      "cpu_seconds": 1.066711,
+      "critical_events_total": 500,
+      "critical_scheduler": "FIFO",
+      "critical_seen_total": 500,
+      "dedicated_drain_thread": true,
+      "durable": {
+        "critical.raw": 62400,
+        "general.raw": 18544080,
+        "quarantine.raw": 57600
+      },
+      "durable_offsets": {
+        "critical": 62400,
+        "general": 18544080,
+        "quarantine": 57600
+      },
+      "error_errno": 0,
+      "exact_loss_available": true,
+      "exact_loss_scope": "USERSPACE_REJECTIONS",
+      "fault_snapshot_complete": true,
+      "faults": [
+        0,
+        0,
+        12,
+        0
+      ],
+      "general_quota_drop": 0,
+      "max_rss_kib": 22528,
+      "metadata": {
+        "checkpoint_coalesced": 0,
+        "committed_offset": 55703,
+        "committed_seq": 13,
+        "dropped": 0,
+        "overflow": 0,
+        "persist_failed": 0,
+        "queue_capacity": 4096,
+        "queue_depth": 0,
+        "queue_high_water": 1,
+        "state": "STOPPED"
+      },
+      "metadata_dropped": 0,
+      "metadata_failed": false,
+      "metadata_overflow": 0,
+      "monotonic_ms": 43020991,
+      "peak_critical_rate": 100,
+      "peak_critical_rate_scope": "MAX_TRACKED_STREAM_ONE_SECOND_EPS",
+      "persist_failed": 0,
+      "pid": 24246,
+      "policy_version": 1,
+      "protected_critical_seen_total": 0,
+      "quarantine_accounting_final": true,
+      "quarantine_by_reason": {
+        "CRITICAL_RATE_EXCEEDED": 3,
+        "CRITICAL_RATE_RECOVERED": 2
+      },
+      "quarantine_by_reason_scope": "TRANSITIONS",
+      "quarantine_dropped_total": 0,
+      "quarantine_enter_total": 3,
+      "quarantine_exit_total": 2,
+      "quarantine_full_appended_total": 0,
+      "quarantine_full_saved_total": 0,
+      "quarantine_full_selected_total": 0,
+      "quarantine_full_submitted_total": 0,
+      "quarantine_global": {
+        "critical_events_total": 500,
+        "protected_events_total": 0,
+        "quarantined_events_total": 240,
+        "state_contention": 0,
+        "stream_map_full": 0,
+        "transition_ring_failed": 0,
+        "untracked_protected": 0,
+        "untracked_protected_ring_failed": 0,
+        "untracked_protected_submitted": 0,
+        "untracked_ring_failed": 0,
+        "untracked_seen": 0,
+        "untracked_selected": 0,
+        "untracked_submitted": 0,
+        "untracked_summarized": 0
+      },
+      "quarantine_not_stored_observed_total": 0,
+      "quarantine_pending_total": 0,
+      "quarantine_ring_failed_total": 0,
+      "quarantine_sample_appended_total": 240,
+      "quarantine_sample_selected_total": 240,
+      "quarantine_sample_submitted_total": 240,
+      "quarantine_sampled_total": 240,
+      "quarantine_seen_total": 240,
+      "quarantine_storage_drop": 0,
+      "quarantine_summarized_total": 0,
+      "quarantine_tracking_complete": true,
+      "quarantined_events_total": 240,
+      "quarantined_streams": 1,
+      "queue_capacity": [
+        8192,
+        16384,
+        512
+      ],
+      "queue_depth": [
+        0,
+        0,
+        0
+      ],
+      "queue_high_water": [
+        1,
+        827,
+        4
+      ],
+      "queue_in_flight": [
+        0,
+        0,
+        0
+      ],
+      "queue_overflow": [
+        0,
+        0,
+        0
+      ],
+      "raw_schema": 3,
+      "received": [
+        260,
+        77267,
+        240
+      ],
+      "record_size": 240,
+      "record_type": "seal",
+      "rule_stats": [
+        {
+          "bulk_budget_contention": 0,
+          "bulk_budget_suppressed": 0,
+          "collector_appended": [
+            260,
+            0,
+            240
+          ],
+          "collector_durable": [
+            260,
+            0,
+            240
+          ],
+          "collector_observed": [
+            260,
+            0,
+            240
+          ],
+          "collector_queue_rejected": [
+            0,
+            0,
+            0
+          ],
+          "collector_quota_rejected": [
+            0,
+            0,
+            0
+          ],
+          "configured_policy": 1,
+          "enabled": true,
+          "evaluated": 77767,
+          "matched": 500,
+          "precedence": 100,
+          "priority": 2,
+          "quarantine_summarized": 0,
+          "ring_failed": 0,
+          "ring_submitted": 500,
+          "rule_id": 1,
+          "selected": 500,
+          "stats_available": true,
+          "unknown": 203
+        }
+      ],
+      "rule_stats_scope": "AGGREGATE_SELECTED_ATTEMPTS_AND_DURABLE_WRITES; PRE_SEQUENCE_AND_KERNEL_LOSS_NOT_EVENT_IDENTIFIABLE",
+      "rule_stats_snapshot_complete": true,
+      "rule_version": 1,
+      "sequence_snapshot_complete": true,
+      "state": "STOPPED",
+      "stream_snapshot_complete": true,
+      "stream_storage_complete": true,
+      "stream_storage_overflow": 0,
+      "streams": [
+        {
+          "cgroup_id": 21,
+          "collector": {
+            "full_appended": 0,
+            "full_durable": 0,
+            "normal_appended": 260,
+            "normal_durable": 260,
+            "queue_rejected_full": 0,
+            "queue_rejected_sample": 0,
+            "sample_appended": 240,
+            "sample_durable": 240,
+            "storage_rejected_full": 0,
+            "storage_rejected_sample": 0
+          },
+          "critical_ring_failed": 0,
+          "critical_submitted": 260,
+          "engine": {
+            "accounted_seen": 500,
+            "burst_start_ns": 43016000000000,
+            "current": {
+              "burst_start_ns": 43016000000000,
+              "duration_ms": 0,
+              "end_ns": 0,
+              "episode_id": 71051,
+              "first_pid": 25445,
+              "first_sequence": 71051,
+              "first_uid": 0,
+              "full_selected": 0,
+              "full_submitted": 0,
+              "high_rate_duration_ms": 4000,
+              "last_event_ns": 43020395174921,
+              "last_pid": 25445,
+              "last_sequence": 77085,
+              "last_uid": 0,
+              "observed_eps": 100,
+              "peak_rate_eps": 100,
+              "ring_failed": 0,
+              "sample_selected": 40,
+              "sample_submitted": 40,
+              "seen": 40,
+              "start_ns": 43020004956267,
+              "summarized": 0,
+              "threshold_eps": 0,
+              "tracking_complete": 1,
+              "tracking_failed_end": 0,
+              "tracking_failed_start": 0,
+              "unique_pid_lower_bound": 1,
+              "unique_uid_lower_bound": 1
+            },
+            "current_rate_eps": 100,
+            "enter_count": 3,
+            "exit_count": 2,
+            "full_selected": 0,
+            "full_submitted": 0,
+            "high_windows": 4,
+            "initialized": 1,
+            "last": {
+              "burst_start_ns": 43016000000000,
+              "duration_ms": 0,
+              "end_ns": 43019005017932,
+              "episode_id": 40140,
+              "first_pid": 25445,
+              "first_sequence": 40140,
+              "first_uid": 0,
+              "full_selected": 0,
+              "full_submitted": 0,
+              "high_rate_duration_ms": 3000,
+              "last_event_ns": 43018994930347,
+              "last_pid": 25445,
+              "last_sequence": 55438,
+              "last_uid": 0,
+              "observed_eps": 100,
+              "peak_rate_eps": 100,
+              "ring_failed": 0,
+              "sample_selected": 100,
+              "sample_submitted": 100,
+              "seen": 100,
+              "start_ns": 43018004999756,
+              "summarized": 0,
+              "threshold_eps": 0,
+              "tracking_complete": 1,
+              "tracking_failed_end": 0,
+              "tracking_failed_start": 0,
+              "unique_pid_lower_bound": 1,
+              "unique_uid_lower_bound": 1
+            },
+            "low_windows": 0,
+            "next_sample_ns": 43020395174921,
+            "peak_rate_eps": 100,
+            "q_seen": 240,
+            "quarantined": 1,
+            "ring_failed": 0,
+            "sample_selected": 240,
+            "sample_submitted": 240,
+            "summarized": 0,
+            "window_complete": 1,
+            "window_count": 40,
+            "window_start_ns": 43020000000000
+          },
+          "kind": 2,
+          "protected_seen": 0,
+          "rule_id": 1,
+          "seen": 500,
+          "tracking_failed": 0,
+          "transition_ring_failed": 0,
+          "untracked_ring_failed": 0,
+          "untracked_seen": 0,
+          "untracked_selected": 0,
+          "untracked_submitted": 0,
+          "untracked_summarized": 0
+        }
+      ],
+      "summary_kind": "AGGREGATE_ONLY",
+      "tenants": [
+        {
+          "budget_contention": 0,
+          "budget_suppress": 0,
+          "cgroup_id": 21,
+          "critical_full": 0,
+          "general_full": 0,
+          "quarantine_full": 0,
+          "quarantine_submitted": 240,
+          "quarantine_summarized": 0,
+          "sequence": 77365,
+          "stream_contention": 0,
+          "stream_map_full": 0,
+          "submitted": [
+            75012,
+            1853,
+            500
+          ]
+        },
+        {
+          "budget_contention": 0,
+          "budget_suppress": 0,
+          "cgroup_id": 1451,
+          "critical_full": 0,
+          "general_full": 0,
+          "quarantine_full": 0,
+          "quarantine_submitted": 0,
+          "quarantine_summarized": 0,
+          "sequence": 402,
+          "stream_contention": 0,
+          "stream_map_full": 0,
+          "submitted": [
+            24,
+            378,
+            0
+          ]
+        }
+      ],
+      "untracked_collector": {
+        "full_appended": 0,
+        "full_durable": 0,
+        "normal_appended": 0,
+        "normal_durable": 0,
+        "queue_rejected_full": 0,
+        "queue_rejected_sample": 0,
+        "sample_appended": 0,
+        "sample_durable": 0,
+        "storage_rejected_full": 0,
+        "storage_rejected_sample": 0
+      },
+      "version": "0.4.0",
+      "writer_threads": 3
+    },
+    "config_sha256": "cd2f2637173bb954cec9257ff98143cd1e1a87a82d904a25bf222578fbaf696f",
+    "evidence_metadata": {
+      "checkpoint_coalesced": 0,
+      "committed_offset": 55703,
+      "committed_seq": 13,
+      "dropped": 0,
+      "overflow": 0,
+      "persist_failed": 0,
+      "queue_capacity": 4096,
+      "queue_depth": 0,
+      "queue_high_water": 1,
+      "state": "STOPPED"
+    },
+    "failure_evidence": {
+      "evidence_scope": "COLLECTOR_HEALTH_OR_BOUNDED_STDERR_TAIL_ONLY",
+      "evidence_sources": [],
+      "physical_enospc_observed": false
+    },
+    "index": {
+      "alive": false,
+      "complete_to_durable": true,
+      "config_sha256": "cd2f2637173bb954cec9257ff98143cd1e1a87a82d904a25bf222578fbaf696f",
+      "coverage_state": "INDEX_COMPLETE",
+      "durable_offsets": {
+        "critical.raw": 62400,
+        "general.raw": 18544080,
+        "quarantine.raw": 57600
+      },
+      "indexed_offsets": {
+        "critical.raw": 62400,
+        "general.raw": 18544080,
+        "quarantine.raw": 57600
+      },
+      "indexed_records": 77767,
+      "lag_bytes": 0,
+      "lag_records": 0,
+      "lane_coverage": {
+        "critical.raw": {
+          "durable_offset": 62400,
+          "indexed_offset": 62400,
+          "lag_bytes": 0,
+          "lag_records": 0
+        },
+        "general.raw": {
+          "durable_offset": 18544080,
+          "indexed_offset": 18544080,
+          "lag_bytes": 0,
+          "lag_records": 0
+        },
+        "quarantine.raw": {
+          "durable_offset": 57600,
+          "indexed_offset": 57600,
+          "lag_bytes": 0,
+          "lag_records": 0
+        }
+      },
+      "last_progress_monotonic_ns": 43036203305827,
+      "offsets": {
+        "critical.raw": 62400,
+        "general.raw": 18544080,
+        "quarantine.raw": 57600
+      },
+      "state": "INDEX_COMPLETE",
+      "updated_monotonic_ns": 43036203305827,
+      "updated_utc": "2026-10-14T02:20:24.044751+00:00"
+    },
+    "policy_version": 1,
+    "rule_engine_schema_version": 1,
+    "rule_stats": [
+      {
+        "bulk_budget_contention": 0,
+        "bulk_budget_suppressed": 0,
+        "collector_appended": [
+          260,
+          0,
+          240
+        ],
+        "collector_durable": [
+          260,
+          0,
+          240
+        ],
+        "collector_observed": [
+          260,
+          0,
+          240
+        ],
+        "collector_queue_rejected": [
+          0,
+          0,
+          0
+        ],
+        "collector_quota_rejected": [
+          0,
+          0,
+          0
+        ],
+        "configured_policy": 1,
+        "enabled": true,
+        "evaluated": 77767,
+        "matched": 500,
+        "precedence": 100,
+        "priority": 2,
+        "quarantine_summarized": 0,
+        "ring_failed": 0,
+        "ring_submitted": 500,
+        "rule_id": 1,
+        "selected": 500,
+        "stats_available": true,
+        "unknown": 203
+      }
+    ],
+    "rule_stats_scope": "AGGREGATE_SELECTED_ATTEMPTS_AND_DURABLE_WRITES; PRE_SEQUENCE_AND_KERNEL_LOSS_NOT_EVENT_IDENTIFIABLE",
+    "rule_stats_snapshot_complete": true,
+    "run_id": "644e7eba-130d-4520-bb8e-53215b5306a7",
+    "run_path": "/root/mglogwh-perf-2026-10-14/data/runs/644e7eba-130d-4520-bb8e-53215b5306a7",
+    "service": {
+      "collector": {
+        "boot": "73dba5d7-f8c5-4b40-a8b9-53afc395871e",
+        "pid": 24246,
+        "start": "4301435",
+        "state": "R"
+      },
+      "collector_exit": 0,
+      "indexer": {
+        "boot": "73dba5d7-f8c5-4b40-a8b9-53afc395871e",
+        "pid": 24247,
+        "start": "4301437",
+        "state": "R"
+      },
+      "indexer_exit": 0,
+      "state": "STOPPED",
+      "supervisor": {
+        "boot": "73dba5d7-f8c5-4b40-a8b9-53afc395871e",
+        "pid": 24245,
+        "start": "4301424",
+        "state": "R"
+      }
+    },
+    "state": "STOPPED",
+    "storage": {
+      "allocation_total_complete": true,
+      "categories": {
+        "export_derived": {
+          "allocated_bytes": 0,
+          "file_count": 0,
+          "logical_bytes": 0
+        },
+        "metadata_control": {
+          "allocated_bytes": 81920,
+          "file_count": 5,
+          "logical_bytes": 63921
+        },
+        "other": {
+          "allocated_bytes": 12288,
+          "file_count": 7,
+          "logical_bytes": 5801
+        },
+        "raw": {
+          "allocated_bytes": 18677760,
+          "file_count": 3,
+          "logical_bytes": 18664080
+        },
+        "sqlite_main": {
+          "allocated_bytes": 32542720,
+          "file_count": 1,
+          "logical_bytes": 32538624
+        },
+        "sqlite_sidecars_temp": {
+          "allocated_bytes": 0,
+          "file_count": 0,
+          "logical_bytes": 0
+        }
+      },
+      "configured_minimum_free_bytes": 268435456,
+      "critical_reserve_physical": false,
+      "entries_seen": 16,
+      "external_exports_included": false,
+      "external_writers_can_exhaust_filesystem": true,
+      "file_count": 16,
+      "file_logical_bytes": 51272426,
+      "filesystem_free_bytes": 1003397099520,
+      "measurement": "FILE_ST_BLOCKS_TIMES_512_AND_STATVFS_FREE; NOT_A_PHYSICAL_RESERVATION",
+      "pressure": "NORMAL",
+      "scan_limit_entries": 4096,
+      "scan_truncated": false,
+      "scope": "RUN_DIRECTORY_TREE_ONLY",
+      "tree_allocated_bytes": 51314688,
+      "unreadable_entries": 0
+    },
+    "version": "0.4.0"
+  },
+  "target_actual_eps": 15350.362,
+  "target_requested_eps": 15350,
+  "truth": {
+    "actual_eps": 15350.362,
+    "attempts": [
+      75000,
+      500,
+      1250
+    ],
+    "elapsed_seconds": 4.999882118,
+    "expected_results": [
+      75000,
+      500,
+      1250
+    ],
+    "late_over_1ms": [
+      185,
+      1,
+      7
+    ],
+    "p95_us": 49.595,
+    "p99_us": 75.845,
+    "requested_eps": 15350,
+    "scope": "DIRECT_SYS_OPENAT_MONOTONIC_WALL_LATENCY_INCLUDES_SCHEDULING",
+    "seconds_requested": 5,
+    "unexpected_results": [
+      0,
+      0,
+      0
+    ],
+    "workload_cpu_seconds": 3.826092,
+    "workload_max_rss_kib": 24832
+  },
+  "valid_run": true,
+  "valid_workload": true,
+  "watchdog_triggered": false
+}

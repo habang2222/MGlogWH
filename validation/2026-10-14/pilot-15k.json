@@ -1,0 +1,18 @@
+{
+  "condition": "NO_SENSOR",
+  "command": "/tmp/mglogwh-perf-eb9c888-build/bench_workload /tmp/mglogwh-perf-2026-10-14-decoy/bulk-missing /tmp/mglogwh-perf-2026-10-14-decoy/critical /tmp/mglogwh-perf-2026-10-14-decoy/normal 5 15000 100 250",
+  "scope": "DIRECT_SYS_OPENAT_MONOTONIC_WALL_LATENCY_INCLUDES_SCHEDULING",
+  "seconds_requested": 5,
+  "requested_eps": 15350,
+  "elapsed_seconds": 4.999978685,
+  "actual_eps": 15350.065,
+  "attempts": [75000, 500, 1250],
+  "expected_results": [75000, 500, 1250],
+  "unexpected_results": [0, 0, 0],
+  "late_over_1ms": [72, 0, 2],
+  "p95_us": 16.973,
+  "p99_us": 53.455,
+  "workload_cpu_seconds": 2.915403,
+  "workload_max_rss_kib": 3328,
+  "validity": "PASS: independent syscall results complete and achieved >=90% of requested rate"
+}

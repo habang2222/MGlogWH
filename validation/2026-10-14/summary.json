@@ -1,0 +1,151 @@
+{
+  "all_valid": true,
+  "completed": 12,
+  "conditions": [
+    {
+      "actual_eps": 15350.213,
+      "critical_durable": 211,
+      "critical_truth": 500,
+      "health_state": "STOPPED",
+      "label": "baseline-r1",
+      "p95_us": 53.022,
+      "p99_us": 84.892,
+      "recover_status": null,
+      "run_id": "769db064-b97f-480a-97fc-518ce2658e24",
+      "valid_run": true
+    },
+    {
+      "actual_eps": 15348.969,
+      "critical_durable": 286,
+      "critical_truth": 500,
+      "health_state": "STOPPED",
+      "label": "rule1-r1",
+      "p95_us": 49.406,
+      "p99_us": 78.828,
+      "recover_status": null,
+      "run_id": "6e16282c-a381-4ffd-82b1-4eca53c997a8",
+      "valid_run": true
+    },
+    {
+      "actual_eps": 15349.602,
+      "critical_durable": 219,
+      "critical_truth": 500,
+      "health_state": "STOPPED",
+      "label": "rule4-r1",
+      "p95_us": 52.35,
+      "p99_us": 83.786,
+      "recover_status": null,
+      "run_id": "f11ba647-b0ee-4c74-8e9d-8337f8a29485",
+      "valid_run": true
+    },
+    {
+      "actual_eps": 15350.098,
+      "critical_durable": 294,
+      "critical_truth": 500,
+      "health_state": "STOPPED",
+      "label": "rule8-r1",
+      "p95_us": 52.03,
+      "p99_us": 82.133,
+      "recover_status": null,
+      "run_id": "07f3117e-ff71-49bc-979a-5e8e4f96fe0d",
+      "valid_run": true
+    },
+    {
+      "actual_eps": 15349.274,
+      "critical_durable": 235,
+      "critical_truth": 500,
+      "health_state": "STOPPED",
+      "label": "rule8-r2",
+      "p95_us": 53.432,
+      "p99_us": 87.898,
+      "recover_status": null,
+      "run_id": "143aec4e-6fdc-4918-8cdb-edba0737b486",
+      "valid_run": true
+    },
+    {
+      "actual_eps": 15350.161,
+      "critical_durable": 292,
+      "critical_truth": 500,
+      "health_state": "STOPPED",
+      "label": "rule4-r2",
+      "p95_us": 57.971,
+      "p99_us": 107.204,
+      "recover_status": null,
+      "run_id": "b0aa6d42-760e-4175-abe3-85807d5b45ca",
+      "valid_run": true
+    },
+    {
+      "actual_eps": 15350.347,
+      "critical_durable": 261,
+      "critical_truth": 500,
+      "health_state": "STOPPED",
+      "label": "rule1-r2",
+      "p95_us": 56.348,
+      "p99_us": 100.402,
+      "recover_status": null,
+      "run_id": "f9d46c32-f9a2-4065-bcb7-b700bc35d62c",
+      "valid_run": true
+    },
+    {
+      "actual_eps": 15347.306,
+      "critical_durable": 291,
+      "critical_truth": 500,
+      "health_state": "STOPPED",
+      "label": "baseline-r2",
+      "p95_us": 50.431,
+      "p99_us": 91.335,
+      "recover_status": null,
+      "run_id": "74895af7-3478-47f6-a213-4597a77d65fc",
+      "valid_run": true
+    },
+    {
+      "actual_eps": 15350.362,
+      "critical_durable": 260,
+      "critical_truth": 500,
+      "health_state": "STOPPED",
+      "label": "rule1-r3",
+      "p95_us": 49.595,
+      "p99_us": 75.845,
+      "recover_status": null,
+      "run_id": "644e7eba-130d-4520-bb8e-53215b5306a7",
+      "valid_run": true
+    },
+    {
+      "actual_eps": 15350.289,
+      "critical_durable": 227,
+      "critical_truth": 500,
+      "health_state": "STOPPED",
+      "label": "baseline-r3",
+      "p95_us": 48.491,
+      "p99_us": 76.919,
+      "recover_status": null,
+      "run_id": "a6f50583-951d-4b16-a590-fe5d2a1d10a4",
+      "valid_run": true
+    },
+    {
+      "actual_eps": 15350.283,
+      "critical_durable": 249,
+      "critical_truth": 500,
+      "health_state": "STOPPED",
+      "label": "rule8-r3",
+      "p95_us": 52.028,
+      "p99_us": 85.21,
+      "recover_status": null,
+      "run_id": "149af650-98a9-42b2-a783-773d3a884244",
+      "valid_run": true
+    },
+    {
+      "actual_eps": 15350.352,
+      "critical_durable": 234,
+      "critical_truth": 500,
+      "health_state": "STOPPED",
+      "label": "rule4-r3",
+      "p95_us": 51.426,
+      "p99_us": 84.79,
+      "recover_status": null,
+      "run_id": "561321bf-91eb-4e3b-bab7-b82a61df6205",
+      "valid_run": true
+    }
+  ],
+  "requested": 12
+}

@@ -1,0 +1,103 @@
+{
+  "bulk_burst": 1000000,
+  "bulk_rate": 1000000,
+  "critical_rate_duration_seconds": 1,
+  "critical_rate_threshold": 1000000,
+  "critical_recovery_duration_seconds": 10,
+  "critical_recovery_threshold": 2000,
+  "critical_reserve_mib": 32,
+  "event_rules": [
+    {
+      "enabled": true,
+      "id": 1,
+      "overload_policy": "QUARANTINE",
+      "precedence": 100,
+      "priority": "CRITICAL",
+      "when": {
+        "all": [
+          {
+            "field": "event_type",
+            "op": "eq",
+            "value": "openat"
+          },
+          {
+            "field": "path",
+            "op": "eq",
+            "value": "/tmp/mglogwh-perf-2026-10-14-decoy/critical"
+          }
+        ]
+      }
+    },
+    {
+      "enabled": true,
+      "id": 2,
+      "overload_policy": "QUARANTINE",
+      "precedence": 100,
+      "priority": "CRITICAL",
+      "when": {
+        "all": [
+          {
+            "field": "event_type",
+            "op": "eq",
+            "value": "openat"
+          },
+          {
+            "field": "path",
+            "op": "eq",
+            "value": "/tmp/mglogwh-perf-2026-10-14-decoy/unused-1"
+          }
+        ]
+      }
+    },
+    {
+      "enabled": true,
+      "id": 3,
+      "overload_policy": "QUARANTINE",
+      "precedence": 100,
+      "priority": "CRITICAL",
+      "when": {
+        "all": [
+          {
+            "field": "event_type",
+            "op": "eq",
+            "value": "openat"
+          },
+          {
+            "field": "path",
+            "op": "eq",
+            "value": "/tmp/mglogwh-perf-2026-10-14-decoy/unused-2"
+          }
+        ]
+      }
+    },
+    {
+      "enabled": true,
+      "id": 4,
+      "overload_policy": "QUARANTINE",
+      "precedence": 100,
+      "priority": "CRITICAL",
+      "when": {
+        "all": [
+          {
+            "field": "event_type",
+            "op": "eq",
+            "value": "openat"
+          },
+          {
+            "field": "path",
+            "op": "eq",
+            "value": "/tmp/mglogwh-perf-2026-10-14-decoy/unused-3"
+          }
+        ]
+      }
+    }
+  ],
+  "max_index_mib": 64,
+  "max_raw_mib": 128,
+  "metadata_max_mib": 8,
+  "minimum_free_mib": 256,
+  "protected_path": "/tmp/mglogwh-perf-2026-10-14-decoy/critical",
+  "quarantine_initial_full_events": 8,
+  "quarantine_max_mib": 8,
+  "quarantine_sample_interval_ms": 100
+}

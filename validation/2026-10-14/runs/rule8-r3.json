@@ -1,0 +1,1964 @@
+{
+  "command": [
+    "/tmp/mglogwh-perf-eb9c888-build/bench_workload",
+    "/tmp/mglogwh-perf-2026-10-14-decoy/bulk-missing",
+    "/tmp/mglogwh-perf-2026-10-14-decoy/critical",
+    "/tmp/mglogwh-perf-2026-10-14-decoy/normal",
+    "5",
+    "15000",
+    "100",
+    "250"
+  ],
+  "condition": "rule8",
+  "config_file": "/mnt/c/Users/victo/Desktop/MGlogWH-github-update/validation/2026-10-14/configs/rule8.json",
+  "config_file_sha256": "658b5a7aa52f5f0eaa9ec8824ab4ba1c3ce2d2f6dfb080f85e39b9db9483aae5",
+  "critical_count_difference": 251,
+  "critical_durable_count": 249,
+  "critical_durable_recall": 0.498,
+  "critical_truth_count": 500,
+  "health": {
+    "active_quarantined_streams": 1,
+    "admitted": [
+      249,
+      77026,
+      251
+    ],
+    "appended": [
+      249,
+      77026,
+      251
+    ],
+    "config_sha256": "2c857e46279a0312dad5b1bf3e9aae1a0d6511a46a30c406ad7f3c7e24b1ebb1",
+    "cpu_seconds": 3.726062,
+    "critical_events_total": 500,
+    "critical_scheduler": "FIFO",
+    "critical_seen_total": 500,
+    "dedicated_drain_thread": true,
+    "durable": {
+      "critical.raw": 59760,
+      "general.raw": 18486240,
+      "quarantine.raw": 60240
+    },
+    "durable_offsets": {
+      "critical": 59760,
+      "general": 18486240,
+      "quarantine": 60240
+    },
+    "error_errno": 0,
+    "exact_loss_available": true,
+    "exact_loss_scope": "USERSPACE_REJECTIONS",
+    "fault_snapshot_complete": true,
+    "faults": [
+      0,
+      0,
+      12,
+      0
+    ],
+    "general_quota_drop": 0,
+    "max_rss_kib": 22528,
+    "metadata": {
+      "checkpoint_coalesced": 0,
+      "committed_offset": 79561,
+      "committed_seq": 13,
+      "dropped": 0,
+      "overflow": 0,
+      "persist_failed": 0,
+      "queue_capacity": 4096,
+      "queue_depth": 0,
+      "queue_high_water": 1,
+      "state": "STOPPED"
+    },
+    "metadata_dropped": 0,
+    "metadata_failed": false,
+    "metadata_overflow": 0,
+    "monotonic_ms": 43070263,
+    "peak_critical_rate": 100,
+    "peak_critical_rate_scope": "MAX_TRACKED_STREAM_ONE_SECOND_EPS",
+    "persist_failed": 0,
+    "pid": 24380,
+    "policy_version": 1,
+    "protected_critical_seen_total": 0,
+    "quarantine_accounting_final": true,
+    "quarantine_by_reason": {
+      "CRITICAL_RATE_EXCEEDED": 3,
+      "CRITICAL_RATE_RECOVERED": 2
+    },
+    "quarantine_by_reason_scope": "TRANSITIONS",
+    "quarantine_dropped_total": 0,
+    "quarantine_enter_total": 3,
+    "quarantine_exit_total": 2,
+    "quarantine_full_appended_total": 0,
+    "quarantine_full_saved_total": 0,
+    "quarantine_full_selected_total": 0,
+    "quarantine_full_submitted_total": 0,
+    "quarantine_global": {
+      "critical_events_total": 500,
+      "protected_events_total": 0,
+      "quarantined_events_total": 251,
+      "state_contention": 0,
+      "stream_map_full": 0,
+      "transition_ring_failed": 0,
+      "untracked_protected": 0,
+      "untracked_protected_ring_failed": 0,
+      "untracked_protected_submitted": 0,
+      "untracked_ring_failed": 0,
+      "untracked_seen": 0,
+      "untracked_selected": 0,
+      "untracked_submitted": 0,
+      "untracked_summarized": 0
+    },
+    "quarantine_not_stored_observed_total": 0,
+    "quarantine_pending_total": 0,
+    "quarantine_ring_failed_total": 0,
+    "quarantine_sample_appended_total": 251,
+    "quarantine_sample_selected_total": 251,
+    "quarantine_sample_submitted_total": 251,
+    "quarantine_sampled_total": 251,
+    "quarantine_seen_total": 251,
+    "quarantine_storage_drop": 0,
+    "quarantine_summarized_total": 0,
+    "quarantine_tracking_complete": true,
+    "quarantined_events_total": 251,
+    "quarantined_streams": 1,
+    "queue_capacity": [
+      8192,
+      16384,
+      512
+    ],
+    "queue_depth": [
+      0,
+      0,
+      0
+    ],
+    "queue_high_water": [
+      1,
+      829,
+      4
+    ],
+    "queue_in_flight": [
+      0,
+      0,
+      0
+    ],
+    "queue_overflow": [
+      0,
+      0,
+      0
+    ],
+    "raw_schema": 3,
+    "received": [
+      249,
+      77026,
+      251
+    ],
+    "record_size": 240,
+    "record_type": "seal",
+    "rule_stats": [
+      {
+        "bulk_budget_contention": 0,
+        "bulk_budget_suppressed": 0,
+        "collector_appended": [
+          249,
+          0,
+          251
+        ],
+        "collector_durable": [
+          249,
+          0,
+          251
+        ],
+        "collector_observed": [
+          249,
+          0,
+          251
+        ],
+        "collector_queue_rejected": [
+          0,
+          0,
+          0
+        ],
+        "collector_quota_rejected": [
+          0,
+          0,
+          0
+        ],
+        "configured_policy": 1,
+        "enabled": true,
+        "evaluated": 77526,
+        "matched": 500,
+        "precedence": 100,
+        "priority": 2,
+        "quarantine_summarized": 0,
+        "ring_failed": 0,
+        "ring_submitted": 500,
+        "rule_id": 1,
+        "selected": 500,
+        "stats_available": true,
+        "unknown": 85
+      },
+      {
+        "bulk_budget_contention": 0,
+        "bulk_budget_suppressed": 0,
+        "collector_appended": [
+          0,
+          0,
+          0
+        ],
+        "collector_durable": [
+          0,
+          0,
+          0
+        ],
+        "collector_observed": [
+          0,
+          0,
+          0
+        ],
+        "collector_queue_rejected": [
+          0,
+          0,
+          0
+        ],
+        "collector_quota_rejected": [
+          0,
+          0,
+          0
+        ],
+        "configured_policy": 1,
+        "enabled": true,
+        "evaluated": 77526,
+        "matched": 0,
+        "precedence": 100,
+        "priority": 2,
+        "quarantine_summarized": 0,
+        "ring_failed": 0,
+        "ring_submitted": 0,
+        "rule_id": 2,
+        "selected": 0,
+        "stats_available": true,
+        "unknown": 85
+      },
+      {
+        "bulk_budget_contention": 0,
+        "bulk_budget_suppressed": 0,
+        "collector_appended": [
+          0,
+          0,
+          0
+        ],
+        "collector_durable": [
+          0,
+          0,
+          0
+        ],
+        "collector_observed": [
+          0,
+          0,
+          0
+        ],
+        "collector_queue_rejected": [
+          0,
+          0,
+          0
+        ],
+        "collector_quota_rejected": [
+          0,
+          0,
+          0
+        ],
+        "configured_policy": 1,
+        "enabled": true,
+        "evaluated": 77526,
+        "matched": 0,
+        "precedence": 100,
+        "priority": 2,
+        "quarantine_summarized": 0,
+        "ring_failed": 0,
+        "ring_submitted": 0,
+        "rule_id": 3,
+        "selected": 0,
+        "stats_available": true,
+        "unknown": 85
+      },
+      {
+        "bulk_budget_contention": 0,
+        "bulk_budget_suppressed": 0,
+        "collector_appended": [
+          0,
+          0,
+          0
+        ],
+        "collector_durable": [
+          0,
+          0,
+          0
+        ],
+        "collector_observed": [
+          0,
+          0,
+          0
+        ],
+        "collector_queue_rejected": [
+          0,
+          0,
+          0
+        ],
+        "collector_quota_rejected": [
+          0,
+          0,
+          0
+        ],
+        "configured_policy": 1,
+        "enabled": true,
+        "evaluated": 77526,
+        "matched": 0,
+        "precedence": 100,
+        "priority": 2,
+        "quarantine_summarized": 0,
+        "ring_failed": 0,
+        "ring_submitted": 0,
+        "rule_id": 4,
+        "selected": 0,
+        "stats_available": true,
+        "unknown": 85
+      },
+      {
+        "bulk_budget_contention": 0,
+        "bulk_budget_suppressed": 0,
+        "collector_appended": [
+          0,
+          0,
+          0
+        ],
+        "collector_durable": [
+          0,
+          0,
+          0
+        ],
+        "collector_observed": [
+          0,
+          0,
+          0
+        ],
+        "collector_queue_rejected": [
+          0,
+          0,
+          0
+        ],
+        "collector_quota_rejected": [
+          0,
+          0,
+          0
+        ],
+        "configured_policy": 1,
+        "enabled": true,
+        "evaluated": 77526,
+        "matched": 0,
+        "precedence": 100,
+        "priority": 2,
+        "quarantine_summarized": 0,
+        "ring_failed": 0,
+        "ring_submitted": 0,
+        "rule_id": 5,
+        "selected": 0,
+        "stats_available": true,
+        "unknown": 85
+      },
+      {
+        "bulk_budget_contention": 0,
+        "bulk_budget_suppressed": 0,
+        "collector_appended": [
+          0,
+          0,
+          0
+        ],
+        "collector_durable": [
+          0,
+          0,
+          0
+        ],
+        "collector_observed": [
+          0,
+          0,
+          0
+        ],
+        "collector_queue_rejected": [
+          0,
+          0,
+          0
+        ],
+        "collector_quota_rejected": [
+          0,
+          0,
+          0
+        ],
+        "configured_policy": 1,
+        "enabled": true,
+        "evaluated": 77526,
+        "matched": 0,
+        "precedence": 100,
+        "priority": 2,
+        "quarantine_summarized": 0,
+        "ring_failed": 0,
+        "ring_submitted": 0,
+        "rule_id": 6,
+        "selected": 0,
+        "stats_available": true,
+        "unknown": 85
+      },
+      {
+        "bulk_budget_contention": 0,
+        "bulk_budget_suppressed": 0,
+        "collector_appended": [
+          0,
+          0,
+          0
+        ],
+        "collector_durable": [
+          0,
+          0,
+          0
+        ],
+        "collector_observed": [
+          0,
+          0,
+          0
+        ],
+        "collector_queue_rejected": [
+          0,
+          0,
+          0
+        ],
+        "collector_quota_rejected": [
+          0,
+          0,
+          0
+        ],
+        "configured_policy": 1,
+        "enabled": true,
+        "evaluated": 77526,
+        "matched": 0,
+        "precedence": 100,
+        "priority": 2,
+        "quarantine_summarized": 0,
+        "ring_failed": 0,
+        "ring_submitted": 0,
+        "rule_id": 7,
+        "selected": 0,
+        "stats_available": true,
+        "unknown": 85
+      },
+      {
+        "bulk_budget_contention": 0,
+        "bulk_budget_suppressed": 0,
+        "collector_appended": [
+          0,
+          0,
+          0
+        ],
+        "collector_durable": [
+          0,
+          0,
+          0
+        ],
+        "collector_observed": [
+          0,
+          0,
+          0
+        ],
+        "collector_queue_rejected": [
+          0,
+          0,
+          0
+        ],
+        "collector_quota_rejected": [
+          0,
+          0,
+          0
+        ],
+        "configured_policy": 1,
+        "enabled": true,
+        "evaluated": 77526,
+        "matched": 0,
+        "precedence": 100,
+        "priority": 2,
+        "quarantine_summarized": 0,
+        "ring_failed": 0,
+        "ring_submitted": 0,
+        "rule_id": 8,
+        "selected": 0,
+        "stats_available": true,
+        "unknown": 85
+      }
+    ],
+    "rule_stats_scope": "AGGREGATE_SELECTED_ATTEMPTS_AND_DURABLE_WRITES; PRE_SEQUENCE_AND_KERNEL_LOSS_NOT_EVENT_IDENTIFIABLE",
+    "rule_stats_snapshot_complete": true,
+    "rule_version": 1,
+    "sequence_snapshot_complete": true,
+    "state": "STOPPED",
+    "stream_snapshot_complete": true,
+    "stream_storage_complete": true,
+    "stream_storage_overflow": 0,
+    "streams": [
+      {
+        "cgroup_id": 21,
+        "collector": {
+          "full_appended": 0,
+          "full_durable": 0,
+          "normal_appended": 249,
+          "normal_durable": 249,
+          "queue_rejected_full": 0,
+          "queue_rejected_sample": 0,
+          "sample_appended": 251,
+          "sample_durable": 251,
+          "storage_rejected_full": 0,
+          "storage_rejected_sample": 0
+        },
+        "critical_ring_failed": 0,
+        "critical_submitted": 249,
+        "engine": {
+          "accounted_seen": 500,
+          "burst_start_ns": 43065000000000,
+          "current": {
+            "burst_start_ns": 43065000000000,
+            "duration_ms": 0,
+            "end_ns": 0,
+            "episode_id": 69305,
+            "first_pid": 25600,
+            "first_sequence": 69305,
+            "first_uid": 0,
+            "full_selected": 0,
+            "full_submitted": 0,
+            "high_rate_duration_ms": 4000,
+            "last_event_ns": 43069500161790,
+            "last_pid": 25600,
+            "last_sequence": 77034,
+            "last_uid": 0,
+            "observed_eps": 100,
+            "peak_rate_eps": 100,
+            "ring_failed": 0,
+            "sample_selected": 51,
+            "sample_submitted": 51,
+            "seen": 51,
+            "start_ns": 43069000159268,
+            "summarized": 0,
+            "threshold_eps": 0,
+            "tracking_complete": 1,
+            "tracking_failed_end": 0,
+            "tracking_failed_start": 0,
+            "unique_pid_lower_bound": 1,
+            "unique_uid_lower_bound": 1
+          },
+          "current_rate_eps": 100,
+          "enter_count": 3,
+          "exit_count": 2,
+          "full_selected": 0,
+          "full_submitted": 0,
+          "high_windows": 4,
+          "initialized": 1,
+          "last": {
+            "burst_start_ns": 43065000000000,
+            "duration_ms": 0,
+            "end_ns": 43068000106281,
+            "episode_id": 38399,
+            "first_pid": 25600,
+            "first_sequence": 38399,
+            "first_uid": 0,
+            "full_selected": 0,
+            "full_submitted": 0,
+            "high_rate_duration_ms": 3000,
+            "last_event_ns": 43067990076609,
+            "last_pid": 25600,
+            "last_sequence": 53697,
+            "last_uid": 0,
+            "observed_eps": 100,
+            "peak_rate_eps": 100,
+            "ring_failed": 0,
+            "sample_selected": 100,
+            "sample_submitted": 100,
+            "seen": 100,
+            "start_ns": 43067000102531,
+            "summarized": 0,
+            "threshold_eps": 0,
+            "tracking_complete": 1,
+            "tracking_failed_end": 0,
+            "tracking_failed_start": 0,
+            "unique_pid_lower_bound": 1,
+            "unique_uid_lower_bound": 1
+          },
+          "low_windows": 0,
+          "next_sample_ns": 43069500161790,
+          "peak_rate_eps": 100,
+          "q_seen": 251,
+          "quarantined": 1,
+          "ring_failed": 0,
+          "sample_selected": 251,
+          "sample_submitted": 251,
+          "summarized": 0,
+          "window_complete": 1,
+          "window_count": 51,
+          "window_start_ns": 43069000000000
+        },
+        "kind": 2,
+        "protected_seen": 0,
+        "rule_id": 1,
+        "seen": 500,
+        "tracking_failed": 0,
+        "transition_ring_failed": 0,
+        "untracked_ring_failed": 0,
+        "untracked_seen": 0,
+        "untracked_selected": 0,
+        "untracked_submitted": 0,
+        "untracked_summarized": 0
+      }
+    ],
+    "summary_kind": "AGGREGATE_ONLY",
+    "tenants": [
+      {
+        "budget_contention": 0,
+        "budget_suppress": 0,
+        "cgroup_id": 1451,
+        "critical_full": 0,
+        "general_full": 0,
+        "quarantine_full": 0,
+        "quarantine_submitted": 0,
+        "quarantine_summarized": 0,
+        "sequence": 181,
+        "stream_contention": 0,
+        "stream_map_full": 0,
+        "submitted": [
+          9,
+          172,
+          0
+        ]
+      },
+      {
+        "budget_contention": 0,
+        "budget_suppress": 0,
+        "cgroup_id": 21,
+        "critical_full": 0,
+        "general_full": 0,
+        "quarantine_full": 0,
+        "quarantine_submitted": 251,
+        "quarantine_summarized": 0,
+        "sequence": 77345,
+        "stream_contention": 0,
+        "stream_map_full": 0,
+        "submitted": [
+          75008,
+          1837,
+          500
+        ]
+      }
+    ],
+    "untracked_collector": {
+      "full_appended": 0,
+      "full_durable": 0,
+      "normal_appended": 0,
+      "normal_durable": 0,
+      "queue_rejected_full": 0,
+      "queue_rejected_sample": 0,
+      "sample_appended": 0,
+      "sample_durable": 0,
+      "storage_rejected_full": 0,
+      "storage_rejected_sample": 0
+    },
+    "version": "0.4.0",
+    "writer_threads": 3
+  },
+  "index_file_bytes": 32456704,
+  "index_health": {
+    "complete_to_durable": true,
+    "config_sha256": "2c857e46279a0312dad5b1bf3e9aae1a0d6511a46a30c406ad7f3c7e24b1ebb1",
+    "coverage_state": "INDEX_COMPLETE",
+    "durable_offsets": {
+      "critical.raw": 59760,
+      "general.raw": 18486240,
+      "quarantine.raw": 60240
+    },
+    "indexed_offsets": {
+      "critical.raw": 59760,
+      "general.raw": 18486240,
+      "quarantine.raw": 60240
+    },
+    "indexed_records": 77526,
+    "lag_bytes": 0,
+    "lag_records": 0,
+    "lane_coverage": {
+      "critical.raw": {
+        "durable_offset": 59760,
+        "indexed_offset": 59760,
+        "lag_bytes": 0,
+        "lag_records": 0
+      },
+      "general.raw": {
+        "durable_offset": 18486240,
+        "indexed_offset": 18486240,
+        "lag_bytes": 0,
+        "lag_records": 0
+      },
+      "quarantine.raw": {
+        "durable_offset": 60240,
+        "indexed_offset": 60240,
+        "lag_bytes": 0,
+        "lag_records": 0
+      }
+    },
+    "last_progress_monotonic_ns": 43084705794393,
+    "offsets": {
+      "critical.raw": 59760,
+      "general.raw": 18486240,
+      "quarantine.raw": 60240
+    },
+    "state": "INDEX_COMPLETE",
+    "updated_monotonic_ns": 43084705794393,
+    "updated_utc": "2026-10-14T02:21:10.079602+00:00"
+  },
+  "label": "rule8-r3",
+  "manifest_sha256": "b843713c3d363d3f3c1841e0e99d76356d592fa3367d81a12f7e304471b0d609",
+  "normalized_config_sha256": "2c857e46279a0312dad5b1bf3e9aae1a0d6511a46a30c406ad7f3c7e24b1ebb1",
+  "raw": {
+    "by_lane": {
+      "critical.raw": 249,
+      "general.raw": 77026,
+      "quarantine.raw": 251
+    },
+    "by_path": {
+      "/tmp/mglogwh-perf-2026-10-14-decoy/bulk-missing": {
+        "lanes": {
+          "general.raw": 75000
+        },
+        "priorities": {
+          "BULK": 75000
+        },
+        "rule_ids": {
+          "0": 75000
+        },
+        "total": 75000
+      },
+      "/tmp/mglogwh-perf-2026-10-14-decoy/critical": {
+        "lanes": {
+          "critical.raw": 249,
+          "quarantine.raw": 251
+        },
+        "priorities": {
+          "CRITICAL": 500
+        },
+        "rule_ids": {
+          "1": 500
+        },
+        "total": 500
+      },
+      "/tmp/mglogwh-perf-2026-10-14-decoy/normal": {
+        "lanes": {
+          "general.raw": 1250
+        },
+        "priorities": {
+          "NORMAL": 1250
+        },
+        "rule_ids": {
+          "0": 1250
+        },
+        "total": 1250
+      }
+    },
+    "crc_and_schema_valid": true,
+    "errors": [],
+    "records_total": 77526
+  },
+  "raw_file_bytes": {
+    "critical.raw": 59760,
+    "general.raw": 18486240,
+    "quarantine.raw": 60240
+  },
+  "recover_error": "command ['/usr/bin/python3', '/tmp/mglogwh-perf-eb9c888-source/manage.py', 'recover', '--run-dir', '/root/mglogwh-perf-2026-10-14/data/runs/149af650-98a9-42b2-a783-773d3a884244'] exited 2:  ence_set_complete\": false,\n  \"raw_recovery_supported\": false,\n  \"durable_records\": 0,\n  \"durable_unique_events\": 0,\n  \"duplicate_loss_records\": 0,\n  \"duplicate_quarantine_controls\": 0,\n  \"source_modified\": false,\n  \"recovery_policy\": \"COMMITTED_FENCE_ONLY_NO_TAIL_PROMOTION\",\n  \"verification_progress\": {\n    \"scope\": \"DIAGNOSTIC_ONLY_NOT_PARTIAL_RECOVERY\",\n    \"journal_committed_boundary_bytes\": 79561,\n    \"journal_verified_prefix_bytes\": 0,\n    \"journal_verified_frames\": 0,\n    \"raw_verified_prefix_bytes\": {}\n  },\n  \"counter_reason_policy\": \"AGGREGATE_ONLY_NEVER_ASSIGN_TO_GAPS\",\n  \"lineage\": {\n    \"run_id\": \"149af650-98a9-42b2-a783-773d3a884244\",\n    \"boot_id\": \"73dba5d7-f8c5-4b40-a8b9-53afc395871e\",\n    \"config_sha256\": \"2c857e46279a0312dad5b1bf3e9aae1a0d6511a46a30c406ad7f3c7e24b1ebb1\",\n    \"manifest_sha256\": \"b843713c3d363d3f3c1841e0e99d76356d592fa3367d81a12f7e304471b0d609\"\n  },\n  \"userspace_loss_reason_coverage_complete\": false,\n  \"userspace_loss_witness_coverage_complete\": false\n}\n",
+  "repeat": 3,
+  "resources_after": {
+    "filesystem_free_bytes": 1003293536256,
+    "filesystem_total_bytes": 1081101176832,
+    "memory_available_kib": 6909188
+  },
+  "resources_before": {
+    "filesystem_free_bytes": 1003344756736,
+    "filesystem_total_bytes": 1081101176832,
+    "memory_available_kib": 6907400
+  },
+  "rules_bin_sha256": "747842262595b45000c458df58c8d30e466140930286ca5ca1ef6c97b4e0839c",
+  "run_dir": "/root/mglogwh-perf-2026-10-14/data/runs/149af650-98a9-42b2-a783-773d3a884244",
+  "run_id": "149af650-98a9-42b2-a783-773d3a884244",
+  "start_state": "RUNNING",
+  "started_utc": "2026-10-14T02:20:47Z",
+  "stop_status": {
+    "collector": {
+      "active_quarantined_streams": 1,
+      "admitted": [
+        249,
+        77026,
+        251
+      ],
+      "appended": [
+        249,
+        77026,
+        251
+      ],
+      "config_sha256": "2c857e46279a0312dad5b1bf3e9aae1a0d6511a46a30c406ad7f3c7e24b1ebb1",
+      "cpu_seconds": 3.726062,
+      "critical_events_total": 500,
+      "critical_scheduler": "FIFO",
+      "critical_seen_total": 500,
+      "dedicated_drain_thread": true,
+      "durable": {
+        "critical.raw": 59760,
+        "general.raw": 18486240,
+        "quarantine.raw": 60240
+      },
+      "durable_offsets": {
+        "critical": 59760,
+        "general": 18486240,
+        "quarantine": 60240
+      },
+      "error_errno": 0,
+      "exact_loss_available": true,
+      "exact_loss_scope": "USERSPACE_REJECTIONS",
+      "fault_snapshot_complete": true,
+      "faults": [
+        0,
+        0,
+        12,
+        0
+      ],
+      "general_quota_drop": 0,
+      "max_rss_kib": 22528,
+      "metadata": {
+        "checkpoint_coalesced": 0,
+        "committed_offset": 79561,
+        "committed_seq": 13,
+        "dropped": 0,
+        "overflow": 0,
+        "persist_failed": 0,
+        "queue_capacity": 4096,
+        "queue_depth": 0,
+        "queue_high_water": 1,
+        "state": "STOPPED"
+      },
+      "metadata_dropped": 0,
+      "metadata_failed": false,
+      "metadata_overflow": 0,
+      "monotonic_ms": 43070263,
+      "peak_critical_rate": 100,
+      "peak_critical_rate_scope": "MAX_TRACKED_STREAM_ONE_SECOND_EPS",
+      "persist_failed": 0,
+      "pid": 24380,
+      "policy_version": 1,
+      "protected_critical_seen_total": 0,
+      "quarantine_accounting_final": true,
+      "quarantine_by_reason": {
+        "CRITICAL_RATE_EXCEEDED": 3,
+        "CRITICAL_RATE_RECOVERED": 2
+      },
+      "quarantine_by_reason_scope": "TRANSITIONS",
+      "quarantine_dropped_total": 0,
+      "quarantine_enter_total": 3,
+      "quarantine_exit_total": 2,
+      "quarantine_full_appended_total": 0,
+      "quarantine_full_saved_total": 0,
+      "quarantine_full_selected_total": 0,
+      "quarantine_full_submitted_total": 0,
+      "quarantine_global": {
+        "critical_events_total": 500,
+        "protected_events_total": 0,
+        "quarantined_events_total": 251,
+        "state_contention": 0,
+        "stream_map_full": 0,
+        "transition_ring_failed": 0,
+        "untracked_protected": 0,
+        "untracked_protected_ring_failed": 0,
+        "untracked_protected_submitted": 0,
+        "untracked_ring_failed": 0,
+        "untracked_seen": 0,
+        "untracked_selected": 0,
+        "untracked_submitted": 0,
+        "untracked_summarized": 0
+      },
+      "quarantine_not_stored_observed_total": 0,
+      "quarantine_pending_total": 0,
+      "quarantine_ring_failed_total": 0,
+      "quarantine_sample_appended_total": 251,
+      "quarantine_sample_selected_total": 251,
+      "quarantine_sample_submitted_total": 251,
+      "quarantine_sampled_total": 251,
+      "quarantine_seen_total": 251,
+      "quarantine_storage_drop": 0,
+      "quarantine_summarized_total": 0,
+      "quarantine_tracking_complete": true,
+      "quarantined_events_total": 251,
+      "quarantined_streams": 1,
+      "queue_capacity": [
+        8192,
+        16384,
+        512
+      ],
+      "queue_depth": [
+        0,
+        0,
+        0
+      ],
+      "queue_high_water": [
+        1,
+        829,
+        4
+      ],
+      "queue_in_flight": [
+        0,
+        0,
+        0
+      ],
+      "queue_overflow": [
+        0,
+        0,
+        0
+      ],
+      "raw_schema": 3,
+      "received": [
+        249,
+        77026,
+        251
+      ],
+      "record_size": 240,
+      "record_type": "seal",
+      "rule_stats": [
+        {
+          "bulk_budget_contention": 0,
+          "bulk_budget_suppressed": 0,
+          "collector_appended": [
+            249,
+            0,
+            251
+          ],
+          "collector_durable": [
+            249,
+            0,
+            251
+          ],
+          "collector_observed": [
+            249,
+            0,
+            251
+          ],
+          "collector_queue_rejected": [
+            0,
+            0,
+            0
+          ],
+          "collector_quota_rejected": [
+            0,
+            0,
+            0
+          ],
+          "configured_policy": 1,
+          "enabled": true,
+          "evaluated": 77526,
+          "matched": 500,
+          "precedence": 100,
+          "priority": 2,
+          "quarantine_summarized": 0,
+          "ring_failed": 0,
+          "ring_submitted": 500,
+          "rule_id": 1,
+          "selected": 500,
+          "stats_available": true,
+          "unknown": 85
+        },
+        {
+          "bulk_budget_contention": 0,
+          "bulk_budget_suppressed": 0,
+          "collector_appended": [
+            0,
+            0,
+            0
+          ],
+          "collector_durable": [
+            0,
+            0,
+            0
+          ],
+          "collector_observed": [
+            0,
+            0,
+            0
+          ],
+          "collector_queue_rejected": [
+            0,
+            0,
+            0
+          ],
+          "collector_quota_rejected": [
+            0,
+            0,
+            0
+          ],
+          "configured_policy": 1,
+          "enabled": true,
+          "evaluated": 77526,
+          "matched": 0,
+          "precedence": 100,
+          "priority": 2,
+          "quarantine_summarized": 0,
+          "ring_failed": 0,
+          "ring_submitted": 0,
+          "rule_id": 2,
+          "selected": 0,
+          "stats_available": true,
+          "unknown": 85
+        },
+        {
+          "bulk_budget_contention": 0,
+          "bulk_budget_suppressed": 0,
+          "collector_appended": [
+            0,
+            0,
+            0
+          ],
+          "collector_durable": [
+            0,
+            0,
+            0
+          ],
+          "collector_observed": [
+            0,
+            0,
+            0
+          ],
+          "collector_queue_rejected": [
+            0,
+            0,
+            0
+          ],
+          "collector_quota_rejected": [
+            0,
+            0,
+            0
+          ],
+          "configured_policy": 1,
+          "enabled": true,
+          "evaluated": 77526,
+          "matched": 0,
+          "precedence": 100,
+          "priority": 2,
+          "quarantine_summarized": 0,
+          "ring_failed": 0,
+          "ring_submitted": 0,
+          "rule_id": 3,
+          "selected": 0,
+          "stats_available": true,
+          "unknown": 85
+        },
+        {
+          "bulk_budget_contention": 0,
+          "bulk_budget_suppressed": 0,
+          "collector_appended": [
+            0,
+            0,
+            0
+          ],
+          "collector_durable": [
+            0,
+            0,
+            0
+          ],
+          "collector_observed": [
+            0,
+            0,
+            0
+          ],
+          "collector_queue_rejected": [
+            0,
+            0,
+            0
+          ],
+          "collector_quota_rejected": [
+            0,
+            0,
+            0
+          ],
+          "configured_policy": 1,
+          "enabled": true,
+          "evaluated": 77526,
+          "matched": 0,
+          "precedence": 100,
+          "priority": 2,
+          "quarantine_summarized": 0,
+          "ring_failed": 0,
+          "ring_submitted": 0,
+          "rule_id": 4,
+          "selected": 0,
+          "stats_available": true,
+          "unknown": 85
+        },
+        {
+          "bulk_budget_contention": 0,
+          "bulk_budget_suppressed": 0,
+          "collector_appended": [
+            0,
+            0,
+            0
+          ],
+          "collector_durable": [
+            0,
+            0,
+            0
+          ],
+          "collector_observed": [
+            0,
+            0,
+            0
+          ],
+          "collector_queue_rejected": [
+            0,
+            0,
+            0
+          ],
+          "collector_quota_rejected": [
+            0,
+            0,
+            0
+          ],
+          "configured_policy": 1,
+          "enabled": true,
+          "evaluated": 77526,
+          "matched": 0,
+          "precedence": 100,
+          "priority": 2,
+          "quarantine_summarized": 0,
+          "ring_failed": 0,
+          "ring_submitted": 0,
+          "rule_id": 5,
+          "selected": 0,
+          "stats_available": true,
+          "unknown": 85
+        },
+        {
+          "bulk_budget_contention": 0,
+          "bulk_budget_suppressed": 0,
+          "collector_appended": [
+            0,
+            0,
+            0
+          ],
+          "collector_durable": [
+            0,
+            0,
+            0
+          ],
+          "collector_observed": [
+            0,
+            0,
+            0
+          ],
+          "collector_queue_rejected": [
+            0,
+            0,
+            0
+          ],
+          "collector_quota_rejected": [
+            0,
+            0,
+            0
+          ],
+          "configured_policy": 1,
+          "enabled": true,
+          "evaluated": 77526,
+          "matched": 0,
+          "precedence": 100,
+          "priority": 2,
+          "quarantine_summarized": 0,
+          "ring_failed": 0,
+          "ring_submitted": 0,
+          "rule_id": 6,
+          "selected": 0,
+          "stats_available": true,
+          "unknown": 85
+        },
+        {
+          "bulk_budget_contention": 0,
+          "bulk_budget_suppressed": 0,
+          "collector_appended": [
+            0,
+            0,
+            0
+          ],
+          "collector_durable": [
+            0,
+            0,
+            0
+          ],
+          "collector_observed": [
+            0,
+            0,
+            0
+          ],
+          "collector_queue_rejected": [
+            0,
+            0,
+            0
+          ],
+          "collector_quota_rejected": [
+            0,
+            0,
+            0
+          ],
+          "configured_policy": 1,
+          "enabled": true,
+          "evaluated": 77526,
+          "matched": 0,
+          "precedence": 100,
+          "priority": 2,
+          "quarantine_summarized": 0,
+          "ring_failed": 0,
+          "ring_submitted": 0,
+          "rule_id": 7,
+          "selected": 0,
+          "stats_available": true,
+          "unknown": 85
+        },
+        {
+          "bulk_budget_contention": 0,
+          "bulk_budget_suppressed": 0,
+          "collector_appended": [
+            0,
+            0,
+            0
+          ],
+          "collector_durable": [
+            0,
+            0,
+            0
+          ],
+          "collector_observed": [
+            0,
+            0,
+            0
+          ],
+          "collector_queue_rejected": [
+            0,
+            0,
+            0
+          ],
+          "collector_quota_rejected": [
+            0,
+            0,
+            0
+          ],
+          "configured_policy": 1,
+          "enabled": true,
+          "evaluated": 77526,
+          "matched": 0,
+          "precedence": 100,
+          "priority": 2,
+          "quarantine_summarized": 0,
+          "ring_failed": 0,
+          "ring_submitted": 0,
+          "rule_id": 8,
+          "selected": 0,
+          "stats_available": true,
+          "unknown": 85
+        }
+      ],
+      "rule_stats_scope": "AGGREGATE_SELECTED_ATTEMPTS_AND_DURABLE_WRITES; PRE_SEQUENCE_AND_KERNEL_LOSS_NOT_EVENT_IDENTIFIABLE",
+      "rule_stats_snapshot_complete": true,
+      "rule_version": 1,
+      "sequence_snapshot_complete": true,
+      "state": "STOPPED",
+      "stream_snapshot_complete": true,
+      "stream_storage_complete": true,
+      "stream_storage_overflow": 0,
+      "streams": [
+        {
+          "cgroup_id": 21,
+          "collector": {
+            "full_appended": 0,
+            "full_durable": 0,
+            "normal_appended": 249,
+            "normal_durable": 249,
+            "queue_rejected_full": 0,
+            "queue_rejected_sample": 0,
+            "sample_appended": 251,
+            "sample_durable": 251,
+            "storage_rejected_full": 0,
+            "storage_rejected_sample": 0
+          },
+          "critical_ring_failed": 0,
+          "critical_submitted": 249,
+          "engine": {
+            "accounted_seen": 500,
+            "burst_start_ns": 43065000000000,
+            "current": {
+              "burst_start_ns": 43065000000000,
+              "duration_ms": 0,
+              "end_ns": 0,
+              "episode_id": 69305,
+              "first_pid": 25600,
+              "first_sequence": 69305,
+              "first_uid": 0,
+              "full_selected": 0,
+              "full_submitted": 0,
+              "high_rate_duration_ms": 4000,
+              "last_event_ns": 43069500161790,
+              "last_pid": 25600,
+              "last_sequence": 77034,
+              "last_uid": 0,
+              "observed_eps": 100,
+              "peak_rate_eps": 100,
+              "ring_failed": 0,
+              "sample_selected": 51,
+              "sample_submitted": 51,
+              "seen": 51,
+              "start_ns": 43069000159268,
+              "summarized": 0,
+              "threshold_eps": 0,
+              "tracking_complete": 1,
+              "tracking_failed_end": 0,
+              "tracking_failed_start": 0,
+              "unique_pid_lower_bound": 1,
+              "unique_uid_lower_bound": 1
+            },
+            "current_rate_eps": 100,
+            "enter_count": 3,
+            "exit_count": 2,
+            "full_selected": 0,
+            "full_submitted": 0,
+            "high_windows": 4,
+            "initialized": 1,
+            "last": {
+              "burst_start_ns": 43065000000000,
+              "duration_ms": 0,
+              "end_ns": 43068000106281,
+              "episode_id": 38399,
+              "first_pid": 25600,
+              "first_sequence": 38399,
+              "first_uid": 0,
+              "full_selected": 0,
+              "full_submitted": 0,
+              "high_rate_duration_ms": 3000,
+              "last_event_ns": 43067990076609,
+              "last_pid": 25600,
+              "last_sequence": 53697,
+              "last_uid": 0,
+              "observed_eps": 100,
+              "peak_rate_eps": 100,
+              "ring_failed": 0,
+              "sample_selected": 100,
+              "sample_submitted": 100,
+              "seen": 100,
+              "start_ns": 43067000102531,
+              "summarized": 0,
+              "threshold_eps": 0,
+              "tracking_complete": 1,
+              "tracking_failed_end": 0,
+              "tracking_failed_start": 0,
+              "unique_pid_lower_bound": 1,
+              "unique_uid_lower_bound": 1
+            },
+            "low_windows": 0,
+            "next_sample_ns": 43069500161790,
+            "peak_rate_eps": 100,
+            "q_seen": 251,
+            "quarantined": 1,
+            "ring_failed": 0,
+            "sample_selected": 251,
+            "sample_submitted": 251,
+            "summarized": 0,
+            "window_complete": 1,
+            "window_count": 51,
+            "window_start_ns": 43069000000000
+          },
+          "kind": 2,
+          "protected_seen": 0,
+          "rule_id": 1,
+          "seen": 500,
+          "tracking_failed": 0,
+          "transition_ring_failed": 0,
+          "untracked_ring_failed": 0,
+          "untracked_seen": 0,
+          "untracked_selected": 0,
+          "untracked_submitted": 0,
+          "untracked_summarized": 0
+        }
+      ],
+      "summary_kind": "AGGREGATE_ONLY",
+      "tenants": [
+        {
+          "budget_contention": 0,
+          "budget_suppress": 0,
+          "cgroup_id": 1451,
+          "critical_full": 0,
+          "general_full": 0,
+          "quarantine_full": 0,
+          "quarantine_submitted": 0,
+          "quarantine_summarized": 0,
+          "sequence": 181,
+          "stream_contention": 0,
+          "stream_map_full": 0,
+          "submitted": [
+            9,
+            172,
+            0
+          ]
+        },
+        {
+          "budget_contention": 0,
+          "budget_suppress": 0,
+          "cgroup_id": 21,
+          "critical_full": 0,
+          "general_full": 0,
+          "quarantine_full": 0,
+          "quarantine_submitted": 251,
+          "quarantine_summarized": 0,
+          "sequence": 77345,
+          "stream_contention": 0,
+          "stream_map_full": 0,
+          "submitted": [
+            75008,
+            1837,
+            500
+          ]
+        }
+      ],
+      "untracked_collector": {
+        "full_appended": 0,
+        "full_durable": 0,
+        "normal_appended": 0,
+        "normal_durable": 0,
+        "queue_rejected_full": 0,
+        "queue_rejected_sample": 0,
+        "sample_appended": 0,
+        "sample_durable": 0,
+        "storage_rejected_full": 0,
+        "storage_rejected_sample": 0
+      },
+      "version": "0.4.0",
+      "writer_threads": 3
+    },
+    "config_sha256": "2c857e46279a0312dad5b1bf3e9aae1a0d6511a46a30c406ad7f3c7e24b1ebb1",
+    "evidence_metadata": {
+      "checkpoint_coalesced": 0,
+      "committed_offset": 79561,
+      "committed_seq": 13,
+      "dropped": 0,
+      "overflow": 0,
+      "persist_failed": 0,
+      "queue_capacity": 4096,
+      "queue_depth": 0,
+      "queue_high_water": 1,
+      "state": "STOPPED"
+    },
+    "failure_evidence": {
+      "evidence_scope": "COLLECTOR_HEALTH_OR_BOUNDED_STDERR_TAIL_ONLY",
+      "evidence_sources": [],
+      "physical_enospc_observed": false
+    },
+    "index": {
+      "alive": false,
+      "complete_to_durable": true,
+      "config_sha256": "2c857e46279a0312dad5b1bf3e9aae1a0d6511a46a30c406ad7f3c7e24b1ebb1",
+      "coverage_state": "INDEX_COMPLETE",
+      "durable_offsets": {
+        "critical.raw": 59760,
+        "general.raw": 18486240,
+        "quarantine.raw": 60240
+      },
+      "indexed_offsets": {
+        "critical.raw": 59760,
+        "general.raw": 18486240,
+        "quarantine.raw": 60240
+      },
+      "indexed_records": 77526,
+      "lag_bytes": 0,
+      "lag_records": 0,
+      "lane_coverage": {
+        "critical.raw": {
+          "durable_offset": 59760,
+          "indexed_offset": 59760,
+          "lag_bytes": 0,
+          "lag_records": 0
+        },
+        "general.raw": {
+          "durable_offset": 18486240,
+          "indexed_offset": 18486240,
+          "lag_bytes": 0,
+          "lag_records": 0
+        },
+        "quarantine.raw": {
+          "durable_offset": 60240,
+          "indexed_offset": 60240,
+          "lag_bytes": 0,
+          "lag_records": 0
+        }
+      },
+      "last_progress_monotonic_ns": 43084705794393,
+      "offsets": {
+        "critical.raw": 59760,
+        "general.raw": 18486240,
+        "quarantine.raw": 60240
+      },
+      "state": "INDEX_COMPLETE",
+      "updated_monotonic_ns": 43084705794393,
+      "updated_utc": "2026-10-14T02:21:10.079602+00:00"
+    },
+    "policy_version": 1,
+    "rule_engine_schema_version": 1,
+    "rule_stats": [
+      {
+        "bulk_budget_contention": 0,
+        "bulk_budget_suppressed": 0,
+        "collector_appended": [
+          249,
+          0,
+          251
+        ],
+        "collector_durable": [
+          249,
+          0,
+          251
+        ],
+        "collector_observed": [
+          249,
+          0,
+          251
+        ],
+        "collector_queue_rejected": [
+          0,
+          0,
+          0
+        ],
+        "collector_quota_rejected": [
+          0,
+          0,
+          0
+        ],
+        "configured_policy": 1,
+        "enabled": true,
+        "evaluated": 77526,
+        "matched": 500,
+        "precedence": 100,
+        "priority": 2,
+        "quarantine_summarized": 0,
+        "ring_failed": 0,
+        "ring_submitted": 500,
+        "rule_id": 1,
+        "selected": 500,
+        "stats_available": true,
+        "unknown": 85
+      },
+      {
+        "bulk_budget_contention": 0,
+        "bulk_budget_suppressed": 0,
+        "collector_appended": [
+          0,
+          0,
+          0
+        ],
+        "collector_durable": [
+          0,
+          0,
+          0
+        ],
+        "collector_observed": [
+          0,
+          0,
+          0
+        ],
+        "collector_queue_rejected": [
+          0,
+          0,
+          0
+        ],
+        "collector_quota_rejected": [
+          0,
+          0,
+          0
+        ],
+        "configured_policy": 1,
+        "enabled": true,
+        "evaluated": 77526,
+        "matched": 0,
+        "precedence": 100,
+        "priority": 2,
+        "quarantine_summarized": 0,
+        "ring_failed": 0,
+        "ring_submitted": 0,
+        "rule_id": 2,
+        "selected": 0,
+        "stats_available": true,
+        "unknown": 85
+      },
+      {
+        "bulk_budget_contention": 0,
+        "bulk_budget_suppressed": 0,
+        "collector_appended": [
+          0,
+          0,
+          0
+        ],
+        "collector_durable": [
+          0,
+          0,
+          0
+        ],
+        "collector_observed": [
+          0,
+          0,
+          0
+        ],
+        "collector_queue_rejected": [
+          0,
+          0,
+          0
+        ],
+        "collector_quota_rejected": [
+          0,
+          0,
+          0
+        ],
+        "configured_policy": 1,
+        "enabled": true,
+        "evaluated": 77526,
+        "matched": 0,
+        "precedence": 100,
+        "priority": 2,
+        "quarantine_summarized": 0,
+        "ring_failed": 0,
+        "ring_submitted": 0,
+        "rule_id": 3,
+        "selected": 0,
+        "stats_available": true,
+        "unknown": 85
+      },
+      {
+        "bulk_budget_contention": 0,
+        "bulk_budget_suppressed": 0,
+        "collector_appended": [
+          0,
+          0,
+          0
+        ],
+        "collector_durable": [
+          0,
+          0,
+          0
+        ],
+        "collector_observed": [
+          0,
+          0,
+          0
+        ],
+        "collector_queue_rejected": [
+          0,
+          0,
+          0
+        ],
+        "collector_quota_rejected": [
+          0,
+          0,
+          0
+        ],
+        "configured_policy": 1,
+        "enabled": true,
+        "evaluated": 77526,
+        "matched": 0,
+        "precedence": 100,
+        "priority": 2,
+        "quarantine_summarized": 0,
+        "ring_failed": 0,
+        "ring_submitted": 0,
+        "rule_id": 4,
+        "selected": 0,
+        "stats_available": true,
+        "unknown": 85
+      },
+      {
+        "bulk_budget_contention": 0,
+        "bulk_budget_suppressed": 0,
+        "collector_appended": [
+          0,
+          0,
+          0
+        ],
+        "collector_durable": [
+          0,
+          0,
+          0
+        ],
+        "collector_observed": [
+          0,
+          0,
+          0
+        ],
+        "collector_queue_rejected": [
+          0,
+          0,
+          0
+        ],
+        "collector_quota_rejected": [
+          0,
+          0,
+          0
+        ],
+        "configured_policy": 1,
+        "enabled": true,
+        "evaluated": 77526,
+        "matched": 0,
+        "precedence": 100,
+        "priority": 2,
+        "quarantine_summarized": 0,
+        "ring_failed": 0,
+        "ring_submitted": 0,
+        "rule_id": 5,
+        "selected": 0,
+        "stats_available": true,
+        "unknown": 85
+      },
+      {
+        "bulk_budget_contention": 0,
+        "bulk_budget_suppressed": 0,
+        "collector_appended": [
+          0,
+          0,
+          0
+        ],
+        "collector_durable": [
+          0,
+          0,
+          0
+        ],
+        "collector_observed": [
+          0,
+          0,
+          0
+        ],
+        "collector_queue_rejected": [
+          0,
+          0,
+          0
+        ],
+        "collector_quota_rejected": [
+          0,
+          0,
+          0
+        ],
+        "configured_policy": 1,
+        "enabled": true,
+        "evaluated": 77526,
+        "matched": 0,
+        "precedence": 100,
+        "priority": 2,
+        "quarantine_summarized": 0,
+        "ring_failed": 0,
+        "ring_submitted": 0,
+        "rule_id": 6,
+        "selected": 0,
+        "stats_available": true,
+        "unknown": 85
+      },
+      {
+        "bulk_budget_contention": 0,
+        "bulk_budget_suppressed": 0,
+        "collector_appended": [
+          0,
+          0,
+          0
+        ],
+        "collector_durable": [
+          0,
+          0,
+          0
+        ],
+        "collector_observed": [
+          0,
+          0,
+          0
+        ],
+        "collector_queue_rejected": [
+          0,
+          0,
+          0
+        ],
+        "collector_quota_rejected": [
+          0,
+          0,
+          0
+        ],
+        "configured_policy": 1,
+        "enabled": true,
+        "evaluated": 77526,
+        "matched": 0,
+        "precedence": 100,
+        "priority": 2,
+        "quarantine_summarized": 0,
+        "ring_failed": 0,
+        "ring_submitted": 0,
+        "rule_id": 7,
+        "selected": 0,
+        "stats_available": true,
+        "unknown": 85
+      },
+      {
+        "bulk_budget_contention": 0,
+        "bulk_budget_suppressed": 0,
+        "collector_appended": [
+          0,
+          0,
+          0
+        ],
+        "collector_durable": [
+          0,
+          0,
+          0
+        ],
+        "collector_observed": [
+          0,
+          0,
+          0
+        ],
+        "collector_queue_rejected": [
+          0,
+          0,
+          0
+        ],
+        "collector_quota_rejected": [
+          0,
+          0,
+          0
+        ],
+        "configured_policy": 1,
+        "enabled": true,
+        "evaluated": 77526,
+        "matched": 0,
+        "precedence": 100,
+        "priority": 2,
+        "quarantine_summarized": 0,
+        "ring_failed": 0,
+        "ring_submitted": 0,
+        "rule_id": 8,
+        "selected": 0,
+        "stats_available": true,
+        "unknown": 85
+      }
+    ],
+    "rule_stats_scope": "AGGREGATE_SELECTED_ATTEMPTS_AND_DURABLE_WRITES; PRE_SEQUENCE_AND_KERNEL_LOSS_NOT_EVENT_IDENTIFIABLE",
+    "rule_stats_snapshot_complete": true,
+    "run_id": "149af650-98a9-42b2-a783-773d3a884244",
+    "run_path": "/root/mglogwh-perf-2026-10-14/data/runs/149af650-98a9-42b2-a783-773d3a884244",
+    "service": {
+      "collector": {
+        "boot": "73dba5d7-f8c5-4b40-a8b9-53afc395871e",
+        "pid": 24380,
+        "start": "4306072",
+        "state": "R"
+      },
+      "collector_exit": 0,
+      "indexer": {
+        "boot": "73dba5d7-f8c5-4b40-a8b9-53afc395871e",
+        "pid": 24381,
+        "start": "4306074",
+        "state": "R"
+      },
+      "indexer_exit": 0,
+      "state": "STOPPED",
+      "supervisor": {
+        "boot": "73dba5d7-f8c5-4b40-a8b9-53afc395871e",
+        "pid": 24379,
+        "start": "4306061",
+        "state": "R"
+      }
+    },
+    "state": "STOPPED",
+    "storage": {
+      "allocation_total_complete": true,
+      "categories": {
+        "export_derived": {
+          "allocated_bytes": 0,
+          "file_count": 0,
+          "logical_bytes": 0
+        },
+        "metadata_control": {
+          "allocated_bytes": 110592,
+          "file_count": 5,
+          "logical_bytes": 90794
+        },
+        "other": {
+          "allocated_bytes": 32768,
+          "file_count": 7,
+          "logical_bytes": 24771
+        },
+        "raw": {
+          "allocated_bytes": 18612224,
+          "file_count": 3,
+          "logical_bytes": 18606240
+        },
+        "sqlite_main": {
+          "allocated_bytes": 32460800,
+          "file_count": 1,
+          "logical_bytes": 32456704
+        },
+        "sqlite_sidecars_temp": {
+          "allocated_bytes": 0,
+          "file_count": 0,
+          "logical_bytes": 0
+        }
+      },
+      "configured_minimum_free_bytes": 268435456,
+      "critical_reserve_physical": false,
+      "entries_seen": 16,
+      "external_exports_included": false,
+      "external_writers_can_exhaust_filesystem": true,
+      "file_count": 16,
+      "file_logical_bytes": 51178509,
+      "filesystem_free_bytes": 1003293536256,
+      "measurement": "FILE_ST_BLOCKS_TIMES_512_AND_STATVFS_FREE; NOT_A_PHYSICAL_RESERVATION",
+      "pressure": "NORMAL",
+      "scan_limit_entries": 4096,
+      "scan_truncated": false,
+      "scope": "RUN_DIRECTORY_TREE_ONLY",
+      "tree_allocated_bytes": 51216384,
+      "unreadable_entries": 0
+    },
+    "version": "0.4.0"
+  },
+  "target_actual_eps": 15350.283,
+  "target_requested_eps": 15350,
+  "truth": {
+    "actual_eps": 15350.283,
+    "attempts": [
+      75000,
+      500,
+      1250
+    ],
+    "elapsed_seconds": 4.999907973,
+    "expected_results": [
+      75000,
+      500,
+      1250
+    ],
+    "late_over_1ms": [
+      511,
+      3,
+      8
+    ],
+    "p95_us": 52.028,
+    "p99_us": 85.21,
+    "requested_eps": 15350,
+    "scope": "DIRECT_SYS_OPENAT_MONOTONIC_WALL_LATENCY_INCLUDES_SCHEDULING",
+    "seconds_requested": 5,
+    "unexpected_results": [
+      0,
+      0,
+      0
+    ],
+    "workload_cpu_seconds": 4.073777,
+    "workload_max_rss_kib": 24832
+  },
+  "valid_run": true,
+  "valid_workload": true,
+  "watchdog_triggered": false
+}

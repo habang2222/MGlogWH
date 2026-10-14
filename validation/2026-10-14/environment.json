@@ -1,0 +1,91 @@
+{
+  "build": "/tmp/mglogwh-perf-eb9c888-build",
+  "build_hashes": {
+    "bpf_object": "4f4564f598eb2abb91891ae0d65bd2c5d94142ae748598f6485d9c7b09878414",
+    "collector": "3c651d6258ac4d2f65edaee24297e9719db852cbbdcafcacc7d85a4df05b763c",
+    "collector_source": "2ebd1b409ad883cd9201eba87b1f68ca35e2cbbfdb798602ef32a84b70ab8bdd",
+    "manage": "f035849f9898dae610ff2196cdc89d566155bd095db1803a2b34b46c981ce923",
+    "sensor_source": "d6da58e193cd0651e35e5e12d4e5cd91097c24e5dd1f2789df8831cb9212aac4",
+    "workload": "1d3a651ad640a3e73330eb2a04323ab6a8f12aceaaffdc539e20647faa4a3697"
+  },
+  "condition_order": [
+    [
+      "baseline",
+      1
+    ],
+    [
+      "rule1",
+      1
+    ],
+    [
+      "rule4",
+      1
+    ],
+    [
+      "rule8",
+      1
+    ],
+    [
+      "rule8",
+      2
+    ],
+    [
+      "rule4",
+      2
+    ],
+    [
+      "rule1",
+      2
+    ],
+    [
+      "baseline",
+      2
+    ],
+    [
+      "rule1",
+      3
+    ],
+    [
+      "baseline",
+      3
+    ],
+    [
+      "rule8",
+      3
+    ],
+    [
+      "rule4",
+      3
+    ]
+  ],
+  "cpu_count": 16,
+  "data": "/root/mglogwh-perf-2026-10-14/data",
+  "decoy_paths": [
+    "/tmp/mglogwh-perf-2026-10-14-decoy/bulk-missing",
+    "/tmp/mglogwh-perf-2026-10-14-decoy/critical",
+    "/tmp/mglogwh-perf-2026-10-14-decoy/normal"
+  ],
+  "duration_seconds": 5,
+  "expected_head": "eb9c888bbf1e60a6c58a0c2082a1d639bc7b6607",
+  "initial_resources": {
+    "filesystem_free_bytes": 1003855515648,
+    "filesystem_total_bytes": 1081101176832,
+    "memory_available_kib": 6913664
+  },
+  "kernel": "6.6.87.2-microsoft-standard-WSL2+",
+  "limits": {
+    "collector_raw_mib": 128,
+    "collector_watchdog_seconds": 20,
+    "disk_free_floor_mib": 2048,
+    "index_main_mib": 64,
+    "memory_available_floor_mib": 1024,
+    "metadata_mib": 8,
+    "workload_timeout_seconds": 13
+  },
+  "rates": [
+    15000,
+    100,
+    250
+  ],
+  "source_snapshot": "/tmp/mglogwh-perf-eb9c888-source"
+}
