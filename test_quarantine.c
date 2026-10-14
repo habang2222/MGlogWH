@@ -164,6 +164,28 @@ static void test_control_metadata_accuracy(void) {
     assert((quality & EQ_CAPTURE_QUALITY_MASK) == EQ_TRUNCATED);
     assert(((quality & EQ_RULE_MASK) >> EQ_RULE_SHIFT) == 77 && EQ_SCHEMA == 3);
 }
+/* BPF rule programs live in volatile rodata. Losing that qualifier lets Clang
+ * fold their zero initializer into the policy instead of reading loaded rules. */
+static void test_volatile_rule_config(void) {
+    const volatile struct eq_quarantine_config config = {1000000, 3000, 2000, 10000, 8, 100};
+    struct eq_quarantine_engine engine = {};
+    struct eq_q_decision decision = {};
+    unsigned long long seen = 0;
+    for (unsigned second = 0; second < 5; second++) {
+        for (unsigned event = 0; event < 100; event++) {
+            unsigned long long now = second * EQ_Q_SECOND_NS + event * (EQ_Q_SECOND_NS / 100);
+            seen++;
+            eq_q_step(&engine, &config, now, seen, 1, 1, seen, 0, 0, &decision);
+            assert(decision.route == EQ_Q_NORMAL);
+        }
+    }
+    assert(!engine.quarantined && !engine.high_windows);
+    struct eq_quarantine_key key = {1, 1, EQ_OPEN};
+    struct eq_quarantine_control control;
+    decision.transition = EQ_Q_ENTER;
+    eq_q_make_control(&control, &key, &engine, &config, &decision);
+    assert(control.threshold_eps == 1000000 && control.duration_ms == 3000);
+}
 int main(void) {
     test_low_rate_stays_critical();
     test_spike_without_duration();
@@ -173,6 +195,7 @@ int main(void) {
     test_low_cooldown_exit();
     test_sampling_reconciliation();
     test_control_metadata_accuracy();
-    puts("8 virtual-time Critical Quarantine cases: OK");
+    test_volatile_rule_config();
+    puts("9 virtual-time Critical Quarantine cases: OK");
     return 0;
 }

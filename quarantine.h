@@ -95,7 +95,7 @@ EQ_Q_INLINE void eq_q_distinct(unsigned long long *bitmap,
     if (!(bitmap[word] & mask)) { bitmap[word] |= mask; (*count)++; }
 }
 EQ_Q_INLINE void eq_q_observe_window(struct eq_quarantine_engine *engine,
-                                     const struct eq_quarantine_config *config,
+                                     const volatile struct eq_quarantine_config *config,
                                      unsigned long long count,
                                      unsigned long long start_ns) {
     engine->current_rate_eps = count;
@@ -115,7 +115,7 @@ EQ_Q_INLINE void eq_q_observe_window(struct eq_quarantine_engine *engine,
     }
 }
 EQ_Q_INLINE void eq_q_step(struct eq_quarantine_engine *engine,
-                           const struct eq_quarantine_config *config,
+                           const volatile struct eq_quarantine_config *config,
                            unsigned long long now_ns, unsigned long long sequence,
                            unsigned pid, unsigned uid, unsigned long long seen_snapshot,
                            unsigned long long tracking_failed, int protected_rule,
@@ -213,7 +213,7 @@ EQ_Q_INLINE void eq_q_note_submission(struct eq_quarantine_engine *engine,
 EQ_Q_INLINE void eq_q_make_control(struct eq_quarantine_control *control,
                                     const struct eq_quarantine_key *key,
                                     const struct eq_quarantine_engine *engine,
-                                    const struct eq_quarantine_config *config,
+                                    const volatile struct eq_quarantine_config *config,
                                     const struct eq_q_decision *decision) {
     __builtin_memset(control, 0, sizeof(*control));
     control->key = *key; control->transition = decision->transition;

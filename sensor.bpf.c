@@ -347,10 +347,10 @@ static __noinline int emit(__u32 kind, long result, const struct pending_open *c
     struct eq_quarantine_key stream_key = {cg, rule, kind};
     struct eq_quarantine_stream *stream = 0;
     struct eq_q_decision decision = {};
-    const struct eq_quarantine_config *config = 0;
+    const volatile struct eq_quarantine_config *config = 0;
     int owner = 0, untracked = 0, quarantined = 0;
     if (priority == EQ_CRITICAL && configured_policy != EQ_COLLECTION) {
-        config = (const void *)&event_rules[bounded_slot].quarantine;
+        config = &event_rules[bounded_slot].quarantine;
         stream = bpf_map_lookup_elem(&quarantine_streams, &stream_key);
         if (!stream) {
             bpf_map_update_elem(&quarantine_streams, &stream_key, &empty_stream, BPF_NOEXIST);
