@@ -2,6 +2,7 @@
 /* Portable matcher tests and a userspace cost proxy; this does not load BPF. */
 #include <assert.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <time.h>
 #include "rules.h"
@@ -104,6 +105,18 @@ static void test_strings_and_uncertainty(void) {
     assert(check(&program, &input, list) == EQ_FALSE);
     input.comm = "ssh";
     assert(check(&program, &input, list) == EQ_TRUE);
+
+    /* A userspace path may occupy only two bytes, including its NUL. The
+     * reference evaluator must stop there, even for a longer rule string. */
+    memcpy(program.strings, "/123456", 8);
+    program.string_bytes = 8;
+    char *short_path = malloc(2);
+    assert(short_path);
+    short_path[0] = '/'; short_path[1] = 0;
+    input.path = short_path;
+    assert(check(&program, &input, predicate(EQ_FIELD_PATH, EQ_OP_EQ,
+                                            string_value(0, 7))) == EQ_FALSE);
+    free(short_path);
 }
 
 static void test_logic_and_conflicts(void) {

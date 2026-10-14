@@ -117,7 +117,9 @@ EQ_RULE_INLINE unsigned eq_rule_one_string(const volatile struct eq_rule_program
             if (!prefix) difference |= (unsigned char)actual[i];
             return difference ? EQ_FALSE : EQ_TRUE;
         }
-        difference |= (unsigned char)actual[i] ^
+        unsigned char observed = (unsigned char)actual[i];
+        if (!observed) return EQ_FALSE;
+        difference |= observed ^
                       (unsigned char)program->strings[offset + i];
     }
     return EQ_UNKNOWN;
