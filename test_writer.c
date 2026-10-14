@@ -229,6 +229,12 @@ static void test_rule_identity_and_durable_counts(void) {
 static uint32_t little_u32(const unsigned char *bytes) {
     return (uint32_t)bytes[0] | (uint32_t)bytes[1] << 8 | (uint32_t)bytes[2] << 16 | (uint32_t)bytes[3] << 24;
 }
+static unsigned occurrences(const char *text, const char *needle) {
+    unsigned count = 0;
+    size_t length = strlen(needle);
+    while ((text = strstr(text, needle))) { count++; text += length; }
+    return count;
+}
 static void test_metadata_fence_crc_and_overflow(void) {
     setup(2);
     char path[] = "/tmp/mglogwh-meta-XXXXXX";
@@ -257,7 +263,12 @@ static void test_metadata_fence_crc_and_overflow(void) {
     input = fopen("evidence.meta.commit", "rb"); assert(input);
     char fence[1024] = {}; assert(fread(fence, 1, sizeof(fence) - 1, input) > 0); fclose(input);
     assert(strstr(fence, "\"journal_seq\":1") && strstr(fence, run_id));
-    const char *seal = "{\"record_type\":\"seal\",\"state\":\"STOPPED\",\"durable_offsets\":{\"critical\":0,\"general\":0},\"tenants\":[],\"sequence_snapshot_complete\":true}";
+    char seal[512];
+    int seal_length = snprintf(seal, sizeof(seal),
+        "{\"record_type\":\"seal\",\"state\":\"STOPPED\",\"config_sha256\":\"%s\","
+        "\"durable_offsets\":{\"critical\":0,\"general\":0},\"tenants\":[],\"sequence_snapshot_complete\":true}",
+        config_sha256);
+    assert(seal_length > 0 && (size_t)seal_length < sizeof(seal));
     assert(!publish_snapshot(strdup(seal), strlen(seal), 1, 1));
     assert(metadata.count == 1 && metadata.queue[metadata.head].terminal);
     assert(access("health.json", F_OK) && errno == ENOENT);
@@ -292,6 +303,13 @@ static void test_metadata_fence_crc_and_overflow(void) {
     assert(!meta_write(&loss) && metadata.written == before && metadata.dropped == 2);
     struct meta_item terminal = {.payload = (char *)seal, .length = strlen(seal), .terminal = 1};
     assert(!meta_write(&terminal) && !meta_sync() && metadata.committed_seq == 3);
+    input = fopen("evidence.meta", "rb"); assert(input && !fseek(input, before, SEEK_SET));
+    assert(fread(header, 8, 1, input) == 1); length = little_u32(header); checksum = little_u32(header + 4);
+    json = calloc(length + 1, 1); assert(json && fread(json, length, 1, input) == 1);
+    assert(checksum == crc32(0, (void *)json, length));
+    assert(occurrences(json, "\"config_sha256\":") == 1);
+    assert(strstr(json, config_sha256));
+    free(json); fclose(input);
     meta_destroy(); memset(&metadata, 0, sizeof(metadata));
     assert(!publish_snapshot(strdup(seal), strlen(seal), 0, 1));
     assert(!access("health.json", F_OK));

@@ -308,9 +308,15 @@ static int meta_write(const struct meta_item *item) {
         body = control_json; body_length = length;
     }
     char prefix[512];
-    int prefix_length = snprintf(prefix, sizeof(prefix), "{\"schema\":1,\"run_id\":\"%s\","
-        "\"manifest_sha256\":\"%s\",\"config_sha256\":\"%s\",\"boot_id\":\"%s\",\"journal_seq\":%llu,",
-        run_id, manifest_sha256, config_sha256, boot_id, (unsigned long long)(metadata.seq + 1));
+    /* Checkpoint/seal bodies also become health.json and already contain the
+     * config hash. Keep exactly one key in each committed journal frame. */
+    int prefix_length = item->loss || item->control ?
+        snprintf(prefix, sizeof(prefix), "{\"schema\":1,\"run_id\":\"%s\","
+            "\"manifest_sha256\":\"%s\",\"config_sha256\":\"%s\",\"boot_id\":\"%s\",\"journal_seq\":%llu,",
+            run_id, manifest_sha256, config_sha256, boot_id, (unsigned long long)(metadata.seq + 1)) :
+        snprintf(prefix, sizeof(prefix), "{\"schema\":1,\"run_id\":\"%s\","
+            "\"manifest_sha256\":\"%s\",\"boot_id\":\"%s\",\"journal_seq\":%llu,",
+            run_id, manifest_sha256, boot_id, (unsigned long long)(metadata.seq + 1));
     if (prefix_length < 0 || (size_t)prefix_length >= sizeof(prefix) || !body_length || body[0] != '{')
         return meta_failure(EPROTO);
     size_t length = prefix_length + body_length - 1;
