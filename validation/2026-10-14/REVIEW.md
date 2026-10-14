@@ -2,7 +2,7 @@
 
 ## 판정과 증거 범위
 
-**최종 상태: WSL 재검증 완료, 독립 Ubuntu 서버 검증 필요.** 이번 검토에서 P0 결함 두 개와 P1 결함 세 개를 수정했다. WSL 파일시스템 복구 후 현재 코드의 Linux 빌드·전체 시험, 새 12회 규칙별 부하, 16개 경로 규칙 사례, 실제 systemd 수집기와 Control Room API 연동을 재검증했다. 새 12개 run은 모두 `recover=RECOVERED`이고 독립 Critical 호출 6,000건과 같은 경로의 durable raw 6,000건이 집계상 일치했다. 사전 시퀀스 진단 fault가 155건 있어 커널 관측·손실 0을 주장하지 않는다. 일반 Ubuntu 서버, 다른 커널, 장시간 고부하와 브라우저에서의 인증 후 전체 조작은 미검증이다. 이전 실패 실험 원본은 수정하지 않았다.
+**최종 상태: 제한 조건에서 검증 완료.** WSL 재검증은 완료했고 독립 Ubuntu 서버 검증은 필요하다. 이번 검토에서 P0 결함 두 개와 P1 결함 세 개를 수정했다. WSL 파일시스템 복구 후 현재 코드의 Linux 빌드·전체 시험, 새 12회 규칙별 부하, 16개 경로 규칙 사례, 실제 systemd 수집기와 Control Room API 연동을 재검증했다. 새 12개 run은 모두 `recover=RECOVERED`이고 독립 Critical 호출 6,000건과 같은 경로의 durable raw 6,000건이 집계상 일치했다. 사전 시퀀스 진단 fault가 155건 있어 커널 관측·손실 0을 주장하지 않는다. 일반 Ubuntu 서버, 다른 커널, 장시간 고부하와 브라우저에서의 인증 후 전체 조작은 미검증이다. 이전 실패 실험 원본은 수정하지 않았다.
 
 최초 결함 진단 기준은 수집기 [eb9c888](https://github.com/habang2222/MGlogWH/commit/eb9c888bbf1e60a6c58a0c2082a1d639bc7b6607), Control Room [dcd244c](https://github.com/habang2222/MGlogWH-ControlRoom/commit/dcd244ccd3dd7212978df689e3f567f5c58e19a0)이다. 수정 후 재검증 소스는 수집기 `f9bd477`이며 `32f31ce` 이후 수집기/BPF 실행 코드는 같고 벤치 기준 표기·검증기가 개선됐다. 수집기 수정은 `363ab82`(불완전 규칙 통계), `769ce82`(BPF 정책 설정), `7e62eae`(원장 JSON), `0e24c0d`(참조 평가기 경계)에 커밋했다. Control Room은 `fbc8c97`에서 적용 성공 표시 결함을 수정했다. [10월 9일 보고서](https://www.notion.so/3f40e129ee9b8144ae55eb4219d7fdb0)는 이전 코드·프로토콜의 결과로만 인용한다.
 
