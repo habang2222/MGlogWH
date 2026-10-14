@@ -1,0 +1,17 @@
+label,pid,path,flags,ret,errno,dev,ino,before_ns,after_ns
+absolute_read,1073,/tmp/mglogwh-matrix-probe-7c1ccb849a3f/target,0,5,0,2096,358637,919819471839,919819525535
+absolute_write,1073,/tmp/mglogwh-matrix-probe-7c1ccb849a3f/target,1,5,0,2096,358637,919819563902,919819573228
+absolute_read_write,1073,/tmp/mglogwh-matrix-probe-7c1ccb849a3f/target,2,5,0,2096,358637,919819577554,919819583668
+absolute_create,1073,/tmp/mglogwh-matrix-probe-7c1ccb849a3f/created,65,5,0,2096,358649,919819587502,919819629403
+absolute_truncate,1073,/tmp/mglogwh-matrix-probe-7c1ccb849a3f/target,513,5,0,2096,358637,919819634382,919819684895
+absolute_o_path,1073,/tmp/mglogwh-matrix-probe-7c1ccb849a3f/target,2097152,5,0,2096,358637,919819688891,919819697112
+relative_cwd,1073,target,0,5,0,2096,358637,919819701007,919819707813
+relative_dirfd,1073,target,0,5,0,2096,358637,919819711427,919819716256
+symlink,1073,/tmp/mglogwh-matrix-probe-7c1ccb849a3f/link,0,5,0,2096,358637,919819719307,919819727569
+absolute_outside,1073,/tmp/mglogwh-matrix-probe-7c1ccb849a3f-outside,0,5,0,2096,358643,919819730651,919819737457
+long_path,1073,/tmp/mglogwh-matrix-probe-7c1ccb849a3f/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx,0,5,0,2096,358642,919819740539,919819746521
+permission_denied,1073,/tmp/mglogwh-matrix-probe-7c1ccb849a3f/denied,0,-1,13,0,0,919819749965,919819759351
+missing,1073,/tmp/mglogwh-matrix-probe-7c1ccb849a3f/missing,0,-1,2,0,0,919819762242,919819771005
+bad_pointer,1073,<EFAULT pointer>,0,-1,14,0,0,919819773465,919819784196
+exec_success,1074,/tmp/mglogwh-matrix-binary-7c1ccb849a3f,0,0,0,0,0,919819786525,919822466896
+exec_failure,1073,/tmp/mglogwh-matrix-probe-7c1ccb849a3f/missing,0,-1,2,0,0,919822510714,919822610657

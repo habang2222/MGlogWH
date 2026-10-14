@@ -1,0 +1,47 @@
+{
+  "coverage_state": "INDEX_COMPLETE",
+  "durable_offsets": {
+    "critical.raw": 3840,
+    "general.raw": 58560,
+    "quarantine.raw": 0
+  },
+  "indexed_offsets": {
+    "critical.raw": 3840,
+    "general.raw": 58560,
+    "quarantine.raw": 0
+  },
+  "lane_coverage": {
+    "critical.raw": {
+      "durable_offset": 3840,
+      "indexed_offset": 3840,
+      "lag_bytes": 0,
+      "lag_records": 0
+    },
+    "general.raw": {
+      "durable_offset": 58560,
+      "indexed_offset": 58560,
+      "lag_bytes": 0,
+      "lag_records": 0
+    },
+    "quarantine.raw": {
+      "durable_offset": 0,
+      "indexed_offset": 0,
+      "lag_bytes": 0,
+      "lag_records": 0
+    }
+  },
+  "lag_bytes": 0,
+  "lag_records": 0,
+  "complete_to_durable": true,
+  "state": "INDEX_COMPLETE",
+  "offsets": {
+    "critical.raw": 3840,
+    "general.raw": 58560,
+    "quarantine.raw": 0
+  },
+  "indexed_records": 260,
+  "last_progress_monotonic_ns": 1060129940831,
+  "updated_monotonic_ns": 1060129940831,
+  "updated_utc": "2026-10-14T08:11:40.577547+00:00",
+  "config_sha256": "7d86b0c4d28711b99925f1d4a60bc4d07eaee5e2a2ea1e7b112efaa2d6565546"
+}

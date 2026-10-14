@@ -1,0 +1,68 @@
+{
+  "version": "0.4.0",
+  "schema": 1,
+  "raw_schema": 3,
+  "raw_record_size": 240,
+  "quality_extension": "RULE_ID_POLICY_AND_VERSIONS_V1",
+  "rule_engine_schema_version": 1,
+  "policy_version": 1,
+  "run_id": "90024ce0-67d8-4b35-b91c-766f25897f8f",
+  "created_utc": "2026-10-14T08:09:16.615970+00:00",
+  "clock_anchor": {
+    "monotonic_ns": 916168431863,
+    "realtime_ns": 1791965356616012446,
+    "precision": "SEQUENTIAL_READS_APPROXIMATE_NOT_CLOCK_STEP_PROOF"
+  },
+  "kernel": "6.6.87.2-microsoft-standard-WSL2+",
+  "boot_id": "8b39c47b-460e-4975-8afe-cdc31cfd2e05",
+  "config_sha256": "5ead7642b90ace51a0a7fc8c39676acd261cf3ace3248689e1f7d4a10e3f5bd2",
+  "collector_sha256": "60aa720fe57839934044ca6a286ec99747754a69c4fb7234f69bf2f090af9c90",
+  "bpf_sha256": "00aec324f79ae6288e93c03c9b174b01e84a6a555fde601e39cc7eeaaf658853",
+  "storage_preflight": {
+    "filesystem_free_bytes": 1001169567744,
+    "required_free_bytes": 377487360,
+    "raw_limit_bytes": 67108864,
+    "sqlite_main_limit_bytes": 33554432,
+    "metadata_limit_bytes": 8388608,
+    "auxiliary_headroom_bytes": 268435456,
+    "physical_reservation": false,
+    "critical_reserve_physical": false,
+    "external_writers_can_exhaust_filesystem": true,
+    "sqlite_journal_not_hard_capped": true,
+    "sqlite_temp_store": "MEMORY"
+  },
+  "capability": {
+    "checks": {
+      "linux": true,
+      "x86_64": true,
+      "root": true,
+      "btf": true,
+      "binary": true,
+      "bpf_object": true,
+      "tracepoints": true
+    },
+    "ready": true,
+    "events": [
+      "exec_success",
+      "openat_enter_exit"
+    ],
+    "all_uid": true,
+    "all_syscall": false,
+    "file_identity": "EXACT_CAPTURED_ABSOLUTE_PATH_ONLY",
+    "pid_namespace": "HOST_INITIAL_PID_NAMESPACE",
+    "uid_namespace": "HOST_INITIAL_USER_NAMESPACE",
+    "observation_scope": "SHARED_WSL_KERNEL_NOT_QEMU_VM",
+    "signing": "UNSIGNED_CRC32_ONLY",
+    "independent_index_process": true,
+    "remote_collector": false,
+    "metadata": "BOUNDED_COMMITTED_JOURNAL_AND_AGGREGATE_COUNTERS",
+    "critical_guard": "PER_STREAM_QUARANTINE_WITH_ORIGINAL_PRIORITY_RETAINED",
+    "critical_stream_key": "CGROUP_RULE_EVENT_KIND",
+    "protected_critical": "CONFIGURED_RULE_EXEMPTION",
+    "quarantine_release": "EVENT_DRIVEN_HYSTERESIS",
+    "ledger_recovery": "READ_ONLY_COMMITTED_PREFIX",
+    "bpf_load_verified_only_after_start": true
+  },
+  "ordering": "PER_CGROUP_SEQUENCE_NOT_GLOBAL_CAUSAL_ORDER",
+  "rules_bin_sha256": "c259463337c10f2c067ad1d0164e1cbd09f599f0956f2eefab557dada323b53e"
+}

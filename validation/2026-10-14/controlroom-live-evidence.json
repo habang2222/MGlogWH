@@ -1,0 +1,28 @@
+{
+  "status": "PASS",
+  "run_dir": "/var/lib/mglogwh/runs/dce9981f-28de-4ad6-9d41-2788ae9a4a2e",
+  "manager_sha256": "f035849f9898dae610ff2196cdc89d566155bd095db1803a2b34b46c981ce923",
+  "manifest_sha256": "85bd719a127f708a9118bba74c47f662c12a5bc771417fe5ea0adb2eed03a676",
+  "config_sha256": "27d5f209571034ed1afc1e24004d89d749b23726d08502f343593ca7c105d914",
+  "health_state": "STOPPED",
+  "index_complete_to_durable": true,
+  "recover_status": "RECOVERED",
+  "recover_errors": [],
+  "raw_records": 312,
+  "indexed_records": 312,
+  "probe_path": "/tmp/mglogwh-controlroom-smoke-f00a0ed8158e4ef3964ae7967d6e0b34.txt",
+  "rule_id": 248,
+  "raw_probe_records": 4,
+  "index_probe_records": 4,
+  "probe_rowids": [
+    1,
+    2,
+    3,
+    4
+  ],
+  "raw_sha256": {
+    "critical.raw": "c9643f9fb29900cd4f104d83908a24269172d76030299fa1f88be50143f2860b",
+    "general.raw": "eb22dff2bd3b0ccfabd75d45c5c8e3069b13fceecf7e0f8d05f39362ec1bb8bc",
+    "quarantine.raw": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+}

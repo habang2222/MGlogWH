@@ -1,0 +1,2238 @@
+{
+  "command": [
+    "/home/ljw/mglogwh-v040-32f31ce-build/bench_workload",
+    "/home/ljw/mglogwh-v040-32f31ce-decoy/bulk-missing",
+    "/home/ljw/mglogwh-v040-32f31ce-decoy/critical",
+    "/home/ljw/mglogwh-v040-32f31ce-decoy/normal",
+    "5",
+    "15000",
+    "100",
+    "250"
+  ],
+  "condition": "rule1",
+  "config_file": "/root/mglogwh-v040-f9bd477-output/configs/rule1.json",
+  "config_file_sha256": "3dda267d56755b3ac8333b88110a636e26dec8d7e4d224fa496de30d0452ebe4",
+  "configured_rule_count": 1,
+  "critical_count_difference": 0,
+  "critical_durable_count": 500,
+  "critical_durable_recall": 1.0,
+  "critical_truth_count": 500,
+  "health": {
+    "active_quarantined_streams": 0,
+    "admitted": [
+      500,
+      79909,
+      0
+    ],
+    "appended": [
+      500,
+      79909,
+      0
+    ],
+    "config_sha256": "d47180a603248173cc89be63b5b08ab2a440d132c686a3a1ab0e70e998d3260d",
+    "cpu_seconds": 1.266384,
+    "critical_events_total": 500,
+    "critical_scheduler": "FIFO",
+    "critical_seen_total": 500,
+    "dedicated_drain_thread": true,
+    "durable": {
+      "critical.raw": 120000,
+      "general.raw": 19178160,
+      "quarantine.raw": 0
+    },
+    "durable_offsets": {
+      "critical": 120000,
+      "general": 19178160,
+      "quarantine": 0
+    },
+    "error_errno": 0,
+    "exact_loss_available": true,
+    "exact_loss_scope": "USERSPACE_REJECTIONS",
+    "fault_snapshot_complete": true,
+    "faults": [
+      0,
+      0,
+      13,
+      0
+    ],
+    "general_quota_drop": 0,
+    "max_rss_kib": 22784,
+    "metadata": {
+      "checkpoint_coalesced": 0,
+      "committed_offset": 59084,
+      "committed_seq": 8,
+      "dropped": 0,
+      "overflow": 0,
+      "persist_failed": 0,
+      "queue_capacity": 4096,
+      "queue_depth": 0,
+      "queue_high_water": 1,
+      "state": "STOPPED"
+    },
+    "metadata_dropped": 0,
+    "metadata_failed": false,
+    "metadata_overflow": 0,
+    "monotonic_ms": 603851,
+    "peak_critical_rate": 100,
+    "peak_critical_rate_scope": "MAX_TRACKED_STREAM_ONE_SECOND_EPS",
+    "persist_failed": 0,
+    "pid": 988,
+    "policy_version": 1,
+    "protected_critical_seen_total": 0,
+    "quarantine_accounting_final": true,
+    "quarantine_by_reason": {
+      "CRITICAL_RATE_EXCEEDED": 0,
+      "CRITICAL_RATE_RECOVERED": 0
+    },
+    "quarantine_by_reason_scope": "TRANSITIONS",
+    "quarantine_dropped_total": 0,
+    "quarantine_enter_total": 0,
+    "quarantine_exit_total": 0,
+    "quarantine_full_appended_total": 0,
+    "quarantine_full_saved_total": 0,
+    "quarantine_full_selected_total": 0,
+    "quarantine_full_submitted_total": 0,
+    "quarantine_global": {
+      "critical_events_total": 500,
+      "protected_events_total": 0,
+      "quarantined_events_total": 0,
+      "state_contention": 0,
+      "stream_map_full": 0,
+      "transition_ring_failed": 0,
+      "untracked_protected": 0,
+      "untracked_protected_ring_failed": 0,
+      "untracked_protected_submitted": 0,
+      "untracked_ring_failed": 0,
+      "untracked_seen": 0,
+      "untracked_selected": 0,
+      "untracked_submitted": 0,
+      "untracked_summarized": 0
+    },
+    "quarantine_not_stored_observed_total": 0,
+    "quarantine_pending_total": 0,
+    "quarantine_ring_failed_total": 0,
+    "quarantine_sample_appended_total": 0,
+    "quarantine_sample_selected_total": 0,
+    "quarantine_sample_submitted_total": 0,
+    "quarantine_sampled_total": 0,
+    "quarantine_seen_total": 0,
+    "quarantine_storage_drop": 0,
+    "quarantine_summarized_total": 0,
+    "quarantine_tracking_complete": true,
+    "quarantined_events_total": 0,
+    "quarantined_streams": 0,
+    "queue_capacity": [
+      8192,
+      16384,
+      512
+    ],
+    "queue_depth": [
+      0,
+      0,
+      0
+    ],
+    "queue_high_water": [
+      7,
+      1451,
+      0
+    ],
+    "queue_in_flight": [
+      0,
+      0,
+      0
+    ],
+    "queue_overflow": [
+      0,
+      0,
+      0
+    ],
+    "raw_schema": 3,
+    "received": [
+      500,
+      79909,
+      0
+    ],
+    "record_size": 240,
+    "record_type": "seal",
+    "rule_stats": [
+      {
+        "bulk_budget_contention": 0,
+        "bulk_budget_suppressed": 0,
+        "collector_appended": [
+          500,
+          0,
+          0
+        ],
+        "collector_durable": [
+          500,
+          0,
+          0
+        ],
+        "collector_observed": [
+          500,
+          0,
+          0
+        ],
+        "collector_queue_rejected": [
+          0,
+          0,
+          0
+        ],
+        "collector_quota_rejected": [
+          0,
+          0,
+          0
+        ],
+        "configured_policy": 1,
+        "enabled": true,
+        "evaluated": 80409,
+        "matched": 500,
+        "precedence": 100,
+        "priority": 2,
+        "quarantine_summarized": 0,
+        "ring_failed": 0,
+        "ring_submitted": 500,
+        "rule_id": 1,
+        "selected": 500,
+        "stats_available": true,
+        "unknown": 1186
+      }
+    ],
+    "rule_stats_scope": "AGGREGATE_SELECTED_ATTEMPTS_AND_DURABLE_WRITES; PRE_SEQUENCE_AND_KERNEL_LOSS_NOT_EVENT_IDENTIFIABLE",
+    "rule_stats_snapshot_complete": true,
+    "rule_version": 1,
+    "sequence_snapshot_complete": true,
+    "state": "STOPPED",
+    "stream_snapshot_complete": true,
+    "stream_storage_complete": true,
+    "stream_storage_overflow": 0,
+    "streams": [
+      {
+        "cgroup_id": 21,
+        "collector": {
+          "full_appended": 0,
+          "full_durable": 0,
+          "normal_appended": 500,
+          "normal_durable": 500,
+          "queue_rejected_full": 0,
+          "queue_rejected_sample": 0,
+          "sample_appended": 0,
+          "sample_durable": 0,
+          "storage_rejected_full": 0,
+          "storage_rejected_sample": 0
+        },
+        "critical_ring_failed": 0,
+        "critical_submitted": 500,
+        "engine": {
+          "accounted_seen": 500,
+          "burst_start_ns": 0,
+          "current": {
+            "burst_start_ns": 0,
+            "duration_ms": 0,
+            "end_ns": 0,
+            "episode_id": 0,
+            "first_pid": 0,
+            "first_sequence": 0,
+            "first_uid": 0,
+            "full_selected": 0,
+            "full_submitted": 0,
+            "high_rate_duration_ms": 0,
+            "last_event_ns": 0,
+            "last_pid": 0,
+            "last_sequence": 0,
+            "last_uid": 0,
+            "observed_eps": 0,
+            "peak_rate_eps": 0,
+            "ring_failed": 0,
+            "sample_selected": 0,
+            "sample_submitted": 0,
+            "seen": 0,
+            "start_ns": 0,
+            "summarized": 0,
+            "threshold_eps": 0,
+            "tracking_complete": 0,
+            "tracking_failed_end": 0,
+            "tracking_failed_start": 0,
+            "unique_pid_lower_bound": 0,
+            "unique_uid_lower_bound": 0
+          },
+          "current_rate_eps": 100,
+          "enter_count": 0,
+          "exit_count": 0,
+          "full_selected": 0,
+          "full_submitted": 0,
+          "high_windows": 0,
+          "initialized": 1,
+          "last": {
+            "burst_start_ns": 0,
+            "duration_ms": 0,
+            "end_ns": 0,
+            "episode_id": 0,
+            "first_pid": 0,
+            "first_sequence": 0,
+            "first_uid": 0,
+            "full_selected": 0,
+            "full_submitted": 0,
+            "high_rate_duration_ms": 0,
+            "last_event_ns": 0,
+            "last_pid": 0,
+            "last_sequence": 0,
+            "last_uid": 0,
+            "observed_eps": 0,
+            "peak_rate_eps": 0,
+            "ring_failed": 0,
+            "sample_selected": 0,
+            "sample_submitted": 0,
+            "seen": 0,
+            "start_ns": 0,
+            "summarized": 0,
+            "threshold_eps": 0,
+            "tracking_complete": 0,
+            "tracking_failed_end": 0,
+            "tracking_failed_start": 0,
+            "unique_pid_lower_bound": 0,
+            "unique_uid_lower_bound": 0
+          },
+          "low_windows": 0,
+          "next_sample_ns": 0,
+          "peak_rate_eps": 100,
+          "q_seen": 0,
+          "quarantined": 0,
+          "ring_failed": 0,
+          "sample_selected": 0,
+          "sample_submitted": 0,
+          "summarized": 0,
+          "window_complete": 1,
+          "window_count": 8,
+          "window_start_ns": 603000000000
+        },
+        "kind": 2,
+        "protected_seen": 0,
+        "rule_id": 1,
+        "seen": 500,
+        "tracking_failed": 0,
+        "transition_ring_failed": 0,
+        "untracked_ring_failed": 0,
+        "untracked_seen": 0,
+        "untracked_selected": 0,
+        "untracked_submitted": 0,
+        "untracked_summarized": 0
+      }
+    ],
+    "summary_kind": "AGGREGATE_ONLY",
+    "tenants": [
+      {
+        "budget_contention": 0,
+        "budget_suppress": 0,
+        "cgroup_id": 2405,
+        "critical_full": 0,
+        "general_full": 0,
+        "quarantine_full": 0,
+        "quarantine_submitted": 0,
+        "quarantine_summarized": 0,
+        "sequence": 10,
+        "stream_contention": 0,
+        "stream_map_full": 0,
+        "submitted": [
+          4,
+          6,
+          0
+        ]
+      },
+      {
+        "budget_contention": 0,
+        "budget_suppress": 0,
+        "cgroup_id": 1451,
+        "critical_full": 0,
+        "general_full": 0,
+        "quarantine_full": 0,
+        "quarantine_submitted": 0,
+        "quarantine_summarized": 0,
+        "sequence": 2213,
+        "stream_contention": 0,
+        "stream_map_full": 0,
+        "submitted": [
+          122,
+          2091,
+          0
+        ]
+      },
+      {
+        "budget_contention": 0,
+        "budget_suppress": 0,
+        "cgroup_id": 60013,
+        "critical_full": 0,
+        "general_full": 0,
+        "quarantine_full": 0,
+        "quarantine_submitted": 0,
+        "quarantine_summarized": 0,
+        "sequence": 1,
+        "stream_contention": 0,
+        "stream_map_full": 0,
+        "submitted": [
+          1,
+          0,
+          0
+        ]
+      },
+      {
+        "budget_contention": 0,
+        "budget_suppress": 0,
+        "cgroup_id": 21,
+        "critical_full": 0,
+        "general_full": 0,
+        "quarantine_full": 0,
+        "quarantine_submitted": 0,
+        "quarantine_summarized": 0,
+        "sequence": 77592,
+        "stream_contention": 0,
+        "stream_map_full": 0,
+        "submitted": [
+          75044,
+          2048,
+          500
+        ]
+      },
+      {
+        "budget_contention": 0,
+        "budget_suppress": 0,
+        "cgroup_id": 58973,
+        "critical_full": 0,
+        "general_full": 0,
+        "quarantine_full": 0,
+        "quarantine_submitted": 0,
+        "quarantine_summarized": 0,
+        "sequence": 2,
+        "stream_contention": 0,
+        "stream_map_full": 0,
+        "submitted": [
+          0,
+          2,
+          0
+        ]
+      },
+      {
+        "budget_contention": 0,
+        "budget_suppress": 0,
+        "cgroup_id": 59545,
+        "critical_full": 0,
+        "general_full": 0,
+        "quarantine_full": 0,
+        "quarantine_submitted": 0,
+        "quarantine_summarized": 0,
+        "sequence": 513,
+        "stream_contention": 0,
+        "stream_map_full": 0,
+        "submitted": [
+          35,
+          478,
+          0
+        ]
+      },
+      {
+        "budget_contention": 0,
+        "budget_suppress": 0,
+        "cgroup_id": 62137,
+        "critical_full": 0,
+        "general_full": 0,
+        "quarantine_full": 0,
+        "quarantine_submitted": 0,
+        "quarantine_summarized": 0,
+        "sequence": 18,
+        "stream_contention": 0,
+        "stream_map_full": 0,
+        "submitted": [
+          0,
+          18,
+          0
+        ]
+      },
+      {
+        "budget_contention": 0,
+        "budget_suppress": 0,
+        "cgroup_id": 437,
+        "critical_full": 0,
+        "general_full": 0,
+        "quarantine_full": 0,
+        "quarantine_submitted": 0,
+        "quarantine_summarized": 0,
+        "sequence": 27,
+        "stream_contention": 0,
+        "stream_map_full": 0,
+        "submitted": [
+          3,
+          24,
+          0
+        ]
+      },
+      {
+        "budget_contention": 0,
+        "budget_suppress": 0,
+        "cgroup_id": 62020,
+        "critical_full": 0,
+        "general_full": 0,
+        "quarantine_full": 0,
+        "quarantine_submitted": 0,
+        "quarantine_summarized": 0,
+        "sequence": 33,
+        "stream_contention": 0,
+        "stream_map_full": 0,
+        "submitted": [
+          3,
+          30,
+          0
+        ]
+      }
+    ],
+    "untracked_collector": {
+      "full_appended": 0,
+      "full_durable": 0,
+      "normal_appended": 0,
+      "normal_durable": 0,
+      "queue_rejected_full": 0,
+      "queue_rejected_sample": 0,
+      "sample_appended": 0,
+      "sample_durable": 0,
+      "storage_rejected_full": 0,
+      "storage_rejected_sample": 0
+    },
+    "version": "0.4.0",
+    "writer_threads": 3
+  },
+  "index_file_bytes": 33505280,
+  "index_health": {
+    "complete_to_durable": true,
+    "config_sha256": "d47180a603248173cc89be63b5b08ab2a440d132c686a3a1ab0e70e998d3260d",
+    "coverage_state": "INDEX_COMPLETE",
+    "durable_offsets": {
+      "critical.raw": 120000,
+      "general.raw": 19178160,
+      "quarantine.raw": 0
+    },
+    "indexed_offsets": {
+      "critical.raw": 120000,
+      "general.raw": 19178160,
+      "quarantine.raw": 0
+    },
+    "indexed_records": 80409,
+    "lag_bytes": 0,
+    "lag_records": 0,
+    "lane_coverage": {
+      "critical.raw": {
+        "durable_offset": 120000,
+        "indexed_offset": 120000,
+        "lag_bytes": 0,
+        "lag_records": 0
+      },
+      "general.raw": {
+        "durable_offset": 19178160,
+        "indexed_offset": 19178160,
+        "lag_bytes": 0,
+        "lag_records": 0
+      },
+      "quarantine.raw": {
+        "durable_offset": 0,
+        "indexed_offset": 0,
+        "lag_bytes": 0,
+        "lag_records": 0
+      }
+    },
+    "last_progress_monotonic_ns": 618521319974,
+    "offsets": {
+      "critical.raw": 120000,
+      "general.raw": 19178160,
+      "quarantine.raw": 0
+    },
+    "state": "INDEX_COMPLETE",
+    "updated_monotonic_ns": 618521319974,
+    "updated_utc": "2026-10-14T08:04:18.968922+00:00"
+  },
+  "label": "rule1-r1",
+  "manifest_sha256": "8eb903ad13ae08a971c6b6287cee44552b495a68df872e22287ad3ae05ae1593",
+  "normalized_config_sha256": "d47180a603248173cc89be63b5b08ab2a440d132c686a3a1ab0e70e998d3260d",
+  "raw": {
+    "by_lane": {
+      "critical.raw": 500,
+      "general.raw": 79909,
+      "quarantine.raw": 0
+    },
+    "by_path": {
+      "/home/ljw/mglogwh-v040-32f31ce-decoy/bulk-missing": {
+        "lanes": {
+          "general.raw": 75000
+        },
+        "priorities": {
+          "BULK": 75000
+        },
+        "rule_ids": {
+          "0": 75000
+        },
+        "total": 75000
+      },
+      "/home/ljw/mglogwh-v040-32f31ce-decoy/critical": {
+        "lanes": {
+          "critical.raw": 500
+        },
+        "priorities": {
+          "CRITICAL": 500
+        },
+        "rule_ids": {
+          "1": 500
+        },
+        "total": 500
+      },
+      "/home/ljw/mglogwh-v040-32f31ce-decoy/normal": {
+        "lanes": {
+          "general.raw": 1250
+        },
+        "priorities": {
+          "NORMAL": 1250
+        },
+        "rule_ids": {
+          "0": 1250
+        },
+        "total": 1250
+      }
+    },
+    "crc_and_schema_valid": true,
+    "errors": [],
+    "records_total": 80409
+  },
+  "raw_file_bytes": {
+    "critical.raw": 120000,
+    "general.raw": 19178160,
+    "quarantine.raw": 0
+  },
+  "recover_report": {
+    "absence_set_complete": true,
+    "checkpoint_userspace_loss_reason_coverage_complete": true,
+    "clean_seal": true,
+    "committed_quarantine_control_count": 0,
+    "counter_reason_policy": "AGGREGATE_ONLY_NEVER_ASSIGN_TO_GAPS",
+    "critical_quarantine": {
+      "actual_durable": {
+        "initial_full_total": 0,
+        "owned_initial_full": 0,
+        "owned_periodic_sample": 0,
+        "periodic_sample_total": 0,
+        "untracked_initial_full": 0,
+        "untracked_periodic_sample": 0
+      },
+      "collector_durable_totals_match_raw": true,
+      "critical_seen_scope_complete": true,
+      "critical_seen_total": 500,
+      "declared_metric_aliases": {
+        "active_quarantined_streams": 0,
+        "critical_events_total": 500,
+        "peak_critical_rate": 100,
+        "peak_critical_rate_scope": "MAX_TRACKED_STREAM_ONE_SECOND_EPS",
+        "quarantined_events_total": 0
+      },
+      "episode_metadata_truncated": false,
+      "episodes": [],
+      "final_scope_complete": true,
+      "full_saved_total": 0,
+      "global_counters": {
+        "critical_events_total": 500,
+        "protected_events_total": 0,
+        "quarantined_events_total": 0,
+        "state_contention": 0,
+        "stream_map_full": 0,
+        "transition_ring_failed": 0,
+        "untracked_protected": 0,
+        "untracked_protected_ring_failed": 0,
+        "untracked_protected_submitted": 0,
+        "untracked_ring_failed": 0,
+        "untracked_seen": 0,
+        "untracked_selected": 0,
+        "untracked_submitted": 0,
+        "untracked_summarized": 0
+      },
+      "individual_event_ids": null,
+      "policy": "ORIGINAL_CRITICAL_PRIORITY_PRESERVED",
+      "protected_seen_total": 0,
+      "quarantine_by_reason": {
+        "CRITICAL_RATE_EXCEEDED": 0,
+        "CRITICAL_RATE_RECOVERED": 0
+      },
+      "quarantine_by_reason_scope": "TRANSITIONS",
+      "quarantine_not_stored_total": 0,
+      "quarantine_pending_or_not_stored_total": 0,
+      "quarantine_seen_total": 0,
+      "sampled_total": 0,
+      "selected_pending_total": 0,
+      "stream_snapshot_complete": true,
+      "stream_storage_complete": true,
+      "streams": [
+        {
+          "actual_durable": {
+            "initial_full_total": 0,
+            "owned_initial_full": 0,
+            "owned_periodic_sample": 0,
+            "periodic_sample_total": 0,
+            "untracked_initial_full": 0,
+            "untracked_periodic_sample": 0
+          },
+          "cgroup_id": 21,
+          "collector": {
+            "full_appended": 0,
+            "full_durable": 0,
+            "normal_appended": 500,
+            "normal_durable": 500,
+            "queue_rejected_full": 0,
+            "queue_rejected_sample": 0,
+            "sample_appended": 0,
+            "sample_durable": 0,
+            "storage_rejected_full": 0,
+            "storage_rejected_sample": 0
+          },
+          "current_rate_eps": 100,
+          "kind": 2,
+          "lifetime": {
+            "durable_initial_full": 0,
+            "durable_periodic_sample": 0,
+            "durable_selection_consistent": true,
+            "individual_event_ids": null,
+            "not_durable": 0,
+            "partition_consistent": true,
+            "pending_or_not_durable": 0,
+            "reconciliation_complete": true,
+            "ring_failed": 0,
+            "scope": "TRACKED_KERNEL_OWNED_QUARANTINE_EVENTS",
+            "seen": 0,
+            "selected_initial_full": 0,
+            "selected_periodic_sample": 0,
+            "selection_consistent": true,
+            "submitted_initial_full": 0,
+            "submitted_not_durable": 0,
+            "submitted_periodic_sample": 0,
+            "summarized": 0,
+            "summary_kind": "AGGREGATE_ONLY",
+            "summary_reason": "CRITICAL_QUARANTINE",
+            "unsynced_or_unexplained_after_rejections": 0,
+            "userspace_rejected_aggregate": 0
+          },
+          "peak_rate_eps": 100,
+          "protected_seen": 0,
+          "rule_id": 1,
+          "seen_total": 500,
+          "tracking_failed": 0,
+          "untracked_counters": {
+            "untracked_ring_failed": 0,
+            "untracked_seen": 0,
+            "untracked_selected": 0,
+            "untracked_submitted": 0,
+            "untracked_summarized": 0
+          }
+        }
+      ],
+      "summary_kind": "AGGREGATE_ONLY",
+      "summary_reason": "CRITICAL_QUARANTINE",
+      "tracking_complete": true
+    },
+    "duplicate_loss_records": 0,
+    "duplicate_quarantine_controls": 0,
+    "durable_records": 80409,
+    "durable_unique_events": 80409,
+    "errors": [],
+    "exact_loss_scope": "USERSPACE_REJECTIONS",
+    "exact_userspace_loss_count": 0,
+    "exact_userspace_loss_durability": "COMMITTED_JOURNAL_FENCE",
+    "exact_userspace_loss_witnesses": {
+      "count": 0,
+      "entries": [],
+      "entries_truncated": false,
+      "identity_scope": "SENSOR_CGROUP_SEQUENCE_WITHIN_RUN_AND_BOOT",
+      "legacy_tombstones_without_witness": 0,
+      "truth_id_scope": "UNBOUND_UNTIL_UNIQUE_NOTEBOOK_MONOTONIC_CONTEXT_MATCH"
+    },
+    "exact_userspace_losses": [],
+    "journal": {
+      "committed_bytes": 59084,
+      "committed_journal_seq": 8,
+      "file_bytes": 59084,
+      "uncommitted_bytes": 0
+    },
+    "last_trusted_checkpoint": {
+      "active_quarantined_streams": 0,
+      "admitted": [
+        500,
+        79909,
+        0
+      ],
+      "appended": [
+        500,
+        79909,
+        0
+      ],
+      "boot_id": "8b39c47b-460e-4975-8afe-cdc31cfd2e05",
+      "config_sha256": "d47180a603248173cc89be63b5b08ab2a440d132c686a3a1ab0e70e998d3260d",
+      "cpu_seconds": 1.262449,
+      "critical_events_total": 500,
+      "critical_scheduler": "FIFO",
+      "critical_seen_total": 500,
+      "dedicated_drain_thread": true,
+      "durable": {
+        "critical.raw": 120000,
+        "general.raw": 19178160,
+        "quarantine.raw": 0
+      },
+      "durable_offsets": {
+        "critical": 120000,
+        "general": 19178160,
+        "quarantine": 0
+      },
+      "error_errno": 0,
+      "exact_loss_available": true,
+      "exact_loss_scope": "USERSPACE_REJECTIONS",
+      "fault_snapshot_complete": true,
+      "faults": [
+        0,
+        0,
+        13,
+        0
+      ],
+      "general_quota_drop": 0,
+      "journal_seq": 8,
+      "manifest_sha256": "8eb903ad13ae08a971c6b6287cee44552b495a68df872e22287ad3ae05ae1593",
+      "max_rss_kib": 22784,
+      "metadata": {
+        "checkpoint_coalesced": 0,
+        "committed_offset": 51108,
+        "committed_seq": 7,
+        "dropped": 0,
+        "overflow": 0,
+        "persist_failed": 0,
+        "queue_capacity": 4096,
+        "queue_depth": 0,
+        "queue_high_water": 1,
+        "state": "RUNNING"
+      },
+      "metadata_dropped": 0,
+      "metadata_failed": false,
+      "metadata_overflow": 0,
+      "monotonic_ms": 603799,
+      "peak_critical_rate": 100,
+      "peak_critical_rate_scope": "MAX_TRACKED_STREAM_ONE_SECOND_EPS",
+      "persist_failed": 0,
+      "pid": 988,
+      "policy_version": 1,
+      "protected_critical_seen_total": 0,
+      "quarantine_accounting_final": true,
+      "quarantine_by_reason": {
+        "CRITICAL_RATE_EXCEEDED": 0,
+        "CRITICAL_RATE_RECOVERED": 0
+      },
+      "quarantine_by_reason_scope": "TRANSITIONS",
+      "quarantine_dropped_total": 0,
+      "quarantine_enter_total": 0,
+      "quarantine_exit_total": 0,
+      "quarantine_full_appended_total": 0,
+      "quarantine_full_saved_total": 0,
+      "quarantine_full_selected_total": 0,
+      "quarantine_full_submitted_total": 0,
+      "quarantine_global": {
+        "critical_events_total": 500,
+        "protected_events_total": 0,
+        "quarantined_events_total": 0,
+        "state_contention": 0,
+        "stream_map_full": 0,
+        "transition_ring_failed": 0,
+        "untracked_protected": 0,
+        "untracked_protected_ring_failed": 0,
+        "untracked_protected_submitted": 0,
+        "untracked_ring_failed": 0,
+        "untracked_seen": 0,
+        "untracked_selected": 0,
+        "untracked_submitted": 0,
+        "untracked_summarized": 0
+      },
+      "quarantine_not_stored_observed_total": 0,
+      "quarantine_pending_total": 0,
+      "quarantine_ring_failed_total": 0,
+      "quarantine_sample_appended_total": 0,
+      "quarantine_sample_selected_total": 0,
+      "quarantine_sample_submitted_total": 0,
+      "quarantine_sampled_total": 0,
+      "quarantine_seen_total": 0,
+      "quarantine_storage_drop": 0,
+      "quarantine_summarized_total": 0,
+      "quarantine_tracking_complete": true,
+      "quarantined_events_total": 0,
+      "quarantined_streams": 0,
+      "queue_capacity": [
+        8192,
+        16384,
+        512
+      ],
+      "queue_depth": [
+        0,
+        0,
+        0
+      ],
+      "queue_high_water": [
+        7,
+        1451,
+        0
+      ],
+      "queue_in_flight": [
+        0,
+        0,
+        0
+      ],
+      "queue_overflow": [
+        0,
+        0,
+        0
+      ],
+      "raw_schema": 3,
+      "received": [
+        500,
+        79909,
+        0
+      ],
+      "record_size": 240,
+      "record_type": "seal",
+      "rule_stats": [
+        {
+          "bulk_budget_contention": 0,
+          "bulk_budget_suppressed": 0,
+          "collector_appended": [
+            500,
+            0,
+            0
+          ],
+          "collector_durable": [
+            500,
+            0,
+            0
+          ],
+          "collector_observed": [
+            500,
+            0,
+            0
+          ],
+          "collector_queue_rejected": [
+            0,
+            0,
+            0
+          ],
+          "collector_quota_rejected": [
+            0,
+            0,
+            0
+          ],
+          "configured_policy": 1,
+          "enabled": true,
+          "evaluated": 80409,
+          "matched": 500,
+          "precedence": 100,
+          "priority": 2,
+          "quarantine_summarized": 0,
+          "ring_failed": 0,
+          "ring_submitted": 500,
+          "rule_id": 1,
+          "selected": 500,
+          "stats_available": true,
+          "unknown": 1186
+        }
+      ],
+      "rule_stats_scope": "AGGREGATE_SELECTED_ATTEMPTS_AND_DURABLE_WRITES; PRE_SEQUENCE_AND_KERNEL_LOSS_NOT_EVENT_IDENTIFIABLE",
+      "rule_stats_snapshot_complete": true,
+      "rule_version": 1,
+      "run_id": "2fd98cfb-ddd2-4078-b18b-a90b155f0284",
+      "schema": 1,
+      "sequence_snapshot_complete": true,
+      "state": "STOPPED",
+      "stream_snapshot_complete": true,
+      "stream_storage_complete": true,
+      "stream_storage_overflow": 0,
+      "streams": [
+        {
+          "cgroup_id": 21,
+          "collector": {
+            "full_appended": 0,
+            "full_durable": 0,
+            "normal_appended": 500,
+            "normal_durable": 500,
+            "queue_rejected_full": 0,
+            "queue_rejected_sample": 0,
+            "sample_appended": 0,
+            "sample_durable": 0,
+            "storage_rejected_full": 0,
+            "storage_rejected_sample": 0
+          },
+          "critical_ring_failed": 0,
+          "critical_submitted": 500,
+          "engine": {
+            "accounted_seen": 500,
+            "burst_start_ns": 0,
+            "current": {
+              "burst_start_ns": 0,
+              "duration_ms": 0,
+              "end_ns": 0,
+              "episode_id": 0,
+              "first_pid": 0,
+              "first_sequence": 0,
+              "first_uid": 0,
+              "full_selected": 0,
+              "full_submitted": 0,
+              "high_rate_duration_ms": 0,
+              "last_event_ns": 0,
+              "last_pid": 0,
+              "last_sequence": 0,
+              "last_uid": 0,
+              "observed_eps": 0,
+              "peak_rate_eps": 0,
+              "ring_failed": 0,
+              "sample_selected": 0,
+              "sample_submitted": 0,
+              "seen": 0,
+              "start_ns": 0,
+              "summarized": 0,
+              "threshold_eps": 0,
+              "tracking_complete": 0,
+              "tracking_failed_end": 0,
+              "tracking_failed_start": 0,
+              "unique_pid_lower_bound": 0,
+              "unique_uid_lower_bound": 0
+            },
+            "current_rate_eps": 100,
+            "enter_count": 0,
+            "exit_count": 0,
+            "full_selected": 0,
+            "full_submitted": 0,
+            "high_windows": 0,
+            "initialized": 1,
+            "last": {
+              "burst_start_ns": 0,
+              "duration_ms": 0,
+              "end_ns": 0,
+              "episode_id": 0,
+              "first_pid": 0,
+              "first_sequence": 0,
+              "first_uid": 0,
+              "full_selected": 0,
+              "full_submitted": 0,
+              "high_rate_duration_ms": 0,
+              "last_event_ns": 0,
+              "last_pid": 0,
+              "last_sequence": 0,
+              "last_uid": 0,
+              "observed_eps": 0,
+              "peak_rate_eps": 0,
+              "ring_failed": 0,
+              "sample_selected": 0,
+              "sample_submitted": 0,
+              "seen": 0,
+              "start_ns": 0,
+              "summarized": 0,
+              "threshold_eps": 0,
+              "tracking_complete": 0,
+              "tracking_failed_end": 0,
+              "tracking_failed_start": 0,
+              "unique_pid_lower_bound": 0,
+              "unique_uid_lower_bound": 0
+            },
+            "low_windows": 0,
+            "next_sample_ns": 0,
+            "peak_rate_eps": 100,
+            "q_seen": 0,
+            "quarantined": 0,
+            "ring_failed": 0,
+            "sample_selected": 0,
+            "sample_submitted": 0,
+            "summarized": 0,
+            "window_complete": 1,
+            "window_count": 8,
+            "window_start_ns": 603000000000
+          },
+          "kind": 2,
+          "protected_seen": 0,
+          "rule_id": 1,
+          "seen": 500,
+          "tracking_failed": 0,
+          "transition_ring_failed": 0,
+          "untracked_ring_failed": 0,
+          "untracked_seen": 0,
+          "untracked_selected": 0,
+          "untracked_submitted": 0,
+          "untracked_summarized": 0
+        }
+      ],
+      "summary_kind": "AGGREGATE_ONLY",
+      "tenants": [
+        {
+          "budget_contention": 0,
+          "budget_suppress": 0,
+          "cgroup_id": 2405,
+          "critical_full": 0,
+          "general_full": 0,
+          "quarantine_full": 0,
+          "quarantine_submitted": 0,
+          "quarantine_summarized": 0,
+          "sequence": 10,
+          "stream_contention": 0,
+          "stream_map_full": 0,
+          "submitted": [
+            4,
+            6,
+            0
+          ]
+        },
+        {
+          "budget_contention": 0,
+          "budget_suppress": 0,
+          "cgroup_id": 1451,
+          "critical_full": 0,
+          "general_full": 0,
+          "quarantine_full": 0,
+          "quarantine_submitted": 0,
+          "quarantine_summarized": 0,
+          "sequence": 2213,
+          "stream_contention": 0,
+          "stream_map_full": 0,
+          "submitted": [
+            122,
+            2091,
+            0
+          ]
+        },
+        {
+          "budget_contention": 0,
+          "budget_suppress": 0,
+          "cgroup_id": 60013,
+          "critical_full": 0,
+          "general_full": 0,
+          "quarantine_full": 0,
+          "quarantine_submitted": 0,
+          "quarantine_summarized": 0,
+          "sequence": 1,
+          "stream_contention": 0,
+          "stream_map_full": 0,
+          "submitted": [
+            1,
+            0,
+            0
+          ]
+        },
+        {
+          "budget_contention": 0,
+          "budget_suppress": 0,
+          "cgroup_id": 21,
+          "critical_full": 0,
+          "general_full": 0,
+          "quarantine_full": 0,
+          "quarantine_submitted": 0,
+          "quarantine_summarized": 0,
+          "sequence": 77592,
+          "stream_contention": 0,
+          "stream_map_full": 0,
+          "submitted": [
+            75044,
+            2048,
+            500
+          ]
+        },
+        {
+          "budget_contention": 0,
+          "budget_suppress": 0,
+          "cgroup_id": 58973,
+          "critical_full": 0,
+          "general_full": 0,
+          "quarantine_full": 0,
+          "quarantine_submitted": 0,
+          "quarantine_summarized": 0,
+          "sequence": 2,
+          "stream_contention": 0,
+          "stream_map_full": 0,
+          "submitted": [
+            0,
+            2,
+            0
+          ]
+        },
+        {
+          "budget_contention": 0,
+          "budget_suppress": 0,
+          "cgroup_id": 59545,
+          "critical_full": 0,
+          "general_full": 0,
+          "quarantine_full": 0,
+          "quarantine_submitted": 0,
+          "quarantine_summarized": 0,
+          "sequence": 513,
+          "stream_contention": 0,
+          "stream_map_full": 0,
+          "submitted": [
+            35,
+            478,
+            0
+          ]
+        },
+        {
+          "budget_contention": 0,
+          "budget_suppress": 0,
+          "cgroup_id": 62137,
+          "critical_full": 0,
+          "general_full": 0,
+          "quarantine_full": 0,
+          "quarantine_submitted": 0,
+          "quarantine_summarized": 0,
+          "sequence": 18,
+          "stream_contention": 0,
+          "stream_map_full": 0,
+          "submitted": [
+            0,
+            18,
+            0
+          ]
+        },
+        {
+          "budget_contention": 0,
+          "budget_suppress": 0,
+          "cgroup_id": 437,
+          "critical_full": 0,
+          "general_full": 0,
+          "quarantine_full": 0,
+          "quarantine_submitted": 0,
+          "quarantine_summarized": 0,
+          "sequence": 27,
+          "stream_contention": 0,
+          "stream_map_full": 0,
+          "submitted": [
+            3,
+            24,
+            0
+          ]
+        },
+        {
+          "budget_contention": 0,
+          "budget_suppress": 0,
+          "cgroup_id": 62020,
+          "critical_full": 0,
+          "general_full": 0,
+          "quarantine_full": 0,
+          "quarantine_submitted": 0,
+          "quarantine_summarized": 0,
+          "sequence": 33,
+          "stream_contention": 0,
+          "stream_map_full": 0,
+          "submitted": [
+            3,
+            30,
+            0
+          ]
+        }
+      ],
+      "untracked_collector": {
+        "full_appended": 0,
+        "full_durable": 0,
+        "normal_appended": 0,
+        "normal_durable": 0,
+        "queue_rejected_full": 0,
+        "queue_rejected_sample": 0,
+        "sample_appended": 0,
+        "sample_durable": 0,
+        "storage_rejected_full": 0,
+        "storage_rejected_sample": 0
+      },
+      "version": "0.4.0",
+      "writer_threads": 3
+    },
+    "lineage": {
+      "boot_id": "8b39c47b-460e-4975-8afe-cdc31cfd2e05",
+      "config_sha256": "d47180a603248173cc89be63b5b08ab2a440d132c686a3a1ab0e70e998d3260d",
+      "manifest_sha256": "8eb903ad13ae08a971c6b6287cee44552b495a68df872e22287ad3ae05ae1593",
+      "run_id": "2fd98cfb-ddd2-4078-b18b-a90b155f0284"
+    },
+    "pre_sequence_policy_faults": {
+      "affected_event_ids": null,
+      "counters": {
+        "quarantine_global_lookup_failed": 0
+      },
+      "explanation": "Policy lookup failed before sequence assignment; later fallback may still allocate a sequence. No event IDs or missing counts are inferred",
+      "summary_kind": "AGGREGATE_ONLY"
+    },
+    "program": "MGlogWHLedger",
+    "raw": {
+      "critical": {
+        "durable_bytes": 120000,
+        "file_bytes": 120000,
+        "partial_tail_bytes": 0,
+        "uncommitted_bytes": 0
+      },
+      "general": {
+        "durable_bytes": 19178160,
+        "file_bytes": 19178160,
+        "partial_tail_bytes": 0,
+        "uncommitted_bytes": 0
+      },
+      "quarantine": {
+        "durable_bytes": 0,
+        "file_bytes": 0,
+        "partial_tail_bytes": 0,
+        "uncommitted_bytes": 0
+      }
+    },
+    "raw_recovery_supported": true,
+    "recovery_policy": "COMMITTED_FENCE_ONLY_NO_TAIL_PROMOTION",
+    "rule_evidence": {
+      "config_sha256": "d47180a603248173cc89be63b5b08ab2a440d132c686a3a1ab0e70e998d3260d",
+      "matched_means": "ALL_MATCHING_RULES_INCLUDING_NON_WINNERS",
+      "policy_version": 1,
+      "pre_sequence_and_kernel_losses_cannot_be_assigned_to_rule": true,
+      "rule_engine_schema_version": 1,
+      "rules": [
+        {
+          "checkpoint_counters": {
+            "bulk_budget_contention": 0,
+            "bulk_budget_suppressed": 0,
+            "collector_appended": [
+              500,
+              0,
+              0
+            ],
+            "collector_durable": [
+              500,
+              0,
+              0
+            ],
+            "collector_observed": [
+              500,
+              0,
+              0
+            ],
+            "collector_queue_rejected": [
+              0,
+              0,
+              0
+            ],
+            "collector_quota_rejected": [
+              0,
+              0,
+              0
+            ],
+            "configured_policy": 1,
+            "enabled": true,
+            "evaluated": 80409,
+            "matched": 500,
+            "precedence": 100,
+            "priority": 2,
+            "quarantine_summarized": 0,
+            "ring_failed": 0,
+            "ring_submitted": 500,
+            "rule_id": 1,
+            "selected": 500,
+            "stats_available": true,
+            "unknown": 1186
+          },
+          "collector_durable_matches_raw": true,
+          "complete_to_durable": true,
+          "configured_policy": "QUARANTINE",
+          "counter_scope": "COMMITTED_CHECKPOINT_AGGREGATE",
+          "kernel_counters_available": true,
+          "per_rule_loss_attribution_complete": false,
+          "per_rule_unobserved_event_count": null,
+          "priority": "CRITICAL",
+          "raw_durable_count": 500,
+          "rule_id": 1
+        }
+      ],
+      "rules_bin_sha256": "dfa4fb0527900101be71d9d17a494497fcb30cd4f293b40dd2cb1ae64a543439",
+      "selected_means": "FINAL_WINNER_ONLY_PRE_SEQUENCE_AGGREGATE",
+      "snapshot_complete": true,
+      "snapshot_scope": "AGGREGATE_SELECTED_ATTEMPTS_AND_DURABLE_WRITES; PRE_SEQUENCE_AND_KERNEL_LOSS_NOT_EVENT_IDENTIFIABLE",
+      "source": "COMMITTED_CHECKPOINT_AND_DURABLE_RAW",
+      "unknown_rule_raw_counts": {},
+      "unmatched_or_legacy_raw_count": 79909
+    },
+    "run_path": "/root/mglogwh-v040-f9bd477-data/runs/2fd98cfb-ddd2-4078-b18b-a90b155f0284",
+    "schema": 1,
+    "source_modified": false,
+    "status": "RECOVERED",
+    "tenant_evidence": [
+      {
+        "accounted_frontier": 10,
+        "cgroup_id": 2405,
+        "checkpoint_sequence": 10,
+        "contiguous_raw_frontier": 10,
+        "final_absence": {
+          "count": 0,
+          "range_count": 0,
+          "ranges": [],
+          "ranges_truncated": false
+        },
+        "frontier_scope": "COMMITTED_DURABLE_RAW_AND_EXACT_USERSPACE_TOMBSTONES_ONLY",
+        "max_seen_exact_sequence": 10
+      },
+      {
+        "accounted_frontier": 2213,
+        "cgroup_id": 1451,
+        "checkpoint_sequence": 2213,
+        "contiguous_raw_frontier": 2213,
+        "final_absence": {
+          "count": 0,
+          "range_count": 0,
+          "ranges": [],
+          "ranges_truncated": false
+        },
+        "frontier_scope": "COMMITTED_DURABLE_RAW_AND_EXACT_USERSPACE_TOMBSTONES_ONLY",
+        "max_seen_exact_sequence": 2213
+      },
+      {
+        "accounted_frontier": 1,
+        "cgroup_id": 60013,
+        "checkpoint_sequence": 1,
+        "contiguous_raw_frontier": 1,
+        "final_absence": {
+          "count": 0,
+          "range_count": 0,
+          "ranges": [],
+          "ranges_truncated": false
+        },
+        "frontier_scope": "COMMITTED_DURABLE_RAW_AND_EXACT_USERSPACE_TOMBSTONES_ONLY",
+        "max_seen_exact_sequence": 1
+      },
+      {
+        "accounted_frontier": 77592,
+        "cgroup_id": 21,
+        "checkpoint_sequence": 77592,
+        "contiguous_raw_frontier": 77592,
+        "final_absence": {
+          "count": 0,
+          "range_count": 0,
+          "ranges": [],
+          "ranges_truncated": false
+        },
+        "frontier_scope": "COMMITTED_DURABLE_RAW_AND_EXACT_USERSPACE_TOMBSTONES_ONLY",
+        "max_seen_exact_sequence": 77592
+      },
+      {
+        "accounted_frontier": 2,
+        "cgroup_id": 58973,
+        "checkpoint_sequence": 2,
+        "contiguous_raw_frontier": 2,
+        "final_absence": {
+          "count": 0,
+          "range_count": 0,
+          "ranges": [],
+          "ranges_truncated": false
+        },
+        "frontier_scope": "COMMITTED_DURABLE_RAW_AND_EXACT_USERSPACE_TOMBSTONES_ONLY",
+        "max_seen_exact_sequence": 2
+      },
+      {
+        "accounted_frontier": 513,
+        "cgroup_id": 59545,
+        "checkpoint_sequence": 513,
+        "contiguous_raw_frontier": 513,
+        "final_absence": {
+          "count": 0,
+          "range_count": 0,
+          "ranges": [],
+          "ranges_truncated": false
+        },
+        "frontier_scope": "COMMITTED_DURABLE_RAW_AND_EXACT_USERSPACE_TOMBSTONES_ONLY",
+        "max_seen_exact_sequence": 513
+      },
+      {
+        "accounted_frontier": 18,
+        "cgroup_id": 62137,
+        "checkpoint_sequence": 18,
+        "contiguous_raw_frontier": 18,
+        "final_absence": {
+          "count": 0,
+          "range_count": 0,
+          "ranges": [],
+          "ranges_truncated": false
+        },
+        "frontier_scope": "COMMITTED_DURABLE_RAW_AND_EXACT_USERSPACE_TOMBSTONES_ONLY",
+        "max_seen_exact_sequence": 18
+      },
+      {
+        "accounted_frontier": 27,
+        "cgroup_id": 437,
+        "checkpoint_sequence": 27,
+        "contiguous_raw_frontier": 27,
+        "final_absence": {
+          "count": 0,
+          "range_count": 0,
+          "ranges": [],
+          "ranges_truncated": false
+        },
+        "frontier_scope": "COMMITTED_DURABLE_RAW_AND_EXACT_USERSPACE_TOMBSTONES_ONLY",
+        "max_seen_exact_sequence": 27
+      },
+      {
+        "accounted_frontier": 33,
+        "cgroup_id": 62020,
+        "checkpoint_sequence": 33,
+        "contiguous_raw_frontier": 33,
+        "final_absence": {
+          "count": 0,
+          "range_count": 0,
+          "ranges": [],
+          "ranges_truncated": false
+        },
+        "frontier_scope": "COMMITTED_DURABLE_RAW_AND_EXACT_USERSPACE_TOMBSTONES_ONLY",
+        "max_seen_exact_sequence": 33
+      }
+    ],
+    "unsequenced_faults": {
+      "affected_event_ids": null,
+      "counters": {
+        "pending_lookup_missing": 13,
+        "pending_update_failed": 0,
+        "tenant_map_missing": 0
+      },
+      "exact_unobserved_event_count": null,
+      "explanation": "Pre-sequence observation faults have no recoverable event IDs; counters are not assigned to gaps",
+      "summary_kind": "AGGREGATE_ONLY"
+    },
+    "userspace_loss_reason_coverage_complete": true,
+    "userspace_loss_witness_coverage_complete": true,
+    "verification_progress": {
+      "journal_committed_boundary_bytes": 59084,
+      "journal_verified_frames": 8,
+      "journal_verified_prefix_bytes": 59084,
+      "raw_verified_prefix_bytes": {
+        "critical": 120000,
+        "general": 19178160,
+        "quarantine": 0
+      },
+      "scope": "DIAGNOSTIC_ONLY_NOT_PARTIAL_RECOVERY"
+    },
+    "version": "0.4.0",
+    "warnings": []
+  },
+  "recover_status": "RECOVERED",
+  "repeat": 1,
+  "resources_after": {
+    "filesystem_free_bytes": 1001684566016,
+    "filesystem_total_bytes": 1081101176832,
+    "memory_available_kib": 6997016
+  },
+  "resources_before": {
+    "filesystem_free_bytes": 1001745846272,
+    "filesystem_total_bytes": 1081101176832,
+    "memory_available_kib": 7009380
+  },
+  "rule_format": "event_rules",
+  "rules_bin_sha256": "dfa4fb0527900101be71d9d17a494497fcb30cd4f293b40dd2cb1ae64a543439",
+  "run_dir": "/root/mglogwh-v040-f9bd477-data/runs/2fd98cfb-ddd2-4078-b18b-a90b155f0284",
+  "run_id": "2fd98cfb-ddd2-4078-b18b-a90b155f0284",
+  "start_state": "RUNNING",
+  "started_utc": "2026-10-14T08:03:56Z",
+  "stop_status": {
+    "collector": {
+      "active_quarantined_streams": 0,
+      "admitted": [
+        500,
+        79909,
+        0
+      ],
+      "appended": [
+        500,
+        79909,
+        0
+      ],
+      "config_sha256": "d47180a603248173cc89be63b5b08ab2a440d132c686a3a1ab0e70e998d3260d",
+      "cpu_seconds": 1.266384,
+      "critical_events_total": 500,
+      "critical_scheduler": "FIFO",
+      "critical_seen_total": 500,
+      "dedicated_drain_thread": true,
+      "durable": {
+        "critical.raw": 120000,
+        "general.raw": 19178160,
+        "quarantine.raw": 0
+      },
+      "durable_offsets": {
+        "critical": 120000,
+        "general": 19178160,
+        "quarantine": 0
+      },
+      "error_errno": 0,
+      "exact_loss_available": true,
+      "exact_loss_scope": "USERSPACE_REJECTIONS",
+      "fault_snapshot_complete": true,
+      "faults": [
+        0,
+        0,
+        13,
+        0
+      ],
+      "general_quota_drop": 0,
+      "max_rss_kib": 22784,
+      "metadata": {
+        "checkpoint_coalesced": 0,
+        "committed_offset": 59084,
+        "committed_seq": 8,
+        "dropped": 0,
+        "overflow": 0,
+        "persist_failed": 0,
+        "queue_capacity": 4096,
+        "queue_depth": 0,
+        "queue_high_water": 1,
+        "state": "STOPPED"
+      },
+      "metadata_dropped": 0,
+      "metadata_failed": false,
+      "metadata_overflow": 0,
+      "monotonic_ms": 603851,
+      "peak_critical_rate": 100,
+      "peak_critical_rate_scope": "MAX_TRACKED_STREAM_ONE_SECOND_EPS",
+      "persist_failed": 0,
+      "pid": 988,
+      "policy_version": 1,
+      "protected_critical_seen_total": 0,
+      "quarantine_accounting_final": true,
+      "quarantine_by_reason": {
+        "CRITICAL_RATE_EXCEEDED": 0,
+        "CRITICAL_RATE_RECOVERED": 0
+      },
+      "quarantine_by_reason_scope": "TRANSITIONS",
+      "quarantine_dropped_total": 0,
+      "quarantine_enter_total": 0,
+      "quarantine_exit_total": 0,
+      "quarantine_full_appended_total": 0,
+      "quarantine_full_saved_total": 0,
+      "quarantine_full_selected_total": 0,
+      "quarantine_full_submitted_total": 0,
+      "quarantine_global": {
+        "critical_events_total": 500,
+        "protected_events_total": 0,
+        "quarantined_events_total": 0,
+        "state_contention": 0,
+        "stream_map_full": 0,
+        "transition_ring_failed": 0,
+        "untracked_protected": 0,
+        "untracked_protected_ring_failed": 0,
+        "untracked_protected_submitted": 0,
+        "untracked_ring_failed": 0,
+        "untracked_seen": 0,
+        "untracked_selected": 0,
+        "untracked_submitted": 0,
+        "untracked_summarized": 0
+      },
+      "quarantine_not_stored_observed_total": 0,
+      "quarantine_pending_total": 0,
+      "quarantine_ring_failed_total": 0,
+      "quarantine_sample_appended_total": 0,
+      "quarantine_sample_selected_total": 0,
+      "quarantine_sample_submitted_total": 0,
+      "quarantine_sampled_total": 0,
+      "quarantine_seen_total": 0,
+      "quarantine_storage_drop": 0,
+      "quarantine_summarized_total": 0,
+      "quarantine_tracking_complete": true,
+      "quarantined_events_total": 0,
+      "quarantined_streams": 0,
+      "queue_capacity": [
+        8192,
+        16384,
+        512
+      ],
+      "queue_depth": [
+        0,
+        0,
+        0
+      ],
+      "queue_high_water": [
+        7,
+        1451,
+        0
+      ],
+      "queue_in_flight": [
+        0,
+        0,
+        0
+      ],
+      "queue_overflow": [
+        0,
+        0,
+        0
+      ],
+      "raw_schema": 3,
+      "received": [
+        500,
+        79909,
+        0
+      ],
+      "record_size": 240,
+      "record_type": "seal",
+      "rule_stats": [
+        {
+          "bulk_budget_contention": 0,
+          "bulk_budget_suppressed": 0,
+          "collector_appended": [
+            500,
+            0,
+            0
+          ],
+          "collector_durable": [
+            500,
+            0,
+            0
+          ],
+          "collector_observed": [
+            500,
+            0,
+            0
+          ],
+          "collector_queue_rejected": [
+            0,
+            0,
+            0
+          ],
+          "collector_quota_rejected": [
+            0,
+            0,
+            0
+          ],
+          "configured_policy": 1,
+          "enabled": true,
+          "evaluated": 80409,
+          "matched": 500,
+          "precedence": 100,
+          "priority": 2,
+          "quarantine_summarized": 0,
+          "ring_failed": 0,
+          "ring_submitted": 500,
+          "rule_id": 1,
+          "selected": 500,
+          "stats_available": true,
+          "unknown": 1186
+        }
+      ],
+      "rule_stats_scope": "AGGREGATE_SELECTED_ATTEMPTS_AND_DURABLE_WRITES; PRE_SEQUENCE_AND_KERNEL_LOSS_NOT_EVENT_IDENTIFIABLE",
+      "rule_stats_snapshot_complete": true,
+      "rule_version": 1,
+      "sequence_snapshot_complete": true,
+      "state": "STOPPED",
+      "stream_snapshot_complete": true,
+      "stream_storage_complete": true,
+      "stream_storage_overflow": 0,
+      "streams": [
+        {
+          "cgroup_id": 21,
+          "collector": {
+            "full_appended": 0,
+            "full_durable": 0,
+            "normal_appended": 500,
+            "normal_durable": 500,
+            "queue_rejected_full": 0,
+            "queue_rejected_sample": 0,
+            "sample_appended": 0,
+            "sample_durable": 0,
+            "storage_rejected_full": 0,
+            "storage_rejected_sample": 0
+          },
+          "critical_ring_failed": 0,
+          "critical_submitted": 500,
+          "engine": {
+            "accounted_seen": 500,
+            "burst_start_ns": 0,
+            "current": {
+              "burst_start_ns": 0,
+              "duration_ms": 0,
+              "end_ns": 0,
+              "episode_id": 0,
+              "first_pid": 0,
+              "first_sequence": 0,
+              "first_uid": 0,
+              "full_selected": 0,
+              "full_submitted": 0,
+              "high_rate_duration_ms": 0,
+              "last_event_ns": 0,
+              "last_pid": 0,
+              "last_sequence": 0,
+              "last_uid": 0,
+              "observed_eps": 0,
+              "peak_rate_eps": 0,
+              "ring_failed": 0,
+              "sample_selected": 0,
+              "sample_submitted": 0,
+              "seen": 0,
+              "start_ns": 0,
+              "summarized": 0,
+              "threshold_eps": 0,
+              "tracking_complete": 0,
+              "tracking_failed_end": 0,
+              "tracking_failed_start": 0,
+              "unique_pid_lower_bound": 0,
+              "unique_uid_lower_bound": 0
+            },
+            "current_rate_eps": 100,
+            "enter_count": 0,
+            "exit_count": 0,
+            "full_selected": 0,
+            "full_submitted": 0,
+            "high_windows": 0,
+            "initialized": 1,
+            "last": {
+              "burst_start_ns": 0,
+              "duration_ms": 0,
+              "end_ns": 0,
+              "episode_id": 0,
+              "first_pid": 0,
+              "first_sequence": 0,
+              "first_uid": 0,
+              "full_selected": 0,
+              "full_submitted": 0,
+              "high_rate_duration_ms": 0,
+              "last_event_ns": 0,
+              "last_pid": 0,
+              "last_sequence": 0,
+              "last_uid": 0,
+              "observed_eps": 0,
+              "peak_rate_eps": 0,
+              "ring_failed": 0,
+              "sample_selected": 0,
+              "sample_submitted": 0,
+              "seen": 0,
+              "start_ns": 0,
+              "summarized": 0,
+              "threshold_eps": 0,
+              "tracking_complete": 0,
+              "tracking_failed_end": 0,
+              "tracking_failed_start": 0,
+              "unique_pid_lower_bound": 0,
+              "unique_uid_lower_bound": 0
+            },
+            "low_windows": 0,
+            "next_sample_ns": 0,
+            "peak_rate_eps": 100,
+            "q_seen": 0,
+            "quarantined": 0,
+            "ring_failed": 0,
+            "sample_selected": 0,
+            "sample_submitted": 0,
+            "summarized": 0,
+            "window_complete": 1,
+            "window_count": 8,
+            "window_start_ns": 603000000000
+          },
+          "kind": 2,
+          "protected_seen": 0,
+          "rule_id": 1,
+          "seen": 500,
+          "tracking_failed": 0,
+          "transition_ring_failed": 0,
+          "untracked_ring_failed": 0,
+          "untracked_seen": 0,
+          "untracked_selected": 0,
+          "untracked_submitted": 0,
+          "untracked_summarized": 0
+        }
+      ],
+      "summary_kind": "AGGREGATE_ONLY",
+      "tenants": [
+        {
+          "budget_contention": 0,
+          "budget_suppress": 0,
+          "cgroup_id": 2405,
+          "critical_full": 0,
+          "general_full": 0,
+          "quarantine_full": 0,
+          "quarantine_submitted": 0,
+          "quarantine_summarized": 0,
+          "sequence": 10,
+          "stream_contention": 0,
+          "stream_map_full": 0,
+          "submitted": [
+            4,
+            6,
+            0
+          ]
+        },
+        {
+          "budget_contention": 0,
+          "budget_suppress": 0,
+          "cgroup_id": 1451,
+          "critical_full": 0,
+          "general_full": 0,
+          "quarantine_full": 0,
+          "quarantine_submitted": 0,
+          "quarantine_summarized": 0,
+          "sequence": 2213,
+          "stream_contention": 0,
+          "stream_map_full": 0,
+          "submitted": [
+            122,
+            2091,
+            0
+          ]
+        },
+        {
+          "budget_contention": 0,
+          "budget_suppress": 0,
+          "cgroup_id": 60013,
+          "critical_full": 0,
+          "general_full": 0,
+          "quarantine_full": 0,
+          "quarantine_submitted": 0,
+          "quarantine_summarized": 0,
+          "sequence": 1,
+          "stream_contention": 0,
+          "stream_map_full": 0,
+          "submitted": [
+            1,
+            0,
+            0
+          ]
+        },
+        {
+          "budget_contention": 0,
+          "budget_suppress": 0,
+          "cgroup_id": 21,
+          "critical_full": 0,
+          "general_full": 0,
+          "quarantine_full": 0,
+          "quarantine_submitted": 0,
+          "quarantine_summarized": 0,
+          "sequence": 77592,
+          "stream_contention": 0,
+          "stream_map_full": 0,
+          "submitted": [
+            75044,
+            2048,
+            500
+          ]
+        },
+        {
+          "budget_contention": 0,
+          "budget_suppress": 0,
+          "cgroup_id": 58973,
+          "critical_full": 0,
+          "general_full": 0,
+          "quarantine_full": 0,
+          "quarantine_submitted": 0,
+          "quarantine_summarized": 0,
+          "sequence": 2,
+          "stream_contention": 0,
+          "stream_map_full": 0,
+          "submitted": [
+            0,
+            2,
+            0
+          ]
+        },
+        {
+          "budget_contention": 0,
+          "budget_suppress": 0,
+          "cgroup_id": 59545,
+          "critical_full": 0,
+          "general_full": 0,
+          "quarantine_full": 0,
+          "quarantine_submitted": 0,
+          "quarantine_summarized": 0,
+          "sequence": 513,
+          "stream_contention": 0,
+          "stream_map_full": 0,
+          "submitted": [
+            35,
+            478,
+            0
+          ]
+        },
+        {
+          "budget_contention": 0,
+          "budget_suppress": 0,
+          "cgroup_id": 62137,
+          "critical_full": 0,
+          "general_full": 0,
+          "quarantine_full": 0,
+          "quarantine_submitted": 0,
+          "quarantine_summarized": 0,
+          "sequence": 18,
+          "stream_contention": 0,
+          "stream_map_full": 0,
+          "submitted": [
+            0,
+            18,
+            0
+          ]
+        },
+        {
+          "budget_contention": 0,
+          "budget_suppress": 0,
+          "cgroup_id": 437,
+          "critical_full": 0,
+          "general_full": 0,
+          "quarantine_full": 0,
+          "quarantine_submitted": 0,
+          "quarantine_summarized": 0,
+          "sequence": 27,
+          "stream_contention": 0,
+          "stream_map_full": 0,
+          "submitted": [
+            3,
+            24,
+            0
+          ]
+        },
+        {
+          "budget_contention": 0,
+          "budget_suppress": 0,
+          "cgroup_id": 62020,
+          "critical_full": 0,
+          "general_full": 0,
+          "quarantine_full": 0,
+          "quarantine_submitted": 0,
+          "quarantine_summarized": 0,
+          "sequence": 33,
+          "stream_contention": 0,
+          "stream_map_full": 0,
+          "submitted": [
+            3,
+            30,
+            0
+          ]
+        }
+      ],
+      "untracked_collector": {
+        "full_appended": 0,
+        "full_durable": 0,
+        "normal_appended": 0,
+        "normal_durable": 0,
+        "queue_rejected_full": 0,
+        "queue_rejected_sample": 0,
+        "sample_appended": 0,
+        "sample_durable": 0,
+        "storage_rejected_full": 0,
+        "storage_rejected_sample": 0
+      },
+      "version": "0.4.0",
+      "writer_threads": 3
+    },
+    "config_sha256": "d47180a603248173cc89be63b5b08ab2a440d132c686a3a1ab0e70e998d3260d",
+    "evidence_metadata": {
+      "checkpoint_coalesced": 0,
+      "committed_offset": 59084,
+      "committed_seq": 8,
+      "dropped": 0,
+      "overflow": 0,
+      "persist_failed": 0,
+      "queue_capacity": 4096,
+      "queue_depth": 0,
+      "queue_high_water": 1,
+      "state": "STOPPED"
+    },
+    "failure_evidence": {
+      "evidence_scope": "COLLECTOR_HEALTH_OR_BOUNDED_STDERR_TAIL_ONLY",
+      "evidence_sources": [],
+      "physical_enospc_observed": false
+    },
+    "index": {
+      "alive": false,
+      "complete_to_durable": true,
+      "config_sha256": "d47180a603248173cc89be63b5b08ab2a440d132c686a3a1ab0e70e998d3260d",
+      "coverage_state": "INDEX_COMPLETE",
+      "durable_offsets": {
+        "critical.raw": 120000,
+        "general.raw": 19178160,
+        "quarantine.raw": 0
+      },
+      "indexed_offsets": {
+        "critical.raw": 120000,
+        "general.raw": 19178160,
+        "quarantine.raw": 0
+      },
+      "indexed_records": 80409,
+      "lag_bytes": 0,
+      "lag_records": 0,
+      "lane_coverage": {
+        "critical.raw": {
+          "durable_offset": 120000,
+          "indexed_offset": 120000,
+          "lag_bytes": 0,
+          "lag_records": 0
+        },
+        "general.raw": {
+          "durable_offset": 19178160,
+          "indexed_offset": 19178160,
+          "lag_bytes": 0,
+          "lag_records": 0
+        },
+        "quarantine.raw": {
+          "durable_offset": 0,
+          "indexed_offset": 0,
+          "lag_bytes": 0,
+          "lag_records": 0
+        }
+      },
+      "last_progress_monotonic_ns": 618521319974,
+      "offsets": {
+        "critical.raw": 120000,
+        "general.raw": 19178160,
+        "quarantine.raw": 0
+      },
+      "state": "INDEX_COMPLETE",
+      "updated_monotonic_ns": 618521319974,
+      "updated_utc": "2026-10-14T08:04:18.968922+00:00"
+    },
+    "policy_version": 1,
+    "rule_engine_schema_version": 1,
+    "rule_stats": [
+      {
+        "bulk_budget_contention": 0,
+        "bulk_budget_suppressed": 0,
+        "collector_appended": [
+          500,
+          0,
+          0
+        ],
+        "collector_durable": [
+          500,
+          0,
+          0
+        ],
+        "collector_observed": [
+          500,
+          0,
+          0
+        ],
+        "collector_queue_rejected": [
+          0,
+          0,
+          0
+        ],
+        "collector_quota_rejected": [
+          0,
+          0,
+          0
+        ],
+        "configured_policy": 1,
+        "enabled": true,
+        "evaluated": 80409,
+        "matched": 500,
+        "precedence": 100,
+        "priority": 2,
+        "quarantine_summarized": 0,
+        "ring_failed": 0,
+        "ring_submitted": 500,
+        "rule_id": 1,
+        "selected": 500,
+        "stats_available": true,
+        "unknown": 1186
+      }
+    ],
+    "rule_stats_scope": "AGGREGATE_SELECTED_ATTEMPTS_AND_DURABLE_WRITES; PRE_SEQUENCE_AND_KERNEL_LOSS_NOT_EVENT_IDENTIFIABLE",
+    "rule_stats_snapshot_complete": true,
+    "run_id": "2fd98cfb-ddd2-4078-b18b-a90b155f0284",
+    "run_path": "/root/mglogwh-v040-f9bd477-data/runs/2fd98cfb-ddd2-4078-b18b-a90b155f0284",
+    "service": {
+      "collector": {
+        "boot": "8b39c47b-460e-4975-8afe-cdc31cfd2e05",
+        "pid": 988,
+        "start": "59695",
+        "state": "R"
+      },
+      "collector_exit": 0,
+      "indexer": {
+        "boot": "8b39c47b-460e-4975-8afe-cdc31cfd2e05",
+        "pid": 1001,
+        "start": "59698",
+        "state": "R"
+      },
+      "indexer_exit": 0,
+      "state": "STOPPED",
+      "supervisor": {
+        "boot": "8b39c47b-460e-4975-8afe-cdc31cfd2e05",
+        "pid": 964,
+        "start": "59673",
+        "state": "R"
+      }
+    },
+    "state": "STOPPED",
+    "storage": {
+      "allocation_total_complete": true,
+      "categories": {
+        "export_derived": {
+          "allocated_bytes": 0,
+          "file_count": 0,
+          "logical_bytes": 0
+        },
+        "metadata_control": {
+          "allocated_bytes": 86016,
+          "file_count": 5,
+          "logical_bytes": 68754
+        },
+        "other": {
+          "allocated_bytes": 12288,
+          "file_count": 7,
+          "logical_bytes": 5803
+        },
+        "raw": {
+          "allocated_bytes": 19304448,
+          "file_count": 3,
+          "logical_bytes": 19298160
+        },
+        "sqlite_main": {
+          "allocated_bytes": 33509376,
+          "file_count": 1,
+          "logical_bytes": 33505280
+        },
+        "sqlite_sidecars_temp": {
+          "allocated_bytes": 0,
+          "file_count": 0,
+          "logical_bytes": 0
+        }
+      },
+      "configured_minimum_free_bytes": 268435456,
+      "critical_reserve_physical": false,
+      "entries_seen": 16,
+      "external_exports_included": false,
+      "external_writers_can_exhaust_filesystem": true,
+      "file_count": 16,
+      "file_logical_bytes": 52877997,
+      "filesystem_free_bytes": 1001684566016,
+      "measurement": "FILE_ST_BLOCKS_TIMES_512_AND_STATVFS_FREE; NOT_A_PHYSICAL_RESERVATION",
+      "pressure": "NORMAL",
+      "scan_limit_entries": 4096,
+      "scan_truncated": false,
+      "scope": "RUN_DIRECTORY_TREE_ONLY",
+      "tree_allocated_bytes": 52912128,
+      "unreadable_entries": 0
+    },
+    "version": "0.4.0"
+  },
+  "target_actual_eps": 15350.227,
+  "target_requested_eps": 15350,
+  "truth": {
+    "actual_eps": 15350.227,
+    "attempts": [
+      75000,
+      500,
+      1250
+    ],
+    "elapsed_seconds": 4.999925958,
+    "expected_results": [
+      75000,
+      500,
+      1250
+    ],
+    "late_over_1ms": [
+      63,
+      1,
+      0
+    ],
+    "p95_us": 54.153,
+    "p99_us": 84.28,
+    "requested_eps": 15350,
+    "scope": "DIRECT_SYS_OPENAT_MONOTONIC_WALL_LATENCY_INCLUDES_SCHEDULING",
+    "seconds_requested": 5,
+    "unexpected_results": [
+      0,
+      0,
+      0
+    ],
+    "workload_cpu_seconds": 4.244502,
+    "workload_max_rss_kib": 22400
+  },
+  "valid_run": true,
+  "valid_workload": true,
+  "watchdog_triggered": false
+}
