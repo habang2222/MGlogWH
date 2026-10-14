@@ -19,6 +19,8 @@ python3 ledger.py --run <data>/runs/<run-uuid> \
 
 commit fence와 frame은 `run_id`, `boot_id`, `config_sha256`, `manifest_sha256`으로 동일 run에 연결됩니다. manifest hash는 파일 전체 byte의 SHA256이고 config hash는 JSON `sort_keys=True,separators=(',',':')`의 SHA256입니다. `event_rules`를 사용하는 schema 3 run에서는 `rules.bin`의 해시와 버전도 manifest와 대조하므로 복구용 복사본에 `rules.bin`을 함께 보존해야 합니다. 기존 `critical_rules`로 시작한 schema 3 run에는 `rules.bin`이 없습니다. `checkpoint`/`seal`의 `durable_offsets`는 새 run의 `critical`·`general`·`quarantine` raw byte 경계입니다. 기존 2-lane run도 지원하며 journal 중간에 lane 집합이 바뀌면 거부합니다. health.json의 마지막 상태만으로 장부 경계를 늘리지 않습니다.
 
+초기 v0.4.0 수집기 `eb9c888`의 checkpoint/seal 프레임에는 `config_sha256`가 두 번 기록되는 결함이 있었다. 엄격한 reader는 이 프레임을 `INVALID`로 거부한다. 이후 수집기는 프레임당 이 키를 한 번만 기록하도록 수정했다. 이전 run을 고쳐 쓰거나 중복 키 중 하나를 임의로 선택해 과거 장부를 신뢰 대상으로 승격하지 않는다. 수정본의 실제 새 run에 대한 복구 결과는 별도 검증이 필요하다.
+
 ## 정확한 정보와 확인 불가 정보
 
 - `loss`는 userspace에서 확인한 `cgroup_id`, `seq`, `lane`, `reason`, `monotonic_ns`의 tombstone입니다. 동일 ID의 동일 tombstone은 중복으로 집계하고 다른 내용이면 손상으로 거부합니다. 동일 ID가 committed raw에도 있으면 충돌입니다.
@@ -37,6 +39,8 @@ raw의 comm/path는 Linux byte 문자열로 검사합니다. NUL 종료와 captu
 0.3 raw schema 2는 기존 240-byte CRC record 크기를 유지합니다. `quality`의 비트 0..1은 기존 캡처 오류, 비트 8은 QUARANTINED, 9는 INITIAL, 10은 PERIODIC, 11은 PROTECTED, 12는 UNTRACKED, 16..23은 rule ID입니다. 그 밖의 비트는 거부합니다. INITIAL/PERIODIC은 동시에 붙을 수 없습니다. quarantine.raw는 원래 priority=critical이며 QUARANTINED와 INITIAL 또는 PERIODIC을 요구합니다. protected 규칙은 critical.raw에 저장되며 PROTECTED|UNTRACKED fallback도 허용합니다. legacy raw schema 1의 quality 의미는 바꾸지 않습니다. v0.4 schema 3도 240바이트이며 비트 13..14에 설정한 보존 정책, 24..27에 규칙 엔진 버전, 28..31에 정책 버전을 더합니다. schema 3의 rule ID는 BULK/NORMAL/CRITICAL 모두에 붙을 수 있습니다. 과거 schema 1·2에는 없는 값을 추정해 채우지 않습니다.
 
 `rule_evidence`는 run의 규칙 정의와 committed checkpoint 통계, 실제 durable raw를 규칙 ID별로 대조합니다. `matched`는 이긴 규칙뿐 아니라 일치한 모든 규칙의 횟수이며, `selected`는 충돌 우선순위에서 최종 선택된 횟수입니다. 두 값 모두 커널의 집계치로서 sequence 할당 전 실패를 포함할 수 있습니다. `raw_durable_count`는 committed 경계 안의 원본만 세고 `collector_durable_matches_raw`는 collector 집계와의 일치 여부입니다. `complete_to_durable`는 clean seal·완전한 통계 snapshot·원본 일치가 확인될 때만 참입니다. `per_rule_unobserved_event_count`와 `per_rule_loss_attribution_complete`는 선행 유실을 규칙에 귀속할 증거가 없어 각각 null과 false로 남깁니다. 일반·Bulk 규칙도 `rule_evidence`에 포함됩니다.
+
+규칙 통계 BPF map 조회에 실패하면 collector는 그 규칙의 `stats_available=false`와 커널 집계 필드의 `null`, `rule_stats_snapshot_complete=false`를 기록합니다. 이 경우 reader는 커밋된 raw와 별도 collector 저장 집계를 계속 검증하되 `RULE_STATS_SNAPSHOT_INCOMPLETE` 경고를 남기고 해당 규칙의 `kernel_counters_available=false`, `complete_to_durable=false`로 표시합니다. 전체 복구 상태가 `RECOVERED`여도 규칙별 커널 집계까지 완전하다는 뜻은 아닙니다. `stats_available=false`와 완전한 snapshot 선언이 함께 있으면 모순으로 거부합니다. 이전 형식처럼 `stats_available`이 없는 수치형 행은 계속 읽습니다.
 
 schema 3 userspace 거절 tombstone의 `witness`에는 실제 callback이 본 규칙 ID·Priority·quality·UID·경로 바이트 등이 붙을 수 있습니다. 이것은 해당 거절의 **관측 증거**이며 모든 실패를 규칙별로 완전히 열거했다는 뜻이 아닙니다. 이전 tombstone에 witness가 없으면 그대로 읽고 빈 정보를 만들어 내지 않습니다. ring 예약 실패, 추적 실패, metadata overflow, UNKNOWN gap은 aggregate나 불완전 범위로 남기며 의도적 Quarantine 요약과 섞지 않습니다.
 

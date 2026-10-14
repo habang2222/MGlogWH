@@ -74,4 +74,6 @@
 
 각 run의 설정 해시와 규칙·정책 버전을 manifest에 보존합니다. 새 원본은 같은 240바이트 레코드의 schema 3으로 구분하며 기존 schema 1·2 reader 호환을 유지합니다. 저장된 원본은 실제 `fdatasync` 경계, 원장은 committed fence까지만 복구합니다. 규칙별 발생·선택·제출·요약·저장 수는 각 증거의 관측 범위와 함께 표시합니다. 정책에 따른 의도적 요약과 ring·queue·저장소 실패를 분리합니다. 규칙 판정 전 실패나 불완전한 snapshot은 특정 규칙에 임의로 귀속하지 않고 `UNKNOWN`/불완전 범위로 남깁니다. 자세한 정의는 [LEDGER.md](LEDGER.md)와 [QUARANTINE.md](QUARANTINE.md)를 따릅니다.
 
+초기 v0.4.0 `eb9c888`에서는 BPF 컴파일러가 규칙별 Quarantine 설정의 0 초기값을 고정해 실제 설정 임계치를 무시하는 결함이 있었다. 이후 수정본은 `volatile` 속성을 정책 함수까지 유지한다. 수정 빌드의 WSL 격리 smoke에서 100만 EPS 임계치·약 96.5 EPS의 500건은 Q 진입 없이 raw 500건으로, 50 EPS 임계치에서는 Q 진입·설정값 50·raw 366건과 정책 요약 134건으로 관찰됐다. 전체 부하 조건과 다른 커널에서의 재검증은 [2026-10-14 검증 기록](validation/2026-10-14/REVIEW.md)에 별도 표시했다.
+
 커널은 규칙마다 최대 24개 토큰을 평가하고, 문자열 비교에는 규칙별 키를 올린 BPF LPM trie를 사용합니다. 규칙 수와 조건 수가 늘면 이벤트당 CPU 비용도 증가할 수 있습니다. `bpf_loop` helper가 있는 커널과 BTF·필요한 tracepoint가 필요합니다. Ubuntu 24.04 WSL 커널 6.6에서는 8규칙 BPF 로드·실제 이벤트 매칭을 확인했습니다. 운영 서버의 커널·권한·부하가 다를 수 있으므로 적용 전에 `make`, `make test`, `python3 -m unittest -v` 및 BPF 로딩·관찰 범위·성능을 환경별로 확인하세요.

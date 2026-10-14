@@ -34,6 +34,8 @@ sudo bash MGlogWH/install-ubuntu.sh
 
 빌드는 일반 사용자로 실행합니다. `Makefile`은 기본적으로 저장소 옆의 `libbpf-bootstrap`과 저장소 안의 `build/`를 사용합니다. 다른 위치에 두었다면 `make -C MGlogWH BOOTSTRAP=/absolute/path/to/libbpf-bootstrap BUILD=/absolute/path/to/build`로 지정하세요. 빌드 위치를 바꾼 경우 설치에도 `sudo env MGLOGWH_BUILD_DIR=/absolute/path/to/build bash MGlogWH/install-ubuntu.sh`를 사용합니다.
 
+GNU Make의 현재 대상 경로 처리상 `MGlogWH`, `libbpf-bootstrap`, `BOOTSTRAP`, `BUILD` 경로에는 공백을 넣지 마세요. 공백이 있는 절대 경로는 빌드 대상으로 분리되어 지원되지 않습니다.
+
 설치 스크립트는 빌드한 수집기와 대응 소스를 root 소유의 `/opt/mglogwh`에 복사합니다. 최초 설치 시 설정은 `/etc/mglogwh/config.json`, 수집 데이터는 `/var/lib/mglogwh`에 둡니다. 기존 설정과 run은 덮어쓰거나 삭제하지 않습니다. 설정을 검토한 뒤 시작합니다.
 
 ```bash
@@ -65,6 +67,6 @@ sudo /usr/bin/python3 /opt/mglogwh/manage.py recover \
   --run-dir /var/lib/mglogwh/runs/REPLACE_WITH_RUN_UUID --out /path/to/report.json
 ```
 
-Ubuntu 24.04 WSL에서 BPF object·skeleton·collector 빌드, C·Python 시험과 8규칙 BPF 실제 로드·이벤트 수집을 확인했습니다. 독립된 run에서 `/etc/shadow` 읽기 이벤트 3건이 `critical.raw`에 기록되고 규칙별 일치·선택 집계와 raw 레코드가 일치했으며 관측된 BPF fault는 0이었습니다. 5,000회 `openat` 부하의 세 번 반복 중앙값은 1규칙 56.36ms, 8규칙 58.07ms였습니다. 이는 Python 호출·syscall·수집기 전체 시간이며 BPF 단독 지연이 아닙니다. 실제 Ubuntu 서버 설치, 다른 커널에서의 BPF 로드와 장시간 부하·성능 시험은 별도 확인이 필요합니다.
+초기 v0.4.0 `eb9c888`에서 Ubuntu 24.04 WSL의 BPF object·skeleton·collector 빌드, C·Python 시험과 8규칙 BPF 실제 로드·이벤트 수집을 확인했습니다. 독립된 run에서 `/etc/shadow` 읽기 이벤트 3건이 `critical.raw`에 기록됐습니다. 당시 5,000회 `openat` 부하의 세 번 반복 중앙값은 1규칙 56.36ms, 8규칙 58.07ms였으며 Python 호출·syscall·수집기 전체 시간입니다. 이후 [2026-10-14 검증](validation/2026-10-14/REVIEW.md)에서 이 버전의 Quarantine 설정 미적용과 원장 checkpoint 중복 키 결함을 발견해 수정했습니다. 당시 시간과 새 수정 전 12회 성능 실험을 수정본의 성능 결론으로 사용하지 않습니다. 수정본의 전체 반복 부하·원장 end-to-end 복구, 실제 Ubuntu 서버 설치와 다른 커널 BPF 로드는 별도 확인이 필요합니다.
 
 수집기 전체에 적용할 최상위 `LICENSE`는 아직 없습니다. 외부 배포 조건은 프로젝트 소유자가 결정해야 합니다. 파일별 라이선스와 외부 코드 고지는 [THIRD_PARTY.md](THIRD_PARTY.md) 및 [licenses/](licenses/)를 확인하세요.
