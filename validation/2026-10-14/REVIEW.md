@@ -2,7 +2,7 @@
 
 ## 판정과 증거 범위
 
-**최종 상태: 추가 검증 필요.** 이번 검토에서 실제 P0 결함 두 개와 P1 결함 세 개를 수정했다. 수정 전 12회 성능 실행은 결함을 재현하고 원본 보존량을 관찰한 자료이지, 수정 후 제품의 성능 검증 결과가 아니다. 수정본의 0·1·4·8규칙 3회 반복, 실제 새 run의 `recover=RECOVERED`, 전체 `make test` 재실행, 일반 Ubuntu 서버 설치는 미완료다. WSL Ubuntu가 작업 후 `/etc/passwd` 읽기 단계에서 `I/O error`를 반환해 후속 Linux 명령을 실행할 수 없었다. 기존 run이나 과거 실험 원본을 수정하지 않았다.
+**최종 상태: 추가 검증 필요.** 이번 검토에서 실제 P0 결함 두 개와 P1 결함 세 개를 수정했다. 수정 전 12회 성능 실행은 결함을 재현하고 원본 보존량을 관찰한 자료이지, 수정 후 제품의 성능 검증 결과가 아니다. 수정본의 legacy 기본 1규칙·`event_rules` 1·4·8규칙 3회 반복, 실제 새 run의 `recover=RECOVERED`, 전체 `make test` 재실행, 일반 Ubuntu 서버 설치는 미완료다. WSL Ubuntu가 작업 후 `/etc/passwd` 읽기 단계에서 `I/O error`를 반환해 후속 Linux 명령을 실행할 수 없었다. 기존 run이나 과거 실험 원본을 수정하지 않았다.
 
 검토 기준은 수집기 [eb9c888](https://github.com/habang2222/MGlogWH/commit/eb9c888bbf1e60a6c58a0c2082a1d639bc7b6607), Control Room [dcd244c](https://github.com/habang2222/MGlogWH-ControlRoom/commit/dcd244ccd3dd7212978df689e3f567f5c58e19a0)이다. 수집기 변경은 `363ab82`(불완전 규칙 통계), `769ce82`(BPF 정책 설정), `7e62eae`(원장 JSON), `0e24c0d`(참조 평가기 경계)에 각각 커밋했다. Control Room은 `fbc8c97`에서 적용 성공 표시 결함을 수정했다. [10월 9일 보고서](https://www.notion.so/3f40e129ee9b8144ae55eb4219d7fdb0)는 이전 코드·프로토콜의 결과로만 인용한다.
 
@@ -31,14 +31,14 @@
 
 ## 규칙 수별 성능: 수정 전 결함 진단 자료
 
-무센서 pilot은 15,350 requested EPS에 15,350.065 actual EPS, 5초 동안 실패 `openat` Bulk 75,000 + 성공 Critical 500 + 성공 Normal 1,250건의 독립 호출 결과가 모두 기대값이었다. 이어서 **수정 전 eb9c888** 고정 archive에서 0·1·4·8규칙을 각 3회, 총 12회 실행했다. 각 실행은 5초, raw 128 MiB·index 64 MiB·metadata 8 MiB 한도, 20초 watchdog, 시작 전 메모리 1 GiB·디스크 2 GiB 하한을 적용했다. 순서를 교차 배치하고 유리한 결과가 나올 때까지 재실행하지 않았다. 설정·빌드 해시는 `environment.json`, `configs/`, 개별 결과는 `runs/`, 원본 SHA-256은 `artifact-hashes-eb9c888.json`에 있다.
+무센서 pilot은 15,350 requested EPS에 15,350.065 actual EPS, 5초 동안 실패 `openat` Bulk 75,000 + 성공 Critical 500 + 성공 Normal 1,250건의 독립 호출 결과가 모두 기대값이었다. 이어서 **수정 전 eb9c888** 고정 archive에서 legacy 기본 1규칙(`baseline`)과 `event_rules` 1·4·8규칙을 각 3회, 총 12회 실행했다. 기존 `baseline` 설정에는 규칙 키가 없지만 `manage.py`가 `protected_path`의 legacy 규칙 1개를 자동 생성한다. 따라서 이 실험에는 **0규칙 조건이 없으며**, `baseline`과 `rule1`은 규칙 수가 같은 서로 다른 형식의 비교다. 각 실행은 5초, raw 128 MiB·index 64 MiB·metadata 8 MiB 한도, 20초 watchdog, 시작 전 메모리 1 GiB·디스크 2 GiB 하한을 적용했다. 순서를 교차 배치하고 유리한 결과가 나올 때까지 재실행하지 않았다. 설정·빌드 해시는 `environment.json`, `configs/`, 개별 결과는 `runs/`, 원본 SHA-256은 `artifact-hashes-eb9c888.json`에 있다.
 
 | 수정 전 조건 | actual EPS 중앙값 | 독립 Critical truth / CRC 통과 durable 전체 lane | Bulk truth/durable 합계 | Normal truth/durable 합계 | syscall p95/p99 중앙 µs | collector CPU 초 중앙 | RSS 중앙 KiB | raw byte 중앙 | 원장 |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---|
-| 0규칙 | 15,350.213 | 1,500 / 1,500 | 225,000 / 225,000 | 3,750 / 3,750 | 50.431 / 84.892 | 1.070 | 22,528 | 18,645,600 | 3/3 INVALID |
-| 1규칙 | 15,350.347 | 1,500 / 1,500 | 225,000 / 225,000 | 3,750 / 3,750 | 49.595 / 78.828 | 1.067 | 22,528 | 18,648,000 | 3/3 INVALID |
-| 4규칙 | 15,350.161 | 1,500 / 1,500 | 225,000 / 225,000 | 3,750 / 3,750 | 52.350 / 84.790 | 3.761 | 22,528 | 18,583,200 | 3/3 INVALID |
-| 8규칙 | 15,350.098 | 1,500 / 1,500 | 225,000 / 225,000 | 3,750 / 3,750 | 52.030 / 85.210 | 3.726 | 22,528 | 18,630,480 | 3/3 INVALID |
+| legacy 기본 1규칙 (`baseline`) | 15,350.213 | 1,500 / 1,500 | 225,000 / 225,000 | 3,750 / 3,750 | 50.431 / 84.892 | 1.070 | 22,528 | 18,645,600 | 3/3 INVALID |
+| `event_rules` 1규칙 | 15,350.347 | 1,500 / 1,500 | 225,000 / 225,000 | 3,750 / 3,750 | 49.595 / 78.828 | 1.067 | 22,528 | 18,648,000 | 3/3 INVALID |
+| `event_rules` 4규칙 | 15,350.161 | 1,500 / 1,500 | 225,000 / 225,000 | 3,750 / 3,750 | 52.350 / 84.790 | 3.761 | 22,528 | 18,583,200 | 3/3 INVALID |
+| `event_rules` 8규칙 | 15,350.098 | 1,500 / 1,500 | 225,000 / 225,000 | 3,750 / 3,750 | 52.030 / 85.210 | 3.726 | 22,528 | 18,630,480 | 3/3 INVALID |
 
 이 표의 Critical 500/500은 **같은 경로의 호출·raw 건수 집계 대응**이다. 개별 syscall 식별자가 없어 1:1 recall을 입증하지 않는다. 초기에 `critical.raw`만 세어 과소 보고한 값을 원본 JSON에는 남겨 두고, 세 raw lane 합계와 원본 해시를 `corrected_summary-eb9c888.json`·`CORRECTION-eb9c888.md`에 별도 정정했다. 네 조건 모두 정책 Bulk suppression·Q summary·ring failure·queue overflow의 집계는 0이지만, 설정이 잘못 적용되어 Q 대표 raw는 발생했다. `fault[2]` pending map miss도 실행별 2~306건의 **run 전체 집계**라 대상 호출에 귀속할 수 없다. CPU는 collector 프로세스의 user+system 시간이고 RSS는 그 프로세스 최대치다. 커널 BPF 비용·event-to-durable 지연은 미측정이다. p95/p99는 `SYS_openat` 전후 wall clock이며 스케줄링과 부하 생성기 시간을 포함한다. 따라서 8규칙의 최종 성능 영향이나 과거 5,000회 smoke·15k/80k/150k 실험과의 우열을 여기서 판정하지 않는다.
 
@@ -80,4 +80,4 @@ Ubuntu 설치 스크립트는 Linux x86_64·Python 3.12·root 소유/권한을 �
 - 독립 pilot `pilot-15k.json`; 12개 원본 `runs/*.json`; 정정 근거 `CORRECTION-eb9c888.md`, `corrected_summary-eb9c888.json`; 파일별 해시 `artifact-hashes-eb9c888.json`. WSL raw 원본 경로는 각 결과의 `source_run_dir`이며 현재 WSL I/O 오류로 재열람이 막혀 있다.
 - 수정본 재실행 준비용 `run_benchmark_portable.py`는 `MGLOGWH_BENCH_SOURCE`, `MGLOGWH_BENCH_BUILD`, `MGLOGWH_BENCH_DATA`, `MGLOGWH_BENCH_DECOY`, `MGLOGWH_BENCH_HEAD`를 요구한다. `bench_workload.c`를 먼저 컴파일하고 유효한 소스·BPF 빌드와 가짜 파일을 준비한다. 새 출력에는 `MGLOGWH_BENCH_OUTPUT`을 지정하며 기존 출력 파일은 덮어쓰지 않는다. 이 스크립트는 수정본에서 **아직 실행하지 않았다**.
 - 복구 확인: `python3 manage.py recover --run-dir <새 run 경로>`에서 `status=RECOVERED`, 원본 CRC, 마지막 committed fence, 규칙 통계 완전성, index 범위를 각각 확인해야 한다. 기존 `INVALID` run을 고쳐 읽는 절차로 취급하지 않는다.
-- 후속 완료 조건: WSL 파일시스템 I/O 장애 해결 및 기존 원본 상태 확인 → 새 격리 run의 원장 복구 → 수정본 0·1·4·8규칙 동일 조건 3회 → path matrix raw·규칙 ID 대조 결과 반출 → 전체 `make`, `make test`, Python 시험 → 독립 Ubuntu 서버와 Control Room 실제 서비스 흐름 확인. 결과가 실패하면 그대로 기록한다.
+- 후속 완료 조건: WSL 파일시스템 I/O 장애 해결 및 기존 원본 상태 확인 → 새 격리 run의 원장 복구 → 수정본 legacy 기본 1규칙·`event_rules` 1·4·8규칙 동일 조건 3회 → path matrix raw·규칙 ID 대조 결과 반출 → 전체 `make`, `make test`, Python 시험 → 독립 Ubuntu 서버와 Control Room 실제 서비스 흐름 확인. 결과가 실패하면 그대로 기록한다.

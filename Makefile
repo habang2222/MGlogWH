@@ -29,4 +29,5 @@ test: $(BUILD)/test_writer $(BUILD)/test_quarantine $(BUILD)/test_rules
 	$(BUILD)/test_rules
 	python3 -m unittest -v test_manage
 	python3 -m unittest -v test_ledger
+	python3 validation/2026-10-14/test_benchmark_portable.py
 .PHONY: test

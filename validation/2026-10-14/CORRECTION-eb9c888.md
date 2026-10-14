@@ -2,6 +2,8 @@
 
 원본 `runs/*.json`의 `critical_durable_count`는 `critical.raw`만 세었습니다. 이 파생 보고서는 각 원본 SHA-256을 남기고 CRC·schema 검증된 durable 경계의 모든 lane을 합산합니다. 원본 JSON과 raw 파일은 변경하지 않았습니다.
 
+`baseline`은 0규칙이 아닙니다. 원래 설정에 규칙 키가 없어 `manage.py`가 legacy `openat` Critical 규칙 1개를 자동 생성했습니다. `rule1`은 별도의 `event_rules` 1규칙 형식입니다.
+
 ## 조건별 3회 결과
 
 | 조건 | 중앙 실제 EPS | Critical 독립 truth | Critical durable 전체 lane | p95 / p99 µs 중앙 | 수집기 CPU 초 중앙 | Q 요약 총합 | 복구 원장 |

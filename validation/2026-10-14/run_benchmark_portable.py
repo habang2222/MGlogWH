@@ -30,9 +30,10 @@ PATHS = [str(DECOY / 'bulk-missing'), str(DECOY / 'critical'), str(DECOY / 'norm
 EXPECTED_HEAD = os.environ['MGLOGWH_BENCH_HEAD']
 SECONDS = 5
 RATES = (15000, 100, 250)
-ORDER = [('baseline', 1), ('rule1', 1), ('rule4', 1), ('rule8', 1),
-         ('rule8', 2), ('rule4', 2), ('rule1', 2), ('baseline', 2),
-         ('rule1', 3), ('baseline', 3), ('rule8', 3), ('rule4', 3)]
+RULE_COUNTS = {'legacy1': 1, 'rule1': 1, 'rule4': 4, 'rule8': 8}
+ORDER = [('legacy1', 1), ('rule1', 1), ('rule4', 1), ('rule8', 1),
+         ('rule8', 2), ('rule4', 2), ('rule1', 2), ('legacy1', 2),
+         ('rule1', 3), ('legacy1', 3), ('rule8', 3), ('rule4', 3)]
 
 
 def write_json(path, value):
@@ -75,8 +76,13 @@ def config_for(name):
                   metadata_max_mib=8, quarantine_max_mib=8,
                   critical_rate_threshold=1000000,
                   critical_rate_duration_seconds=1)
-    count = {'baseline': 0, 'rule1': 1, 'rule4': 4, 'rule8': 8}[name]
-    if count:
+    count = RULE_COUNTS[name]
+    if name == 'legacy1':
+        # The product requires at least one rule.  A config with no rule keys
+        # silently creates this legacy rule, so spell it out for the benchmark.
+        source['critical_rules'] = [dict(id=1, event_type='openat',
+                                         path=PATHS[1], protected=False)]
+    else:
         rules = []
         for index in range(count):
             path = PATHS[1] if index == 0 else str(DECOY / f'unused-{index}')
@@ -86,6 +92,17 @@ def config_for(name):
                                              dict(field='path', op='eq', value=path)])))
         source['event_rules'] = rules
     return source
+
+
+def verify_condition(name, normalized):
+    """Prevent a mislabeled rule-count comparison before loading the sensor."""
+    if name == 'legacy1':
+        rules = normalized.get('critical_rules')
+        expected = [dict(id=1, event_type='openat', path=PATHS[1], protected=False)]
+        if 'event_rules' in normalized or rules != expected:
+            raise RuntimeError('legacy1 must contain exactly one explicit legacy rule')
+    elif 'critical_rules' in normalized or len(normalized.get('event_rules', [])) != RULE_COUNTS[name]:
+        raise RuntimeError(f'{name} must contain {RULE_COUNTS[name]} event_rules')
 
 
 def load_manage():
@@ -135,7 +152,10 @@ def stop_manage(env, run_id):
 
 def one_run(manage, name, repeat, env, configs):
     label = f'{name}-r{repeat}'
-    result = dict(label=label, condition=name, repeat=repeat, started_utc=time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime()),
+    result = dict(label=label, condition=name, repeat=repeat,
+                  rule_format='legacy' if name == 'legacy1' else 'event_rules',
+                  configured_rule_count=RULE_COUNTS[name],
+                  started_utc=time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime()),
                   config_file=str(configs[name]), config_file_sha256=sha256(configs[name]),
                   resources_before=free_resources(), command=[str(BUILD / 'bench_workload'), *PATHS,
                                                                str(SECONDS), *(str(x) for x in RATES)])
@@ -238,19 +258,22 @@ def main():
     build_hashes = {name: sha256(path) for name, path in {
         'collector': BUILD / 'collector', 'bpf_object': BUILD / 'sensor.bpf.o',
         'workload': BUILD / 'bench_workload', 'manage': SOURCE / 'manage.py',
+        'benchmark_harness': Path(__file__).resolve(),
         'sensor_source': SOURCE / 'sensor.bpf.c', 'collector_source': SOURCE / 'collector.c'}.items()}
     write_json(OUTPUT / 'environment.json', dict(expected_head=EXPECTED_HEAD, source_snapshot=str(SOURCE),
                build=str(BUILD), data=str(DATA), decoy_paths=PATHS, kernel=os.uname().release,
                cpu_count=os.cpu_count(), initial_resources=free_resources(), build_hashes=build_hashes,
-               condition_order=ORDER, duration_seconds=SECONDS, rates=RATES,
+               condition_order=ORDER, rule_counts=RULE_COUNTS,
+               legacy1_note='One explicit legacy critical rule; no zero-rule condition is supported',
+               duration_seconds=SECONDS, rates=RATES,
                limits=dict(collector_raw_mib=128, index_main_mib=64, metadata_mib=8,
                            memory_available_floor_mib=1024, disk_free_floor_mib=2048,
                            workload_timeout_seconds=SECONDS + 8, collector_watchdog_seconds=20)))
     configs = {}
-    for name in ('baseline', 'rule1', 'rule4', 'rule8'):
+    for name in RULE_COUNTS:
         path = OUTPUT / 'configs' / f'{name}.json'
         write_json(path, config_for(name))
-        manager.config(path)  # Refuse malformed configs before loading any sensor.
+        verify_condition(name, manager.config(path))  # Check semantics before loading any sensor.
         configs[name] = path
     summaries = []
     for name, repeat in ORDER:
@@ -259,7 +282,9 @@ def main():
         try:
             result = one_run(manager, name, repeat, env, configs)
             write_json(OUTPUT / 'runs' / f'{label}.json', result)
-            summaries.append(dict(label=label, valid_run=result['valid_run'], run_id=result['run_id'],
+            summaries.append(dict(label=label, condition=name, rule_format=result['rule_format'],
+                                  configured_rule_count=result['configured_rule_count'],
+                                  valid_run=result['valid_run'], run_id=result['run_id'],
                                   actual_eps=result['target_actual_eps'],
                                   critical_truth=result['critical_truth_count'],
                                   critical_durable=result['critical_durable_count'],
