@@ -287,8 +287,16 @@ def _snapshot(value, previous=None):
             _integer(row.get('priority'), 'rule_stats priority', 0, 2)
             _integer(row.get('configured_policy'), 'rule_stats configured_policy', 0, 2)
             _integer(row.get('precedence'), 'rule_stats precedence', 0, 1000)
+            available = row.get('stats_available', True)
+            if type(available) is not bool:
+                raise LedgerError('rule_stats stats_available must be boolean')
+            if not available and value['rule_stats_snapshot_complete']:
+                raise LedgerError('unavailable rule_stats contradicts complete snapshot')
             for key in scalar_counters:
-                _integer(row.get(key), 'rule_stats ' + key)
+                if available:
+                    _integer(row.get(key), 'rule_stats ' + key)
+                elif key not in row or row[key] is not None:
+                    raise LedgerError('unavailable rule_stats ' + key + ' must be null')
             for key in lane_counters:
                 counts = row.get(key)
                 if not isinstance(counts, list) or len(counts) != 3:
@@ -815,6 +823,8 @@ def _rule_evidence(db, snapshot, report):
         'SELECT rule_id,count(*) FROM durable GROUP BY rule_id')}
     stats = snapshot.get('rule_stats') if snapshot else None
     stats_by_id = {row['rule_id']: row for row in stats} if stats else {}
+    if stats is not None and snapshot.get('rule_stats_snapshot_complete') is False:
+        report['warnings'].append('RULE_STATS_SNAPSHOT_INCOMPLETE: kernel rule counters may be unavailable')
     if stats is not None and set(stats_by_id) != {rule['id'] for rule in rules}:
         raise LedgerError('rule_stats/config rule ID set mismatch')
     rows = []
@@ -838,8 +848,10 @@ def _rule_evidence(db, snapshot, report):
                              'QUARANTINE_EXEMPT' if rule.get('protected') else 'QUARANTINE'),
                          raw_durable_count=durable,
                          checkpoint_counters=counters,
+                         kernel_counters_available=counters.get('stats_available', True) if counters else None,
                          collector_durable_matches_raw=reconciled,
-                         counter_scope='COMMITTED_CHECKPOINT_AGGREGATE' if counters else 'NOT_AVAILABLE',
+                         counter_scope=('COMMITTED_CHECKPOINT_AGGREGATE' if counters.get('stats_available', True)
+                                        else 'COMMITTED_CHECKPOINT_PARTIAL_KERNEL_STATS') if counters else 'NOT_AVAILABLE',
                          complete_to_durable=bool(report['clean_seal'] and
                              snapshot.get('rule_stats_snapshot_complete') is True and reconciled) if snapshot else False,
                          per_rule_unobserved_event_count=None,

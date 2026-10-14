@@ -122,6 +122,47 @@ class RecoveryTests(unittest.TestCase):
         self.assertTrue(row['complete_to_durable'])
         self.assertFalse(row['per_rule_loss_attribution_complete'])
 
+    def test_schema3_unavailable_kernel_stats_keep_committed_raw_recoverable(self):
+        self.advanced_lineage()
+        raw = self.raw(schema=3, quality=(1 << 24) | (1 << 28) | (7 << 16))
+        (self.run / 'critical.raw').write_bytes(raw)
+        stats = self.advanced_stats()
+        stats['stats_available'] = False
+        for key in ('evaluated', 'matched', 'unknown', 'selected', 'ring_submitted',
+                    'quarantine_summarized', 'ring_failed', 'bulk_budget_suppressed',
+                    'bulk_budget_contention'):
+            stats[key] = None
+        self.checkpoint(sequence=1, critical=len(raw), seal=True,
+                        rule_stats=[stats], rule_stats_snapshot_complete=False,
+                        rule_stats_scope='AGGREGATE_SELECTED_ATTEMPTS_AND_DURABLE_WRITES')
+        self.commit()
+        report = self.report()
+        self.assertEqual('RECOVERED', report['status'])
+        self.assertEqual(1, report['durable_records'])
+        row = report['rule_evidence']['rules'][0]
+        self.assertEqual(1, row['raw_durable_count'])
+        self.assertTrue(row['collector_durable_matches_raw'])
+        self.assertFalse(row['complete_to_durable'])
+        self.assertFalse(row['kernel_counters_available'])
+        self.assertIn('RULE_STATS_SNAPSHOT_INCOMPLETE', report['warnings'][0])
+        self.assertFalse(report['rule_evidence']['snapshot_complete'])
+
+    def test_schema3_unavailable_kernel_stats_cannot_claim_complete_snapshot(self):
+        self.advanced_lineage()
+        stats = self.advanced_stats(durable=0)
+        stats['stats_available'] = False
+        for key in ('evaluated', 'matched', 'unknown', 'selected', 'ring_submitted',
+                    'quarantine_summarized', 'ring_failed', 'bulk_budget_suppressed',
+                    'bulk_budget_contention'):
+            stats[key] = None
+        self.checkpoint(sequence=0, seal=True, rule_stats=[stats],
+                        rule_stats_snapshot_complete=True,
+                        rule_stats_scope='AGGREGATE_SELECTED_ATTEMPTS_AND_DURABLE_WRITES')
+        self.commit()
+        report = self.report()
+        self.assertEqual('INVALID', report['status'])
+        self.assertIn('contradicts complete snapshot', report['errors'][0])
+
 
     def test_schema3_rule_file_tamper_invalidates_lineage(self):
         self.advanced_lineage()
