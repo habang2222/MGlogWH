@@ -15207,6 +15207,1242 @@ int main(void) {
 
 
 
+## 11.9 validation/2026-10-14의 모든 검증·벤치마크 도구
+
+`validation/`은 일반 수집기의 실시간 이벤트 경로와 구분되는 이전 실험·검증 자료다. 각 실험 스크립트의 함수 정의·검증 지점을 다음과 같이 추적한다. 실제 측정은 이번 문서 작업에서 새로 수행하지 않았다.
+
+
+### [validation/2026-10-14/run_benchmark.py](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/run_benchmark.py) — 273줄, 11개 감지된 함수
+
+**역할**: 조건별 독립 부하/센서를 실행하고 결과 파일을 생성한다.
+
+
+#### write_json — [L34–L40](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/run_benchmark.py#L34-L40)
+
+**선언/입력**: `def write_json(path, value):`. 인자를 전달한 호출 경로와 설정·실험 출력 JSON을 연결한다.
+
+**검증·오류 분기**: 직접 assert가 없으면 호출자가 출력·반환을 검증하거나 데이터를 구성하는 helper다.
+
+**메모리·리소스·반환**: 코드에서 파일 생성/닫기, 프로세스 실행·타임아웃, 예외·반환값, 출력 report 필드의 변화를 확인한다. 실험 도구의 성공은 지정 workload 검증이지 모든 커널에서 무손실 보증은 아니다.
+
+**시작 코드 원문(전체는 줄번호 링크)**:
+
+```python
+def write_json(path, value):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open('x', encoding='utf-8') as file:
+        json.dump(value, file, ensure_ascii=False, indent=2, sort_keys=True)
+        file.write('\n')
+```
+
+#### sha256 — [L41–L48](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/run_benchmark.py#L41-L48)
+
+**선언/입력**: `def sha256(path):`. 인자를 전달한 호출 경로와 설정·실험 출력 JSON을 연결한다.
+
+**검증·오류 분기**: 직접 assert가 없으면 호출자가 출력·반환을 검증하거나 데이터를 구성하는 helper다.
+
+**메모리·리소스·반환**: 코드에서 파일 생성/닫기, 프로세스 실행·타임아웃, 예외·반환값, 출력 report 필드의 변화를 확인한다. 실험 도구의 성공은 지정 workload 검증이지 모든 커널에서 무손실 보증은 아니다.
+
+**시작 코드 원문(전체는 줄번호 링크)**:
+
+```python
+def sha256(path):
+    h = hashlib.sha256()
+    with path.open('rb') as file:
+        for chunk in iter(lambda: file.read(1024 * 1024), b''):
+            h.update(chunk)
+    return h.hexdigest()
+```
+
+#### run — [L49–L55](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/run_benchmark.py#L49-L55)
+
+**선언/입력**: `def run(args, *, timeout=25, env=None):`. 인자를 전달한 호출 경로와 설정·실험 출력 JSON을 연결한다.
+
+**검증·오류 분기**: [L52](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/run_benchmark.py#L52) `raise RuntimeError(f'command {args!r} exited {p.returncode}: {p.stderr[-4000:]} {p.stdout[-1000:]}')`
+
+**메모리·리소스·반환**: 코드에서 파일 생성/닫기, 프로세스 실행·타임아웃, 예외·반환값, 출력 report 필드의 변화를 확인한다. 실험 도구의 성공은 지정 workload 검증이지 모든 커널에서 무손실 보증은 아니다.
+
+**시작 코드 원문(전체는 줄번호 링크)**:
+
+```python
+def run(args, *, timeout=25, env=None):
+    p = subprocess.run(args, capture_output=True, text=True, timeout=timeout, env=env)
+    if p.returncode:
+        raise RuntimeError(f'command {args!r} exited {p.returncode}: {p.stderr[-4000:]} {p.stdout[-1000:]}')
+    return p.stdout
+```
+
+#### free_resources — [L56–L63](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/run_benchmark.py#L56-L63)
+
+**선언/입력**: `def free_resources():`. 인자를 전달한 호출 경로와 설정·실험 출력 JSON을 연결한다.
+
+**검증·오류 분기**: 직접 assert가 없으면 호출자가 출력·반환을 검증하거나 데이터를 구성하는 helper다.
+
+**메모리·리소스·반환**: 코드에서 파일 생성/닫기, 프로세스 실행·타임아웃, 예외·반환값, 출력 report 필드의 변화를 확인한다. 실험 도구의 성공은 지정 workload 검증이지 모든 커널에서 무손실 보증은 아니다.
+
+**시작 코드 원문(전체는 줄번호 링크)**:
+
+```python
+def free_resources():
+    mem = Path('/proc/meminfo').read_text()
+    available_kib = int(next(line.split()[1] for line in mem.splitlines() if line.startswith('MemAvailable:')))
+    d = shutil.disk_usage(DATA.parent)
+    return dict(memory_available_kib=available_kib, filesystem_free_bytes=d.free,
+                filesystem_total_bytes=d.total)
+```
+
+#### config_for — [L64–L86](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/run_benchmark.py#L64-L86)
+
+**선언/입력**: `def config_for(name):`. 인자를 전달한 호출 경로와 설정·실험 출력 JSON을 연결한다.
+
+**검증·오류 분기**: 직접 assert가 없으면 호출자가 출력·반환을 검증하거나 데이터를 구성하는 helper다.
+
+**메모리·리소스·반환**: 코드에서 파일 생성/닫기, 프로세스 실행·타임아웃, 예외·반환값, 출력 report 필드의 변화를 확인한다. 실험 도구의 성공은 지정 workload 검증이지 모든 커널에서 무손실 보증은 아니다.
+
+**시작 코드 원문(전체는 줄번호 링크)**:
+
+```python
+def config_for(name):
+    source = json.loads((SOURCE / 'config.json').read_text())
+    source.pop('critical_rules', None)
+    source['protected_path'] = PATHS[1]
+    source.update(bulk_rate=1000000, bulk_burst=1000000,
+                  max_raw_mib=128, critical_reserve_mib=32,
+                  max_index_mib=64, minimum_free_mib=256,
+                  metadata_max_mib=8, quarantine_max_mib=8,
+                  critical_rate_threshold=1000000,
+                  critical_rate_duration_seconds=1)
+    count = {'baseline': 0, 'rule1': 1, 'rule4': 4, 'rule8': 8}[name]
+    if count:
+```
+
+#### load_manage — [L87–L93](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/run_benchmark.py#L87-L93)
+
+**선언/입력**: `def load_manage():`. 인자를 전달한 호출 경로와 설정·실험 출력 JSON을 연결한다.
+
+**검증·오류 분기**: 직접 assert가 없으면 호출자가 출력·반환을 검증하거나 데이터를 구성하는 helper다.
+
+**메모리·리소스·반환**: 코드에서 파일 생성/닫기, 프로세스 실행·타임아웃, 예외·반환값, 출력 report 필드의 변화를 확인한다. 실험 도구의 성공은 지정 workload 검증이지 모든 커널에서 무손실 보증은 아니다.
+
+**시작 코드 원문(전체는 줄번호 링크)**:
+
+```python
+def load_manage():
+    spec = importlib.util.spec_from_file_location('mglogwh_pinned_manage', SOURCE / 'manage.py')
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+```
+
+#### inspect_raw — [L94–L126](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/run_benchmark.py#L94-L126)
+
+**선언/입력**: `def inspect_raw(manage, run_dir, health):`. 인자를 전달한 호출 경로와 설정·실험 출력 JSON을 연결한다.
+
+**검증·오류 분기**: 직접 assert가 없으면 호출자가 출력·반환을 검증하거나 데이터를 구성하는 helper다.
+
+**메모리·리소스·반환**: 코드에서 파일 생성/닫기, 프로세스 실행·타임아웃, 예외·반환값, 출력 report 필드의 변화를 확인한다. 실험 도구의 성공은 지정 workload 검증이지 모든 커널에서 무손실 보증은 아니다.
+
+**시작 코드 원문(전체는 줄번호 링크)**:
+
+```python
+def inspect_raw(manage, run_dir, health):
+    boundaries = health.get('durable', {})
+    result = {'crc_and_schema_valid': True, 'records_total': 0, 'by_path': {},
+              'by_lane': {}, 'errors': []}
+    for lane in manage.LANES:
+        path = run_dir / lane
+        boundary = boundaries.get(lane)
+        if not isinstance(boundary, int) or boundary < 0 or boundary % manage.RECORD_SIZE or path.stat().st_size < boundary:
+            result['crc_and_schema_valid'] = False
+            result['errors'].append(f'{lane}: invalid durable boundary {boundary}')
+            continue
+        result['by_lane'][lane] = boundary // manage.RECORD_SIZE
+```
+
+#### stop_manage — [L127–L131](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/run_benchmark.py#L127-L131)
+
+**선언/입력**: `def stop_manage(env, run_id):`. 인자를 전달한 호출 경로와 설정·실험 출력 JSON을 연결한다.
+
+**검증·오류 분기**: 직접 assert가 없으면 호출자가 출력·반환을 검증하거나 데이터를 구성하는 helper다.
+
+**메모리·리소스·반환**: 코드에서 파일 생성/닫기, 프로세스 실행·타임아웃, 예외·반환값, 출력 report 필드의 변화를 확인한다. 실험 도구의 성공은 지정 workload 검증이지 모든 커널에서 무손실 보증은 아니다.
+
+**시작 코드 원문(전체는 줄번호 링크)**:
+
+```python
+def stop_manage(env, run_id):
+    return json.loads(run([sys.executable, str(SOURCE / 'manage.py'), 'stop', '--run', run_id],
+                          timeout=85, env=env))
+```
+
+#### one_run — [L132–L212](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/run_benchmark.py#L132-L212)
+
+**선언/입력**: `def one_run(manage, name, repeat, env, configs):`. 인자를 전달한 호출 경로와 설정·실험 출력 JSON을 연결한다.
+
+**검증·오류 분기**: [L139](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/run_benchmark.py#L139) `raise RuntimeError('resource guard: <1GiB available RAM or <2GiB disk free')`; [L163](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/run_benchmark.py#L163) `raise RuntimeError('collector did not enter RUNNING')`
+
+**메모리·리소스·반환**: 코드에서 파일 생성/닫기, 프로세스 실행·타임아웃, 예외·반환값, 출력 report 필드의 변화를 확인한다. 실험 도구의 성공은 지정 workload 검증이지 모든 커널에서 무손실 보증은 아니다.
+
+**시작 코드 원문(전체는 줄번호 링크)**:
+
+```python
+def one_run(manage, name, repeat, env, configs):
+    label = f'{name}-r{repeat}'
+    result = dict(label=label, condition=name, repeat=repeat, started_utc=time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime()),
+                  config_file=str(configs[name]), config_file_sha256=sha256(configs[name]),
+                  resources_before=free_resources(), command=[str(BUILD / 'bench_workload'), *PATHS,
+                                                               str(SECONDS), *(str(x) for x in RATES)])
+    if result['resources_before']['memory_available_kib'] < 1024 * 1024 or result['resources_before']['filesystem_free_bytes'] < 2 * 1024**3:
+        raise RuntimeError('resource guard: <1GiB available RAM or <2GiB disk free')
+    start = json.loads(run([sys.executable, str(SOURCE / 'manage.py'), 'start', '--config', str(configs[name])],
+                           timeout=25, env=env))
+    run_id = start['run_id']
+    run_dir = Path(start['run_path'])
+```
+
+#### watchdog — [L150–L157](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/run_benchmark.py#L150-L157)
+
+**선언/입력**: `def watchdog():`. 인자를 전달한 호출 경로와 설정·실험 출력 JSON을 연결한다.
+
+**검증·오류 분기**: 직접 assert가 없으면 호출자가 출력·반환을 검증하거나 데이터를 구성하는 helper다.
+
+**메모리·리소스·반환**: 코드에서 파일 생성/닫기, 프로세스 실행·타임아웃, 예외·반환값, 출력 report 필드의 변화를 확인한다. 실험 도구의 성공은 지정 workload 검증이지 모든 커널에서 무손실 보증은 아니다.
+
+**시작 코드 원문(전체는 줄번호 링크)**:
+
+```python
+    def watchdog():
+        if not stopping.is_set():
+            watchdog_triggered.set()
+            try:
+                stop_manage(env, run_id)
+            except Exception as exc:
+                result['watchdog_stop_error'] = str(exc)
+```
+
+#### main — [L213–L270](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/run_benchmark.py#L213-L270)
+
+**선언/입력**: `def main():`. 인자를 전달한 호출 경로와 설정·실험 출력 JSON을 연결한다.
+
+**검증·오류 분기**: [L215](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/run_benchmark.py#L215) `raise RuntimeError('root is required for BPF load; pilot is separate and unprivileged')`; [L217](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/run_benchmark.py#L217) `raise RuntimeError('pinned source/build absent')`; [L219](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/run_benchmark.py#L219) `raise RuntimeError('decoy workload paths have changed')`
+
+**메모리·리소스·반환**: 코드에서 파일 생성/닫기, 프로세스 실행·타임아웃, 예외·반환값, 출력 report 필드의 변화를 확인한다. 실험 도구의 성공은 지정 workload 검증이지 모든 커널에서 무손실 보증은 아니다.
+
+**시작 코드 원문(전체는 줄번호 링크)**:
+
+```python
+def main():
+    if os.geteuid() != 0:
+        raise RuntimeError('root is required for BPF load; pilot is separate and unprivileged')
+    if not (SOURCE / 'manage.py').exists() or not (BUILD / 'collector').exists():
+        raise RuntimeError('pinned source/build absent')
+    if not DECOY.joinpath('critical').is_file() or not DECOY.joinpath('normal').is_file() or DECOY.joinpath('bulk-missing').exists():
+        raise RuntimeError('decoy workload paths have changed')
+    DATA.mkdir(parents=True, exist_ok=True, mode=0o700)
+    os.chmod(DATA, 0o700)
+    manager = load_manage()
+    env = os.environ.copy()
+    env.update(MGLOGWH_DATA_DIR=str(DATA), MGLOGWH_BUILD_DIR=str(BUILD))
+```
+
+### [validation/2026-10-14/run_benchmark_portable.py](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/run_benchmark_portable.py) — 311줄, 12개 감지된 함수
+
+**역할**: 실험 설정을 정규화하고 반복 부하의 결과·중지·복구 상태를 수집한다.
+
+
+#### write_json — [L39–L45](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/run_benchmark_portable.py#L39-L45)
+
+**선언/입력**: `def write_json(path, value):`. 인자를 전달한 호출 경로와 설정·실험 출력 JSON을 연결한다.
+
+**검증·오류 분기**: 직접 assert가 없으면 호출자가 출력·반환을 검증하거나 데이터를 구성하는 helper다.
+
+**메모리·리소스·반환**: 코드에서 파일 생성/닫기, 프로세스 실행·타임아웃, 예외·반환값, 출력 report 필드의 변화를 확인한다. 실험 도구의 성공은 지정 workload 검증이지 모든 커널에서 무손실 보증은 아니다.
+
+**시작 코드 원문(전체는 줄번호 링크)**:
+
+```python
+def write_json(path, value):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open('x', encoding='utf-8') as file:
+        json.dump(value, file, ensure_ascii=False, indent=2, sort_keys=True)
+        file.write('\n')
+```
+
+#### sha256 — [L46–L53](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/run_benchmark_portable.py#L46-L53)
+
+**선언/입력**: `def sha256(path):`. 인자를 전달한 호출 경로와 설정·실험 출력 JSON을 연결한다.
+
+**검증·오류 분기**: 직접 assert가 없으면 호출자가 출력·반환을 검증하거나 데이터를 구성하는 helper다.
+
+**메모리·리소스·반환**: 코드에서 파일 생성/닫기, 프로세스 실행·타임아웃, 예외·반환값, 출력 report 필드의 변화를 확인한다. 실험 도구의 성공은 지정 workload 검증이지 모든 커널에서 무손실 보증은 아니다.
+
+**시작 코드 원문(전체는 줄번호 링크)**:
+
+```python
+def sha256(path):
+    h = hashlib.sha256()
+    with path.open('rb') as file:
+        for chunk in iter(lambda: file.read(1024 * 1024), b''):
+            h.update(chunk)
+    return h.hexdigest()
+```
+
+#### run — [L54–L60](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/run_benchmark_portable.py#L54-L60)
+
+**선언/입력**: `def run(args, *, timeout=25, env=None):`. 인자를 전달한 호출 경로와 설정·실험 출력 JSON을 연결한다.
+
+**검증·오류 분기**: [L57](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/run_benchmark_portable.py#L57) `raise RuntimeError(f'command {args!r} exited {p.returncode}: {p.stderr[-4000:]} {p.stdout[-1000:]}')`
+
+**메모리·리소스·반환**: 코드에서 파일 생성/닫기, 프로세스 실행·타임아웃, 예외·반환값, 출력 report 필드의 변화를 확인한다. 실험 도구의 성공은 지정 workload 검증이지 모든 커널에서 무손실 보증은 아니다.
+
+**시작 코드 원문(전체는 줄번호 링크)**:
+
+```python
+def run(args, *, timeout=25, env=None):
+    p = subprocess.run(args, capture_output=True, text=True, timeout=timeout, env=env)
+    if p.returncode:
+        raise RuntimeError(f'command {args!r} exited {p.returncode}: {p.stderr[-4000:]} {p.stdout[-1000:]}')
+    return p.stdout
+```
+
+#### free_resources — [L61–L68](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/run_benchmark_portable.py#L61-L68)
+
+**선언/입력**: `def free_resources():`. 인자를 전달한 호출 경로와 설정·실험 출력 JSON을 연결한다.
+
+**검증·오류 분기**: 직접 assert가 없으면 호출자가 출력·반환을 검증하거나 데이터를 구성하는 helper다.
+
+**메모리·리소스·반환**: 코드에서 파일 생성/닫기, 프로세스 실행·타임아웃, 예외·반환값, 출력 report 필드의 변화를 확인한다. 실험 도구의 성공은 지정 workload 검증이지 모든 커널에서 무손실 보증은 아니다.
+
+**시작 코드 원문(전체는 줄번호 링크)**:
+
+```python
+def free_resources():
+    mem = Path('/proc/meminfo').read_text()
+    available_kib = int(next(line.split()[1] for line in mem.splitlines() if line.startswith('MemAvailable:')))
+    d = shutil.disk_usage(DATA.parent)
+    return dict(memory_available_kib=available_kib, filesystem_free_bytes=d.free,
+                filesystem_total_bytes=d.total)
+```
+
+#### config_for — [L69–L96](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/run_benchmark_portable.py#L69-L96)
+
+**선언/입력**: `def config_for(name):`. 인자를 전달한 호출 경로와 설정·실험 출력 JSON을 연결한다.
+
+**검증·오류 분기**: 직접 assert가 없으면 호출자가 출력·반환을 검증하거나 데이터를 구성하는 helper다.
+
+**메모리·리소스·반환**: 코드에서 파일 생성/닫기, 프로세스 실행·타임아웃, 예외·반환값, 출력 report 필드의 변화를 확인한다. 실험 도구의 성공은 지정 workload 검증이지 모든 커널에서 무손실 보증은 아니다.
+
+**시작 코드 원문(전체는 줄번호 링크)**:
+
+```python
+def config_for(name):
+    source = json.loads((SOURCE / 'config.json').read_text())
+    source.pop('critical_rules', None)
+    source['protected_path'] = PATHS[1]
+    source.update(bulk_rate=1000000, bulk_burst=1000000,
+                  max_raw_mib=128, critical_reserve_mib=32,
+                  max_index_mib=64, minimum_free_mib=256,
+                  metadata_max_mib=8, quarantine_max_mib=8,
+                  critical_rate_threshold=1000000,
+                  critical_rate_duration_seconds=1)
+    count = RULE_COUNTS[name]
+    if name == 'legacy1':
+```
+
+#### verify_condition — [L97–L107](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/run_benchmark_portable.py#L97-L107)
+
+**선언/입력**: `def verify_condition(name, normalized):`. 인자를 전달한 호출 경로와 설정·실험 출력 JSON을 연결한다.
+
+**검증·오류 분기**: [L97](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/run_benchmark_portable.py#L97) `def verify_condition(name, normalized):`; [L103](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/run_benchmark_portable.py#L103) `raise RuntimeError('legacy1 must contain exactly one explicit legacy rule')`; [L105](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/run_benchmark_portable.py#L105) `raise RuntimeError(f'{name} must contain {RULE_COUNTS[name]} event_rules')`
+
+**메모리·리소스·반환**: 코드에서 파일 생성/닫기, 프로세스 실행·타임아웃, 예외·반환값, 출력 report 필드의 변화를 확인한다. 실험 도구의 성공은 지정 workload 검증이지 모든 커널에서 무손실 보증은 아니다.
+
+**시작 코드 원문(전체는 줄번호 링크)**:
+
+```python
+def verify_condition(name, normalized):
+    """Prevent a mislabeled rule-count comparison before loading the sensor."""
+    if name == 'legacy1':
+        rules = normalized.get('critical_rules')
+        expected = [dict(id=1, event_type='openat', path=PATHS[1], protected=False)]
+        if 'event_rules' in normalized or rules != expected:
+            raise RuntimeError('legacy1 must contain exactly one explicit legacy rule')
+    elif 'critical_rules' in normalized or len(normalized.get('event_rules', [])) != RULE_COUNTS[name]:
+        raise RuntimeError(f'{name} must contain {RULE_COUNTS[name]} event_rules')
+```
+
+#### load_manage — [L108–L114](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/run_benchmark_portable.py#L108-L114)
+
+**선언/입력**: `def load_manage():`. 인자를 전달한 호출 경로와 설정·실험 출력 JSON을 연결한다.
+
+**검증·오류 분기**: 직접 assert가 없으면 호출자가 출력·반환을 검증하거나 데이터를 구성하는 helper다.
+
+**메모리·리소스·반환**: 코드에서 파일 생성/닫기, 프로세스 실행·타임아웃, 예외·반환값, 출력 report 필드의 변화를 확인한다. 실험 도구의 성공은 지정 workload 검증이지 모든 커널에서 무손실 보증은 아니다.
+
+**시작 코드 원문(전체는 줄번호 링크)**:
+
+```python
+def load_manage():
+    spec = importlib.util.spec_from_file_location('mglogwh_pinned_manage', SOURCE / 'manage.py')
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+```
+
+#### inspect_raw — [L115–L147](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/run_benchmark_portable.py#L115-L147)
+
+**선언/입력**: `def inspect_raw(manage, run_dir, health):`. 인자를 전달한 호출 경로와 설정·실험 출력 JSON을 연결한다.
+
+**검증·오류 분기**: 직접 assert가 없으면 호출자가 출력·반환을 검증하거나 데이터를 구성하는 helper다.
+
+**메모리·리소스·반환**: 코드에서 파일 생성/닫기, 프로세스 실행·타임아웃, 예외·반환값, 출력 report 필드의 변화를 확인한다. 실험 도구의 성공은 지정 workload 검증이지 모든 커널에서 무손실 보증은 아니다.
+
+**시작 코드 원문(전체는 줄번호 링크)**:
+
+```python
+def inspect_raw(manage, run_dir, health):
+    boundaries = health.get('durable', {})
+    result = {'crc_and_schema_valid': True, 'records_total': 0, 'by_path': {},
+              'by_lane': {}, 'errors': []}
+    for lane in manage.LANES:
+        path = run_dir / lane
+        boundary = boundaries.get(lane)
+        if not isinstance(boundary, int) or boundary < 0 or boundary % manage.RECORD_SIZE or path.stat().st_size < boundary:
+            result['crc_and_schema_valid'] = False
+            result['errors'].append(f'{lane}: invalid durable boundary {boundary}')
+            continue
+        result['by_lane'][lane] = boundary // manage.RECORD_SIZE
+```
+
+#### stop_manage — [L148–L152](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/run_benchmark_portable.py#L148-L152)
+
+**선언/입력**: `def stop_manage(env, run_id):`. 인자를 전달한 호출 경로와 설정·실험 출력 JSON을 연결한다.
+
+**검증·오류 분기**: 직접 assert가 없으면 호출자가 출력·반환을 검증하거나 데이터를 구성하는 helper다.
+
+**메모리·리소스·반환**: 코드에서 파일 생성/닫기, 프로세스 실행·타임아웃, 예외·반환값, 출력 report 필드의 변화를 확인한다. 실험 도구의 성공은 지정 workload 검증이지 모든 커널에서 무손실 보증은 아니다.
+
+**시작 코드 원문(전체는 줄번호 링크)**:
+
+```python
+def stop_manage(env, run_id):
+    return json.loads(run([sys.executable, str(SOURCE / 'manage.py'), 'stop', '--run', run_id],
+                          timeout=85, env=env))
+```
+
+#### one_run — [L153–L237](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/run_benchmark_portable.py#L153-L237)
+
+**선언/입력**: `def one_run(manage, name, repeat, env, configs):`. 인자를 전달한 호출 경로와 설정·실험 출력 JSON을 연결한다.
+
+**검증·오류 분기**: [L163](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/run_benchmark_portable.py#L163) `raise RuntimeError('resource guard: <1GiB available RAM or <2GiB disk free')`; [L187](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/run_benchmark_portable.py#L187) `raise RuntimeError('collector did not enter RUNNING')`
+
+**메모리·리소스·반환**: 코드에서 파일 생성/닫기, 프로세스 실행·타임아웃, 예외·반환값, 출력 report 필드의 변화를 확인한다. 실험 도구의 성공은 지정 workload 검증이지 모든 커널에서 무손실 보증은 아니다.
+
+**시작 코드 원문(전체는 줄번호 링크)**:
+
+```python
+def one_run(manage, name, repeat, env, configs):
+    label = f'{name}-r{repeat}'
+    result = dict(label=label, condition=name, repeat=repeat,
+                  rule_format='legacy' if name == 'legacy1' else 'event_rules',
+                  configured_rule_count=RULE_COUNTS[name],
+                  started_utc=time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime()),
+                  config_file=str(configs[name]), config_file_sha256=sha256(configs[name]),
+                  resources_before=free_resources(), command=[str(BUILD / 'bench_workload'), *PATHS,
+                                                               str(SECONDS), *(str(x) for x in RATES)])
+    if result['resources_before']['memory_available_kib'] < 1024 * 1024 or result['resources_before']['filesystem_free_bytes'] < 2 * 1024**3:
+        raise RuntimeError('resource guard: <1GiB available RAM or <2GiB disk free')
+    start = json.loads(run([sys.executable, str(SOURCE / 'manage.py'), 'start', '--config', str(configs[name])],
+```
+
+#### watchdog — [L174–L181](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/run_benchmark_portable.py#L174-L181)
+
+**선언/입력**: `def watchdog():`. 인자를 전달한 호출 경로와 설정·실험 출력 JSON을 연결한다.
+
+**검증·오류 분기**: 직접 assert가 없으면 호출자가 출력·반환을 검증하거나 데이터를 구성하는 helper다.
+
+**메모리·리소스·반환**: 코드에서 파일 생성/닫기, 프로세스 실행·타임아웃, 예외·반환값, 출력 report 필드의 변화를 확인한다. 실험 도구의 성공은 지정 workload 검증이지 모든 커널에서 무손실 보증은 아니다.
+
+**시작 코드 원문(전체는 줄번호 링크)**:
+
+```python
+    def watchdog():
+        if not stopping.is_set():
+            watchdog_triggered.set()
+            try:
+                stop_manage(env, run_id)
+            except Exception as exc:
+                result['watchdog_stop_error'] = str(exc)
+```
+
+#### main — [L238–L308](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/run_benchmark_portable.py#L238-L308)
+
+**선언/입력**: `def main():`. 인자를 전달한 호출 경로와 설정·실험 출력 JSON을 연결한다.
+
+**검증·오류 분기**: [L240](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/run_benchmark_portable.py#L240) `raise RuntimeError('root is required for BPF load; pilot is separate and unprivileged')`; [L242](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/run_benchmark_portable.py#L242) `raise RuntimeError('pinned source/build absent')`; [L244](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/run_benchmark_portable.py#L244) `raise RuntimeError('MGLOGWH_BENCH_HEAD must be a lowercase 40-character commit hash')`; [L246](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/run_benchmark_portable.py#L246) `raise RuntimeError('output directory must be new/empty to preserve previous evidence')`; [L248](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/run_benchmark_portable.py#L248) `raise RuntimeError('data directory must be new/empty to preserve previous runs')`; [L250](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/run_benchmark_portable.py#L250) `raise RuntimeError('benchmark paths must be absolute')`; [L252](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/run_benchmark_portable.py#L252) `raise RuntimeError('decoy workload paths have changed')`; [L276](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/run_benchmark_portable.py#L276) `verify_condition(name, manager.config(path))  # Check semantics before loading any sensor.`
+
+**메모리·리소스·반환**: 코드에서 파일 생성/닫기, 프로세스 실행·타임아웃, 예외·반환값, 출력 report 필드의 변화를 확인한다. 실험 도구의 성공은 지정 workload 검증이지 모든 커널에서 무손실 보증은 아니다.
+
+**시작 코드 원문(전체는 줄번호 링크)**:
+
+```python
+def main():
+    if os.geteuid() != 0:
+        raise RuntimeError('root is required for BPF load; pilot is separate and unprivileged')
+    if not (SOURCE / 'manage.py').exists() or not (BUILD / 'collector').exists():
+        raise RuntimeError('pinned source/build absent')
+    if not EXPECTED_HEAD or len(EXPECTED_HEAD) != 40 or not all(c in '0123456789abcdef' for c in EXPECTED_HEAD):
+        raise RuntimeError('MGLOGWH_BENCH_HEAD must be a lowercase 40-character commit hash')
+    if OUTPUT.exists() and any(OUTPUT.iterdir()):
+        raise RuntimeError('output directory must be new/empty to preserve previous evidence')
+    if DATA.exists() and any(DATA.iterdir()):
+        raise RuntimeError('data directory must be new/empty to preserve previous runs')
+    if not DATA.is_absolute() or not OUTPUT.is_absolute() or not DECOY.is_absolute():
+```
+
+### [validation/2026-10-14/run_path_matrix.py](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/run_path_matrix.py) — 336줄, 10개 감지된 함수
+
+**역할**: 경로·규칙 조합별 이벤트 판정과 독립 truth 데이터를 비교한다.
+
+
+#### write_json — [L49–L54](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/run_path_matrix.py#L49-L54)
+
+**선언/입력**: `def write_json(path, value):`. 인자를 전달한 호출 경로와 설정·실험 출력 JSON을 연결한다.
+
+**검증·오류 분기**: 직접 assert가 없으면 호출자가 출력·반환을 검증하거나 데이터를 구성하는 helper다.
+
+**메모리·리소스·반환**: 코드에서 파일 생성/닫기, 프로세스 실행·타임아웃, 예외·반환값, 출력 report 필드의 변화를 확인한다. 실험 도구의 성공은 지정 workload 검증이지 모든 커널에서 무손실 보증은 아니다.
+
+**시작 코드 원문(전체는 줄번호 링크)**:
+
+```python
+def write_json(path, value):
+    with path.open('x', encoding='utf-8') as file:
+        json.dump(value, file, ensure_ascii=False, indent=2, sort_keys=True)
+        file.write('\n')
+```
+
+#### sha256 — [L55–L62](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/run_path_matrix.py#L55-L62)
+
+**선언/입력**: `def sha256(path):`. 인자를 전달한 호출 경로와 설정·실험 출력 JSON을 연결한다.
+
+**검증·오류 분기**: 직접 assert가 없으면 호출자가 출력·반환을 검증하거나 데이터를 구성하는 helper다.
+
+**메모리·리소스·반환**: 코드에서 파일 생성/닫기, 프로세스 실행·타임아웃, 예외·반환값, 출력 report 필드의 변화를 확인한다. 실험 도구의 성공은 지정 workload 검증이지 모든 커널에서 무손실 보증은 아니다.
+
+**시작 코드 원문(전체는 줄번호 링크)**:
+
+```python
+def sha256(path):
+    h = hashlib.sha256()
+    with path.open('rb') as file:
+        for chunk in iter(lambda: file.read(1024 * 1024), b''):
+            h.update(chunk)
+    return h.hexdigest()
+```
+
+#### command — [L63–L77](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/run_path_matrix.py#L63-L77)
+
+**선언/입력**: `def command(label, argv, output, *, env=None, timeout=30):`. 인자를 전달한 호출 경로와 설정·실험 출력 JSON을 연결한다.
+
+**검증·오류 분기**: [L70](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/run_path_matrix.py#L70) `raise`; [L74](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/run_path_matrix.py#L74) `raise RuntimeError(f'{label} exited {p.returncode}: {p.stderr[-1000:]}')`
+
+**메모리·리소스·반환**: 코드에서 파일 생성/닫기, 프로세스 실행·타임아웃, 예외·반환값, 출력 report 필드의 변화를 확인한다. 실험 도구의 성공은 지정 workload 검증이지 모든 커널에서 무손실 보증은 아니다.
+
+**시작 코드 원문(전체는 줄번호 링크)**:
+
+```python
+def command(label, argv, output, *, env=None, timeout=30):
+    try:
+        p = subprocess.run(argv, capture_output=True, text=True, env=env,
+                           timeout=timeout)
+    except subprocess.TimeoutExpired as exc:
+        write_json(output / (label + '-timeout.json'),
+                   {'argv': argv, 'timeout': timeout, 'error': str(exc)})
+        raise
+    (output / (label + '.stdout')).write_text(p.stdout, encoding='utf-8')
+    (output / (label + '.stderr')).write_text(p.stderr, encoding='utf-8')
+    if p.returncode:
+        raise RuntimeError(f'{label} exited {p.returncode}: {p.stderr[-1000:]}')
+```
+
+#### load_manage — [L78–L85](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/run_path_matrix.py#L78-L85)
+
+**선언/입력**: `def load_manage():`. 인자를 전달한 호출 경로와 설정·실험 출력 JSON을 연결한다.
+
+**검증·오류 분기**: 직접 assert가 없으면 호출자가 출력·반환을 검증하거나 데이터를 구성하는 helper다.
+
+**메모리·리소스·반환**: 코드에서 파일 생성/닫기, 프로세스 실행·타임아웃, 예외·반환값, 출력 report 필드의 변화를 확인한다. 실험 도구의 성공은 지정 workload 검증이지 모든 커널에서 무손실 보증은 아니다.
+
+**시작 코드 원문(전체는 줄번호 링크)**:
+
+```python
+def load_manage():
+    spec = importlib.util.spec_from_file_location('mglogwh_matrix_manage',
+                                                  SOURCE / 'manage.py')
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+```
+
+#### config_for — [L86–L124](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/run_path_matrix.py#L86-L124)
+
+**선언/입력**: `def config_for(probe_root, binary):`. 인자를 전달한 호출 경로와 설정·실험 출력 JSON을 연결한다.
+
+**검증·오류 분기**: 직접 assert가 없으면 호출자가 출력·반환을 검증하거나 데이터를 구성하는 helper다.
+
+**메모리·리소스·반환**: 코드에서 파일 생성/닫기, 프로세스 실행·타임아웃, 예외·반환값, 출력 report 필드의 변화를 확인한다. 실험 도구의 성공은 지정 workload 검증이지 모든 커널에서 무손실 보증은 아니다.
+
+**시작 코드 원문(전체는 줄번호 링크)**:
+
+```python
+def config_for(probe_root, binary):
+    config = json.loads((SOURCE / 'config.json').read_text(encoding='utf-8'))
+    config.pop('critical_rules', None)
+    config['protected_path'] = str(probe_root / 'target')
+    config.update(bulk_rate=1000000, bulk_burst=1000000, max_raw_mib=64,
+                  critical_reserve_mib=16, max_index_mib=32,
+                  minimum_free_mib=256, metadata_max_mib=8,
+                  quarantine_max_mib=8, critical_rate_threshold=1000000,
+                  critical_rate_duration_seconds=1)
+    kind_open = {'field': 'event_type', 'op': 'eq', 'value': 'openat'}
+    kind_exec = {'field': 'event_type', 'op': 'eq', 'value': 'exec'}
+    comm = {'field': 'comm', 'op': 'eq', 'value': 'mgmatrixprobe'}
+```
+
+#### all_ — [L100–L102](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/run_path_matrix.py#L100-L102)
+
+**선언/입력**: `def all_(*nodes):`. 인자를 전달한 호출 경로와 설정·실험 출력 JSON을 연결한다.
+
+**검증·오류 분기**: 직접 assert가 없으면 호출자가 출력·반환을 검증하거나 데이터를 구성하는 helper다.
+
+**메모리·리소스·반환**: 코드에서 파일 생성/닫기, 프로세스 실행·타임아웃, 예외·반환값, 출력 report 필드의 변화를 확인한다. 실험 도구의 성공은 지정 workload 검증이지 모든 커널에서 무손실 보증은 아니다.
+
+**시작 코드 원문(전체는 줄번호 링크)**:
+
+```python
+    def all_(*nodes):
+        return {'all': list(nodes)}
+```
+
+#### rule — [L103–L107](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/run_path_matrix.py#L103-L107)
+
+**선언/입력**: `def rule(identifier, precedence, when):`. 인자를 전달한 호출 경로와 설정·실험 출력 JSON을 연결한다.
+
+**검증·오류 분기**: 직접 assert가 없으면 호출자가 출력·반환을 검증하거나 데이터를 구성하는 helper다.
+
+**메모리·리소스·반환**: 코드에서 파일 생성/닫기, 프로세스 실행·타임아웃, 예외·반환값, 출력 report 필드의 변화를 확인한다. 실험 도구의 성공은 지정 workload 검증이지 모든 커널에서 무손실 보증은 아니다.
+
+**시작 코드 원문(전체는 줄번호 링크)**:
+
+```python
+    def rule(identifier, precedence, when):
+        return dict(id=identifier, enabled=True, precedence=precedence,
+                    priority='CRITICAL', overload_policy='QUARANTINE_EXEMPT',
+                    when=when)
+```
+
+#### read_raw — [L125–L145](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/run_path_matrix.py#L125-L145)
+
+**선언/입력**: `def read_raw(manage, run_dir, health):`. 인자를 전달한 호출 경로와 설정·실험 출력 JSON을 연결한다.
+
+**검증·오류 분기**: [L133](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/run_path_matrix.py#L133) `raise ValueError(f'invalid durable boundary: {lane} {boundary}')`
+
+**메모리·리소스·반환**: 코드에서 파일 생성/닫기, 프로세스 실행·타임아웃, 예외·반환값, 출력 report 필드의 변화를 확인한다. 실험 도구의 성공은 지정 workload 검증이지 모든 커널에서 무손실 보증은 아니다.
+
+**시작 코드 원문(전체는 줄번호 링크)**:
+
+```python
+def read_raw(manage, run_dir, health):
+    events = []
+    hashes = {}
+    for lane in manage.LANES:
+        raw_path = run_dir / lane
+        boundary = health.get('durable', {}).get(lane)
+        if (type(boundary) is not int or boundary < 0 or
+                boundary % manage.RECORD_SIZE or raw_path.stat().st_size < boundary):
+            raise ValueError(f'invalid durable boundary: {lane} {boundary}')
+        hashes[lane] = dict(sha256=sha256(raw_path),
+                            durable_bytes=boundary,
+                            file_bytes=raw_path.stat().st_size)
+```
+
+#### compare_cases — [L146–L229](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/run_path_matrix.py#L146-L229)
+
+**선언/입력**: `def compare_cases(truth_path, events, binary):`. 인자를 전달한 호출 경로와 설정·실험 출력 JSON을 연결한다.
+
+**검증·오류 분기**: [L152](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/run_path_matrix.py#L152) `raise ValueError('probe truth case list differs from the fixed matrix')`; [L168](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/run_path_matrix.py#L168) `raise ValueError(f'ambiguous host PID binding: parent={len(parent_execs)} '`; [L173](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/run_path_matrix.py#L173) `raise ValueError('probe parent and child must have distinct PIDs')`
+
+**메모리·리소스·반환**: 코드에서 파일 생성/닫기, 프로세스 실행·타임아웃, 예외·반환값, 출력 report 필드의 변화를 확인한다. 실험 도구의 성공은 지정 workload 검증이지 모든 커널에서 무손실 보증은 아니다.
+
+**시작 코드 원문(전체는 줄번호 링크)**:
+
+```python
+def compare_cases(truth_path, events, binary):
+    cases = []
+    used = set()
+    with truth_path.open(newline='', encoding='utf-8') as file:
+        truth = list(csv.DictReader(file))
+    if set(row['label'] for row in truth) != set(CASE_IDS) or len(truth) != len(CASE_IDS):
+        raise ValueError('probe truth case list differs from the fixed matrix')
+    by_label = {row['label']: row for row in truth}
+    first_open_ns = min(int(row['before_ns']) for row in truth
+                        if not row['label'].startswith('exec_'))
+    parent_execs = [event for event in events
+                    if event['kind'] == 1 and event['path'] == str(binary) and
+```
+
+#### main — [L230–L333](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/run_path_matrix.py#L230-L333)
+
+**선언/입력**: `def main():`. 인자를 전달한 호출 경로와 설정·실험 출력 JSON을 연결한다.
+
+**검증·오류 분기**: [L232](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/run_path_matrix.py#L232) `raise RuntimeError('run_path_matrix.py requires root')`; [L234](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/run_path_matrix.py#L234) `raise RuntimeError('current source or collector build is missing')`; [L240](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/run_path_matrix.py#L240) `raise RuntimeError('memory or disk free space is below matrix safety floor')`; [L248](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/run_path_matrix.py#L248) `raise RuntimeError('unique matrix path already exists')`; [L278](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/run_path_matrix.py#L278) `raise RuntimeError(stop_error)`
+
+**메모리·리소스·반환**: 코드에서 파일 생성/닫기, 프로세스 실행·타임아웃, 예외·반환값, 출력 report 필드의 변화를 확인한다. 실험 도구의 성공은 지정 workload 검증이지 모든 커널에서 무손실 보증은 아니다.
+
+**시작 코드 원문(전체는 줄번호 링크)**:
+
+```python
+def main():
+    if os.geteuid() != 0:
+        raise RuntimeError('run_path_matrix.py requires root')
+    if not (SOURCE / 'manage.py').is_file() or not (BUILD / 'collector').is_file():
+        raise RuntimeError('current source or collector build is missing')
+    available_kib = int(next(line.split()[1] for line in
+                             Path('/proc/meminfo').read_text().splitlines()
+                             if line.startswith('MemAvailable:')))
+    free_bytes = shutil.disk_usage('/root').free
+    if available_kib < 1024 * 1024 or free_bytes < 2 * 1024**3:
+        raise RuntimeError('memory or disk free space is below matrix safety floor')
+    identity = uuid.uuid4().hex[:12]
+```
+
+### [validation/2026-10-14/test_benchmark_portable.py](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/test_benchmark_portable.py) — 68줄, 5개 감지된 함수
+
+**역할**: legacy/advanced 벤치 설정과 실제 규칙 수의 대응을 unittest로 검증한다.
+
+
+#### setUp — [L18–L36](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/test_benchmark_portable.py#L18-L36)
+
+**선언/입력**: `def setUp(self):`. 인자를 전달한 호출 경로와 설정·실험 출력 JSON을 연결한다.
+
+**검증·오류 분기**: 직접 assert가 없으면 호출자가 출력·반환을 검증하거나 데이터를 구성하는 helper다.
+
+**메모리·리소스·반환**: 코드에서 파일 생성/닫기, 프로세스 실행·타임아웃, 예외·반환값, 출력 report 필드의 변화를 확인한다. 실험 도구의 성공은 지정 workload 검증이지 모든 커널에서 무손실 보증은 아니다.
+
+**시작 코드 원문(전체는 줄번호 링크)**:
+
+```python
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory(prefix='mglogwh-bench-unit-')
+        self.addCleanup(self.temp.cleanup)
+        work = Path(self.temp.name)
+        env = dict(MGLOGWH_BENCH_SOURCE=str(ROOT), MGLOGWH_BENCH_BUILD=str(work / 'build'),
+                   MGLOGWH_BENCH_DATA=str(work / 'data'), MGLOGWH_BENCH_DECOY=str(work / 'decoy'),
+                   MGLOGWH_BENCH_HEAD='0' * 40, MGLOGWH_BENCH_OUTPUT=str(work / 'out'))
+        spec = importlib.util.spec_from_file_location('benchmark_portable',
+                                                      Path(__file__).with_name('run_benchmark_portable.py'))
+        self.bench = importlib.util.module_from_spec(spec)
+        with patch.dict(os.environ, env):
+            spec.loader.exec_module(self.bench)
+```
+
+#### normalized — [L37–L42](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/test_benchmark_portable.py#L37-L42)
+
+**선언/입력**: `def normalized(self, name):`. 인자를 전달한 호출 경로와 설정·실험 출력 JSON을 연결한다.
+
+**검증·오류 분기**: [L40](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/test_benchmark_portable.py#L40) `self.bench.verify_condition(name, value)`
+
+**메모리·리소스·반환**: 코드에서 파일 생성/닫기, 프로세스 실행·타임아웃, 예외·반환값, 출력 report 필드의 변화를 확인한다. 실험 도구의 성공은 지정 workload 검증이지 모든 커널에서 무손실 보증은 아니다.
+
+**시작 코드 원문(전체는 줄번호 링크)**:
+
+```python
+    def normalized(self, name):
+        self.config_path.write_text(json.dumps(self.bench.config_for(name)), encoding='utf-8')
+        value = manage.config(self.config_path)
+        self.bench.verify_condition(name, value)
+        return value
+```
+
+#### test_legacy_condition_has_one_explicit_rule — [L43–L49](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/test_benchmark_portable.py#L43-L49)
+
+**선언/입력**: `def test_legacy_condition_has_one_explicit_rule(self):`. 인자를 전달한 호출 경로와 설정·실험 출력 JSON을 연결한다.
+
+**검증·오류 분기**: [L45](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/test_benchmark_portable.py#L45) `self.assertNotIn('event_rules', value)`; [L46](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/test_benchmark_portable.py#L46) `self.assertEqual(value['critical_rules'], [dict(id=1, event_type='openat',`; [L48](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/test_benchmark_portable.py#L48) `self.assertEqual(self.bench.RULE_COUNTS['legacy1'], 1)`
+
+**메모리·리소스·반환**: 코드에서 파일 생성/닫기, 프로세스 실행·타임아웃, 예외·반환값, 출력 report 필드의 변화를 확인한다. 실험 도구의 성공은 지정 workload 검증이지 모든 커널에서 무손실 보증은 아니다.
+
+**시작 코드 원문(전체는 줄번호 링크)**:
+
+```python
+    def test_legacy_condition_has_one_explicit_rule(self):
+        value = self.normalized('legacy1')
+        self.assertNotIn('event_rules', value)
+        self.assertEqual(value['critical_rules'], [dict(id=1, event_type='openat',
+                                                        path=self.bench.PATHS[1], protected=False)])
+        self.assertEqual(self.bench.RULE_COUNTS['legacy1'], 1)
+```
+
+#### test_advanced_conditions_have_declared_binary_rule_counts — [L51–L58](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/test_benchmark_portable.py#L51-L58)
+
+**선언/입력**: `def test_advanced_conditions_have_declared_binary_rule_counts(self):`. 인자를 전달한 호출 경로와 설정·실험 출력 JSON을 연결한다.
+
+**검증·오류 분기**: [L55](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/test_benchmark_portable.py#L55) `self.assertNotIn('critical_rules', value)`; [L56](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/test_benchmark_portable.py#L56) `self.assertEqual(len(value['event_rules']), expected)`; [L57](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/test_benchmark_portable.py#L57) `self.assertEqual(struct.unpack('<5I', manage.compile_rule_file(value)[:20])[2], expected)`
+
+**메모리·리소스·반환**: 코드에서 파일 생성/닫기, 프로세스 실행·타임아웃, 예외·반환값, 출력 report 필드의 변화를 확인한다. 실험 도구의 성공은 지정 workload 검증이지 모든 커널에서 무손실 보증은 아니다.
+
+**시작 코드 원문(전체는 줄번호 링크)**:
+
+```python
+    def test_advanced_conditions_have_declared_binary_rule_counts(self):
+        for name, expected in [('rule1', 1), ('rule4', 4), ('rule8', 8)]:
+            with self.subTest(name=name):
+                value = self.normalized(name)
+                self.assertNotIn('critical_rules', value)
+                self.assertEqual(len(value['event_rules']), expected)
+                self.assertEqual(struct.unpack('<5I', manage.compile_rule_file(value)[:20])[2], expected)
+```
+
+#### test_mislabeled_legacy_condition_is_rejected — [L59–L65](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/test_benchmark_portable.py#L59-L65)
+
+**선언/입력**: `def test_mislabeled_legacy_condition_is_rejected(self):`. 인자를 전달한 호출 경로와 설정·실험 출력 JSON을 연결한다.
+
+**검증·오류 분기**: [L62](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/test_benchmark_portable.py#L62) `with self.assertRaisesRegex(RuntimeError, 'exactly one'):`; [L63](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/test_benchmark_portable.py#L63) `self.bench.verify_condition('legacy1', value)`
+
+**메모리·리소스·반환**: 코드에서 파일 생성/닫기, 프로세스 실행·타임아웃, 예외·반환값, 출력 report 필드의 변화를 확인한다. 실험 도구의 성공은 지정 workload 검증이지 모든 커널에서 무손실 보증은 아니다.
+
+**시작 코드 원문(전체는 줄번호 링크)**:
+
+```python
+    def test_mislabeled_legacy_condition_is_rejected(self):
+        value = self.normalized('legacy1')
+        del value['critical_rules']
+        with self.assertRaisesRegex(RuntimeError, 'exactly one'):
+            self.bench.verify_condition('legacy1', value)
+```
+
+### [validation/2026-10-14/summarize_benchmark.py](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/summarize_benchmark.py) — 148줄, 4개 감지된 함수
+
+**역할**: 저장된 벤치 결과의 통계값을 집계한다.
+
+
+#### sha256 — [L16–L19](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/summarize_benchmark.py#L16-L19)
+
+**선언/입력**: `def sha256(path):`. 인자를 전달한 호출 경로와 설정·실험 출력 JSON을 연결한다.
+
+**검증·오류 분기**: 직접 assert가 없으면 호출자가 출력·반환을 검증하거나 데이터를 구성하는 helper다.
+
+**메모리·리소스·반환**: 코드에서 파일 생성/닫기, 프로세스 실행·타임아웃, 예외·반환값, 출력 report 필드의 변화를 확인한다. 실험 도구의 성공은 지정 workload 검증이지 모든 커널에서 무손실 보증은 아니다.
+
+**시작 코드 원문(전체는 줄번호 링크)**:
+
+```python
+def sha256(path):
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+```
+
+#### get_count — [L20–L24](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/summarize_benchmark.py#L20-L24)
+
+**선언/입력**: `def get_count(item, path, lane=None):`. 인자를 전달한 호출 경로와 설정·실험 출력 JSON을 연결한다.
+
+**검증·오류 분기**: 직접 assert가 없으면 호출자가 출력·반환을 검증하거나 데이터를 구성하는 helper다.
+
+**메모리·리소스·반환**: 코드에서 파일 생성/닫기, 프로세스 실행·타임아웃, 예외·반환값, 출력 report 필드의 변화를 확인한다. 실험 도구의 성공은 지정 workload 검증이지 모든 커널에서 무손실 보증은 아니다.
+
+**시작 코드 원문(전체는 줄번호 링크)**:
+
+```python
+def get_count(item, path, lane=None):
+    entry = item['raw']['by_path'].get(path, {})
+    return entry.get('lanes', {}).get(lane, 0) if lane else entry.get('total', 0)
+```
+
+#### summarize_one — [L25–L83](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/summarize_benchmark.py#L25-L83)
+
+**선언/입력**: `def summarize_one(path):`. 인자를 전달한 호출 경로와 설정·실험 출력 JSON을 연결한다.
+
+**검증·오류 분기**: 직접 assert가 없으면 호출자가 출력·반환을 검증하거나 데이터를 구성하는 helper다.
+
+**메모리·리소스·반환**: 코드에서 파일 생성/닫기, 프로세스 실행·타임아웃, 예외·반환값, 출력 report 필드의 변화를 확인한다. 실험 도구의 성공은 지정 workload 검증이지 모든 커널에서 무손실 보증은 아니다.
+
+**시작 코드 원문(전체는 줄번호 링크)**:
+
+```python
+def summarize_one(path):
+    item = json.loads(path.read_text())
+    health = item['health']
+    truth = item['truth']
+    stop_index = item.get('stop_status', {}).get('index', {})
+    tenant = health.get('tenants', [])
+    raw_counts = {kind: get_count(item, key) for kind, key in
+                  (('critical', CRITICAL), ('normal', NORMAL), ('bulk', BULK))}
+    by_lane = item['raw']['by_path'].get(CRITICAL, {}).get('lanes', {})
+    result = dict(label=item['label'], condition=item['condition'], repeat=item['repeat'],
+                  original_json_sha256=sha256(path), source_run_id=item['run_id'],
+                  source_run_dir=item['run_dir'],
+```
+
+#### main — [L84–L145](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/summarize_benchmark.py#L84-L145)
+
+**선언/입력**: `def main():`. 인자를 전달한 호출 경로와 설정·실험 출력 JSON을 연결한다.
+
+**검증·오류 분기**: 직접 assert가 없으면 호출자가 출력·반환을 검증하거나 데이터를 구성하는 helper다.
+
+**메모리·리소스·반환**: 코드에서 파일 생성/닫기, 프로세스 실행·타임아웃, 예외·반환값, 출력 report 필드의 변화를 확인한다. 실험 도구의 성공은 지정 workload 검증이지 모든 커널에서 무손실 보증은 아니다.
+
+**시작 코드 원문(전체는 줄번호 링크)**:
+
+```python
+def main():
+    rows = [summarize_one(path) for path in sorted((HERE / 'runs').glob('*.json'))
+            if not path.name.endswith('-error.json')]
+    grouped = defaultdict(list)
+    for row in rows:
+        grouped[row['condition']].append(row)
+    aggregate = {}
+    for case in CASES:
+        cases = grouped[case]
+        aggregate[case] = dict(repeats=len(cases),
+            requested_eps=cases[0]['requested_eps'] if cases else None,
+            actual_eps_median=median(c['actual_eps'] for c in cases) if cases else None,
+```
+
+### [validation/2026-10-14/hash_artifacts.py](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/hash_artifacts.py) — 42줄, 2개 감지된 함수
+
+**역할**: 아카이브된 실험 파일의 SHA-256을 계산·기록한다.
+
+
+#### sha256 — [L13–L20](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/hash_artifacts.py#L13-L20)
+
+**선언/입력**: `def sha256(path):`. 인자를 전달한 호출 경로와 설정·실험 출력 JSON을 연결한다.
+
+**검증·오류 분기**: 직접 assert가 없으면 호출자가 출력·반환을 검증하거나 데이터를 구성하는 helper다.
+
+**메모리·리소스·반환**: 코드에서 파일 생성/닫기, 프로세스 실행·타임아웃, 예외·반환값, 출력 report 필드의 변화를 확인한다. 실험 도구의 성공은 지정 workload 검증이지 모든 커널에서 무손실 보증은 아니다.
+
+**시작 코드 원문(전체는 줄번호 링크)**:
+
+```python
+def sha256(path):
+    digest = hashlib.sha256()
+    with path.open('rb') as file:
+        for chunk in iter(lambda: file.read(1024 * 1024), b''):
+            digest.update(chunk)
+    return digest.hexdigest()
+```
+
+#### main — [L21–L39](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/hash_artifacts.py#L21-L39)
+
+**선언/입력**: `def main():`. 인자를 전달한 호출 경로와 설정·실험 출력 JSON을 연결한다.
+
+**검증·오류 분기**: 직접 assert가 없으면 호출자가 출력·반환을 검증하거나 데이터를 구성하는 helper다.
+
+**메모리·리소스·반환**: 코드에서 파일 생성/닫기, 프로세스 실행·타임아웃, 예외·반환값, 출력 report 필드의 변화를 확인한다. 실험 도구의 성공은 지정 workload 검증이지 모든 커널에서 무손실 보증은 아니다.
+
+**시작 코드 원문(전체는 줄번호 링크)**:
+
+```python
+def main():
+    result = {}
+    for summary in sorted((HERE / 'runs').glob('*.json')):
+        if summary.name.endswith('-error.json'):
+            continue
+        original = json.loads(summary.read_text())
+        run = Path(original['run_dir'])
+        result[original['label']] = {
+            'original_summary_sha256': sha256(summary),
+            'run_id': original['run_id'], 'run_dir': str(run),
+            'files': {name: dict(bytes=(run / name).stat().st_size,
+                                 sha256=sha256(run / name))
+```
+
+### [validation/2026-10-14/verify_controlroom_run.py](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/verify_controlroom_run.py) — 95줄, 2개 감지된 함수
+
+**역할**: Control Room 연동 검증 기록의 run 상태·증거 일관성을 확인한다.
+
+
+#### digest — [L15–L22](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/verify_controlroom_run.py#L15-L22)
+
+**선언/입력**: `def digest(path):`. 인자를 전달한 호출 경로와 설정·실험 출력 JSON을 연결한다.
+
+**검증·오류 분기**: 직접 assert가 없으면 호출자가 출력·반환을 검증하거나 데이터를 구성하는 helper다.
+
+**메모리·리소스·반환**: 코드에서 파일 생성/닫기, 프로세스 실행·타임아웃, 예외·반환값, 출력 report 필드의 변화를 확인한다. 실험 도구의 성공은 지정 workload 검증이지 모든 커널에서 무손실 보증은 아니다.
+
+**시작 코드 원문(전체는 줄번호 링크)**:
+
+```python
+def digest(path):
+    value = hashlib.sha256()
+    with path.open('rb') as stream:
+        for chunk in iter(lambda: stream.read(1024 * 1024), b''):
+            value.update(chunk)
+    return value.hexdigest()
+```
+
+#### main — [L23–L92](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/verify_controlroom_run.py#L23-L92)
+
+**선언/입력**: `def main():`. 인자를 전달한 호출 경로와 설정·실험 출력 JSON을 연결한다.
+
+**검증·오류 분기**: [L46](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/verify_controlroom_run.py#L46) `raise ValueError(f'invalid durable boundary: {lane}')`
+
+**메모리·리소스·반환**: 코드에서 파일 생성/닫기, 프로세스 실행·타임아웃, 예외·반환값, 출력 report 필드의 변화를 확인한다. 실험 도구의 성공은 지정 workload 검증이지 모든 커널에서 무손실 보증은 아니다.
+
+**시작 코드 원문(전체는 줄번호 링크)**:
+
+```python
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--run-dir', type=Path, required=True)
+    parser.add_argument('--probe-path', required=True)
+    parser.add_argument('--rule-id', type=int, required=True)
+    parser.add_argument('--manager', type=Path, default=Path('/opt/mglogwh/manage.py'))
+    args = parser.parse_args()
+    run_dir = args.run_dir.resolve(strict=True)
+    manager_path = args.manager.resolve(strict=True)
+    spec = importlib.util.spec_from_file_location('mglogwh_live_manager', manager_path)
+    manager = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(manager)
+```
+
+### [validation/2026-10-14/bench_workload.c](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/bench_workload.c) — 152줄, 6개 감지된 함수
+
+**역할**: 목표 속도와 호출 수에 맞춘 openat 부하·latency를 생성한다.
+
+
+#### ns_now — [L31–L35](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/bench_workload.c#L31-L35)
+
+**선언/입력**: `static uint64_t ns_now(void) `. 인자를 전달한 호출 경로와 설정·실험 출력 JSON을 연결한다.
+
+**검증·오류 분기**: 직접 assert가 없으면 호출자가 출력·반환을 검증하거나 데이터를 구성하는 helper다.
+
+**메모리·리소스·반환**: 코드에서 파일 생성/닫기, 프로세스 실행·타임아웃, 예외·반환값, 출력 report 필드의 변화를 확인한다. 실험 도구의 성공은 지정 workload 검증이지 모든 커널에서 무손실 보증은 아니다.
+
+**시작 코드 원문(전체는 줄번호 링크)**:
+
+```c
+static uint64_t ns_now(void) {
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return (uint64_t)ts.tv_sec * 1000000000ull + (uint64_t)ts.tv_nsec;
+}
+```
+
+#### sleep_until — [L37–L41](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/bench_workload.c#L37-L41)
+
+**선언/입력**: `static void sleep_until(uint64_t ns) `. 인자를 전달한 호출 경로와 설정·실험 출력 JSON을 연결한다.
+
+**검증·오류 분기**: 직접 assert가 없으면 호출자가 출력·반환을 검증하거나 데이터를 구성하는 helper다.
+
+**메모리·리소스·반환**: 코드에서 파일 생성/닫기, 프로세스 실행·타임아웃, 예외·반환값, 출력 report 필드의 변화를 확인한다. 실험 도구의 성공은 지정 workload 검증이지 모든 커널에서 무손실 보증은 아니다.
+
+**시작 코드 원문(전체는 줄번호 링크)**:
+
+```c
+static void sleep_until(uint64_t ns) {
+    struct timespec ts = {.tv_sec = (time_t)(ns / 1000000000ull),
+                          .tv_nsec = (long)(ns % 1000000000ull)};
+    while (clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &ts, NULL) == EINTR) {}
+}
+```
+
+#### run_worker — [L43–L66](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/bench_workload.c#L43-L66)
+
+**선언/입력**: `static void *run_worker(void *opaque) `. 인자를 전달한 호출 경로와 설정·실험 출력 JSON을 연결한다.
+
+**검증·오류 분기**: 직접 assert가 없으면 호출자가 출력·반환을 검증하거나 데이터를 구성하는 helper다.
+
+**메모리·리소스·반환**: 코드에서 파일 생성/닫기, 프로세스 실행·타임아웃, 예외·반환값, 출력 report 필드의 변화를 확인한다. 실험 도구의 성공은 지정 workload 검증이지 모든 커널에서 무손실 보증은 아니다.
+
+**시작 코드 원문(전체는 줄번호 링크)**:
+
+```c
+static void *run_worker(void *opaque) {
+    struct worker *w = opaque;
+    uint64_t count = (uint64_t)w->rate * w->seconds;
+    for (uint64_t i = 0; i < count; i++) {
+        uint64_t due = w->start_ns + i * 1000000000ull / w->rate;
+        sleep_until(due);
+        uint64_t before = ns_now();
+        errno = 0;
+        long fd = syscall(SYS_openat, AT_FDCWD, w->path, O_RDONLY | O_CLOEXEC, 0);
+        int saved_errno = errno;
+        uint64_t after = ns_now();
+        if (fd >= 0) close((int)fd);
+```
+
+#### cmp_u64 — [L68–L71](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/bench_workload.c#L68-L71)
+
+**선언/입력**: `static int cmp_u64(const void *a, const void *b) `. 인자를 전달한 호출 경로와 설정·실험 출력 JSON을 연결한다.
+
+**검증·오류 분기**: 직접 assert가 없으면 호출자가 출력·반환을 검증하거나 데이터를 구성하는 helper다.
+
+**메모리·리소스·반환**: 코드에서 파일 생성/닫기, 프로세스 실행·타임아웃, 예외·반환값, 출력 report 필드의 변화를 확인한다. 실험 도구의 성공은 지정 workload 검증이지 모든 커널에서 무손실 보증은 아니다.
+
+**시작 코드 원문(전체는 줄번호 링크)**:
+
+```c
+static int cmp_u64(const void *a, const void *b) {
+    uint64_t x = *(const uint64_t *)a, y = *(const uint64_t *)b;
+    return (x > y) - (x < y);
+}
+```
+
+#### percentile_us — [L73–L79](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/bench_workload.c#L73-L79)
+
+**선언/입력**: `static double percentile_us(uint64_t *samples, size_t count, unsigned p) `. 인자를 전달한 호출 경로와 설정·실험 출력 JSON을 연결한다.
+
+**검증·오류 분기**: 직접 assert가 없으면 호출자가 출력·반환을 검증하거나 데이터를 구성하는 helper다.
+
+**메모리·리소스·반환**: 코드에서 파일 생성/닫기, 프로세스 실행·타임아웃, 예외·반환값, 출력 report 필드의 변화를 확인한다. 실험 도구의 성공은 지정 workload 검증이지 모든 커널에서 무손실 보증은 아니다.
+
+**시작 코드 원문(전체는 줄번호 링크)**:
+
+```c
+static double percentile_us(uint64_t *samples, size_t count, unsigned p) {
+    if (!count) return 0;
+    size_t rank = ((uint64_t)p * count + 99) / 100;
+    if (rank < 1) rank = 1;
+    if (rank > count) rank = count;
+    return (double)samples[rank - 1] / 1000.0;
+}
+```
+
+#### main — [L81–L151](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/bench_workload.c#L81-L151)
+
+**선언/입력**: `int main(int argc, char **argv) `. 인자를 전달한 호출 경로와 설정·실험 출력 JSON을 연결한다.
+
+**검증·오류 분기**: [L84](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/bench_workload.c#L84) `return 2;`; [L91](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/bench_workload.c#L91) `if (errno || *end || v == 0 || v > (i == 0 ? 10ul : 200000ul)) return 2;`; [L96](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/bench_workload.c#L96) `return 2;`; [L108](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/bench_workload.c#L108) `if (!w[i].latency_ns) return 1;`; [L110](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/bench_workload.c#L110) `for (int i = 0; i < WORKERS; i++) if (pthread_create(&threads[i], NULL, run_worker, &w[i])) return 1;`; [L124](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/bench_workload.c#L124) `if (!latency) return 1;`
+
+**메모리·리소스·반환**: 코드에서 파일 생성/닫기, 프로세스 실행·타임아웃, 예외·반환값, 출력 report 필드의 변화를 확인한다. 실험 도구의 성공은 지정 workload 검증이지 모든 커널에서 무손실 보증은 아니다.
+
+**시작 코드 원문(전체는 줄번호 링크)**:
+
+```c
+int main(int argc, char **argv) {
+    if (argc != 8) {
+        fprintf(stderr, "usage: bench_workload BULK_PATH CRITICAL_PATH NORMAL_PATH SECONDS BULK_EPS CRITICAL_EPS NORMAL_EPS\n");
+        return 2;
+    }
+    char *end;
+    unsigned value[4];
+    for (int i = 0; i < 4; i++) {
+        errno = 0;
+        unsigned long v = strtoul(argv[i + 4], &end, 10);
+        if (errno || *end || v == 0 || v > (i == 0 ? 10ul : 200000ul)) return 2;
+        value[i] = (unsigned)v;
+```
+
+### [validation/2026-10-14/path_matrix_probe.c](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/path_matrix_probe.c) — 111줄, 5개 감지된 함수
+
+**역할**: 경로별 호출과 결과를 구성해 truth 파일과 대조하는 C 부하 프로그램이다.
+
+
+#### ns — [L18–L22](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/path_matrix_probe.c#L18-L22)
+
+**선언/입력**: `static unsigned long long ns(void) `. 인자를 전달한 호출 경로와 설정·실험 출력 JSON을 연결한다.
+
+**검증·오류 분기**: 직접 assert가 없으면 호출자가 출력·반환을 검증하거나 데이터를 구성하는 helper다.
+
+**메모리·리소스·반환**: 코드에서 파일 생성/닫기, 프로세스 실행·타임아웃, 예외·반환값, 출력 report 필드의 변화를 확인한다. 실험 도구의 성공은 지정 workload 검증이지 모든 커널에서 무손실 보증은 아니다.
+
+**시작 코드 원문(전체는 줄번호 링크)**:
+
+```c
+static unsigned long long ns(void) {
+    struct timespec t;
+    clock_gettime(CLOCK_MONOTONIC, &t);
+    return (unsigned long long)t.tv_sec * 1000000000ULL + t.tv_nsec;
+}
+```
+
+#### path — [L23–L26](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/path_matrix_probe.c#L23-L26)
+
+**선언/입력**: `static void path(char *out, size_t size, const char *root, const char *part) `. 인자를 전달한 호출 경로와 설정·실험 출력 JSON을 연결한다.
+
+**검증·오류 분기**: 직접 assert가 없으면 호출자가 출력·반환을 검증하거나 데이터를 구성하는 helper다.
+
+**메모리·리소스·반환**: 코드에서 파일 생성/닫기, 프로세스 실행·타임아웃, 예외·반환값, 출력 report 필드의 변화를 확인한다. 실험 도구의 성공은 지정 workload 검증이지 모든 커널에서 무손실 보증은 아니다.
+
+**시작 코드 원문(전체는 줄번호 링크)**:
+
+```c
+static void path(char *out, size_t size, const char *root, const char *part) {
+    int n = snprintf(out, size, "%s/%s", root, part);
+    if (n < 0 || (size_t)n >= size) abort();
+}
+```
+
+#### mkfile — [L27–L30](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/path_matrix_probe.c#L27-L30)
+
+**선언/입력**: `static void mkfile(const char *name) `. 인자를 전달한 호출 경로와 설정·실험 출력 JSON을 연결한다.
+
+**검증·오류 분기**: 직접 assert가 없으면 호출자가 출력·반환을 검증하거나 데이터를 구성하는 helper다.
+
+**메모리·리소스·반환**: 코드에서 파일 생성/닫기, 프로세스 실행·타임아웃, 예외·반환값, 출력 report 필드의 변화를 확인한다. 실험 도구의 성공은 지정 workload 검증이지 모든 커널에서 무손실 보증은 아니다.
+
+**시작 코드 원문(전체는 줄번호 링크)**:
+
+```c
+static void mkfile(const char *name) {
+    int fd = open(name, O_CREAT | O_TRUNC | O_WRONLY, 0600);
+    if (fd < 0 || write(fd, "fake\n", 5) != 5 || close(fd)) abort();
+}
+```
+
+#### exercise — [L31–L46](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/path_matrix_probe.c#L31-L46)
+
+**선언/입력**: `static void exercise(FILE *truth, const char *label, int dirfd, const char *name, const char *shown, int flags) `. 인자를 전달한 호출 경로와 설정·실험 출력 JSON을 연결한다.
+
+**검증·오류 분기**: 직접 assert가 없으면 호출자가 출력·반환을 검증하거나 데이터를 구성하는 helper다.
+
+**메모리·리소스·반환**: 코드에서 파일 생성/닫기, 프로세스 실행·타임아웃, 예외·반환값, 출력 report 필드의 변화를 확인한다. 실험 도구의 성공은 지정 workload 검증이지 모든 커널에서 무손실 보증은 아니다.
+
+**시작 코드 원문(전체는 줄번호 링크)**:
+
+```c
+static void exercise(FILE *truth, const char *label, int dirfd, const char *name,
+                     const char *shown, int flags) {
+    unsigned long long before = ns();
+    errno = 0;
+    long fd = syscall(SYS_openat, dirfd, name, flags, 0600);
+    int saved = errno;
+    unsigned long long after = ns();
+    struct stat st = {};
+    if (fd >= 0 && fstat((int)fd, &st)) abort();
+    fprintf(truth, "%s,%d,%s,%d,%ld,%d,%llu,%llu,%llu,%llu\n",
+            label, getpid(), shown, flags, fd, saved,
+            fd >= 0 ? (unsigned long long)st.st_dev : 0,
+```
+
+#### main — [L47–L110](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/path_matrix_probe.c#L47-L110)
+
+**선언/입력**: `int main(int argc, char **argv) `. 인자를 전달한 호출 경로와 설정·실험 출력 JSON을 연결한다.
+
+**검증·오류 분기**: [L49](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/path_matrix_probe.c#L49) `if (argc != 4) return 2;`
+
+**메모리·리소스·반환**: 코드에서 파일 생성/닫기, 프로세스 실행·타임아웃, 예외·반환값, 출력 report 필드의 변화를 확인한다. 실험 도구의 성공은 지정 workload 검증이지 모든 커널에서 무손실 보증은 아니다.
+
+**시작 코드 원문(전체는 줄번호 링크)**:
+
+```c
+int main(int argc, char **argv) {
+    if (argc == 2 && !strcmp(argv[1], "--exec-child")) return 0;
+    if (argc != 4) return 2;
+    const char *root = argv[1], *truth_name = argv[2], *self = argv[3];
+    char target[512], denied[512], link[512], created[512], missing[512], longname[512], outside[512];
+    char longbase[111];
+    memset(longbase, 'x', sizeof(longbase)-1);
+    longbase[sizeof(longbase)-1] = 0;
+    path(target, sizeof(target), root, "target");
+    path(denied, sizeof(denied), root, "denied");
+    path(link, sizeof(link), root, "link");
+    path(created, sizeof(created), root, "created");
+```
+
+**검증 기록의 한계**: `validation/2026-10-14/REVIEW.md` 및 보존된 JSON, 로그, source tar는 당시 버전과 WSL 환경에 귀속된다. 이번에 각각의 결과 파일 내부 전체를 독립 검산하거나 Linux 테스트를 다시 실행한 것은 아니다.
+
 # PART 12. 코드 기준 보안성·한계
 
 | 항목 | 코드로 확인한 보장/구현 | 남는 위험·미구현/미검증 |
