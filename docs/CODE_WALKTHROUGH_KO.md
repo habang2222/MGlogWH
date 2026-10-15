@@ -16483,7 +16483,422 @@ int main(int argc, char **argv) {
 
 # 전체 소스 및 함수 누락 점검표
 
-<!-- CHECKLIST_INSERT -->
+
+## 1. 필수 소스별 함수 정의 점검
+
+**[x] 표시는 실제 코드 정의·해설·원문(일부 실험 도구는 원문 도입부)·링크를 이 문서에 연결했음을 뜻하며, 실행 시험을 완료했다는 뜻이 아니다.**
+
+
+### [sensor.bpf.c](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/sensor.bpf.c) — 14개 함수/메서드
+
+- [x] [`fault`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/sensor.bpf.c#L111-L114) — sensor.bpf.c:111–114
+- [x] [`is_collector`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/sensor.bpf.c#L115-L120) — sensor.bpf.c:115–120
+- [x] [`eq_bpf_numeric_predicate`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/sensor.bpf.c#L128-L131) — sensor.bpf.c:128–131
+- [x] [`eq_bpf_evaluate`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/sensor.bpf.c#L132-L196) — sensor.bpf.c:132–196
+- [x] [`eq_match_rule_step`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/sensor.bpf.c#L197-L214) — sensor.bpf.c:197–214
+- [x] [`match_rule`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/sensor.bpf.c#L215-L247) — sensor.bpf.c:215–247
+- [x] [`admit`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/sensor.bpf.c#L251-L263) — sensor.bpf.c:251–263
+- [x] [`acquire_stream`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/sensor.bpf.c#L264-L268) — sensor.bpf.c:264–268
+- [x] [`fallback_sample`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/sensor.bpf.c#L269-L277) — sensor.bpf.c:269–277
+- [x] [`emit`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/sensor.bpf.c#L278-L489) — sensor.bpf.c:278–489
+- [x] [`open_enter`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/sensor.bpf.c#L491-L505) — sensor.bpf.c:491–505
+- [x] [`open_exit`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/sensor.bpf.c#L507-L515) — sensor.bpf.c:507–515
+- [x] [`exec_event`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/sensor.bpf.c#L517-L527) — sensor.bpf.c:517–527
+- [x] [`cleanup_thread`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/sensor.bpf.c#L529-L533) — sensor.bpf.c:529–533
+
+### [collector.c](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/collector.c) — 40개 함수/메서드
+
+- [x] [`rule_id`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/collector.c#L88-L90) — collector.c:88–90
+- [x] [`storage_for`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/collector.c#L93-L104) — collector.c:93–104
+- [x] [`storage_class`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/collector.c#L105-L107) — collector.c:105–107
+- [x] [`json_episode`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/collector.c#L108-L120) — collector.c:108–120
+- [x] [`json_storage`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/collector.c#L121-L131) — collector.c:121–131
+- [x] [`json_rule_storage`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/collector.c#L132-L143) — collector.c:132–143
+- [x] [`stop`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/collector.c#L144-L144) — collector.c:144–144
+- [x] [`now_ms`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/collector.c#L145-L149) — collector.c:145–149
+- [x] [`fail`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/collector.c#L150-L157) — collector.c:150–157
+- [x] [`failed`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/collector.c#L158-L163) — collector.c:158–163
+- [x] [`loss_name`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/collector.c#L164-L171) — collector.c:164–171
+- [x] [`loss_locked`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/collector.c#L174-L184) — collector.c:174–184
+- [x] [`save_control`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/collector.c#L185-L205) — collector.c:185–205
+- [x] [`meta_failure`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/collector.c#L206-L212) — collector.c:206–212
+- [x] [`meta_init`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/collector.c#L213-L232) — collector.c:213–232
+- [x] [`meta_sync`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/collector.c#L235-L255) — collector.c:235–255
+- [x] [`meta_write`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/collector.c#L256-L346) — collector.c:256–346
+- [x] [`write_metadata`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/collector.c#L347-L380) — collector.c:347–380
+- [x] [`meta_enqueue`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/collector.c#L383-L403) — collector.c:383–403
+- [x] [`meta_close`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/collector.c#L404-L408) — collector.c:404–408
+- [x] [`meta_wait_idle`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/collector.c#L409-L414) — collector.c:409–414
+- [x] [`meta_destroy`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/collector.c#L415-L421) — collector.c:415–421
+- [x] [`queue_init`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/collector.c#L422-L435) — collector.c:422–435
+- [x] [`queues_close`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/collector.c#L436-L443) — collector.c:436–443
+- [x] [`queue_destroy`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/collector.c#L444-L449) — collector.c:444–449
+- [x] [`save_event`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/collector.c#L452-L529) — collector.c:452–529
+- [x] [`sync_lane`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/collector.c#L532-L549) — collector.c:532–549
+- [x] [`write_lane`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/collector.c#L550-L594) — collector.c:550–594
+- [x] [`drain_rings`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/collector.c#L596-L611) — collector.c:596–611
+- [x] [`publish_snapshot`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/collector.c#L612-L624) — collector.c:612–624
+- [x] [`json_engine`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/collector.c#L625-L636) — collector.c:625–636
+- [x] [`storage_snapshot_for`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/collector.c#L637-L647) — collector.c:637–647
+- [x] [`snapshot`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/collector.c#L648-L859) — collector.c:648–859
+- [x] [`parse_number`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/collector.c#L860-L865) — collector.c:860–865
+- [x] [`copy_identity`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/collector.c#L866-L876) — collector.c:866–876
+- [x] [`rule_program_valid`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/collector.c#L877-L937) — collector.c:877–937
+- [x] [`read_rules_file`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/collector.c#L938-L975) — collector.c:938–975
+- [x] [`legacy_program`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/collector.c#L976-L991) — collector.c:976–991
+- [x] [`install_rule_strings`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/collector.c#L992-L1016) — collector.c:992–1016
+- [x] [`main`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/collector.c#L1017-L1171) — collector.c:1017–1171
+
+### [rules.h](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/rules.h) — 10개 함수/메서드
+
+- [x] [`eq_rule_not`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/rules.h#L72-L74) — rules.h:72–74
+- [x] [`eq_rule_all`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/rules.h#L75-L78) — rules.h:75–78
+- [x] [`eq_rule_any`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/rules.h#L79-L82) — rules.h:79–82
+- [x] [`eq_rule_numeric`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/rules.h#L83-L104) — rules.h:83–104
+- [x] [`eq_rule_one_string`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/rules.h#L107-L126) — rules.h:107–126
+- [x] [`eq_rule_string`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/rules.h#L127-L146) — rules.h:127–146
+- [x] [`eq_rule_numeric_predicate`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/rules.h#L147-L177) — rules.h:147–177
+- [x] [`eq_rule_predicate`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/rules.h#L178-L191) — rules.h:178–191
+- [x] [`eq_rule_evaluate`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/rules.h#L192-L224) — rules.h:192–224
+- [x] [`eq_rule_better`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/rules.h#L225-L240) — rules.h:225–240
+
+### [quarantine.h](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/quarantine.h) — 5개 함수/메서드
+
+- [x] [`eq_q_distinct`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/quarantine.h#L89-L96) — quarantine.h:89–96
+- [x] [`eq_q_observe_window`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/quarantine.h#L97-L116) — quarantine.h:97–116
+- [x] [`eq_q_step`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/quarantine.h#L117-L202) — quarantine.h:117–202
+- [x] [`eq_q_note_submission`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/quarantine.h#L203-L212) — quarantine.h:203–212
+- [x] [`eq_q_make_control`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/quarantine.h#L213-L230) — quarantine.h:213–230
+
+### [manage.py](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py) — 39개 함수/메서드
+
+- [x] [`setting_path`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L32-L38) — manage.py:32–38
+- [x] [`validate_rules`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L97-L118) — manage.py:97–118
+- [x] [`_rule_string`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L119-L132) — manage.py:119–132
+- [x] [`_rule_value`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L133-L149) — manage.py:133–149
+- [x] [`_validate_when`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L150-L184) — manage.py:150–184
+- [x] [`_rule_comparison`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L185-L197) — manage.py:185–197
+- [x] [`_could_match_kind`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L198-L216) — manage.py:198–216
+- [x] [`_rule_tokens`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L217-L231) — manage.py:217–231
+- [x] [`validate_event_rules`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L232-L283) — manage.py:232–283
+- [x] [`compile_rule_file`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L284-L339) — manage.py:284–339
+- [x] [`atomic_bytes`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L340-L358) — manage.py:340–358
+- [x] [`raw_lanes`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L359-L366) — manage.py:359–366
+- [x] [`read_json`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L367-L373) — manage.py:367–373
+- [x] [`atomic_json`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L374-L395) — manage.py:374–395
+- [x] [`ensure_data_dir`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L396-L412) — manage.py:396–412
+- [x] [`config`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L413-L461) — manage.py:413–461
+- [x] [`unique`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L418-L424) — manage.py:418–424
+- [x] [`fingerprint`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L462-L469) — manage.py:462–469
+- [x] [`identity`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L470-L480) — manage.py:470–480
+- [x] [`alive`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L481-L486) — manage.py:481–486
+- [x] [`lock`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L488-L497) — manage.py:488–497
+- [x] [`current`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L498-L509) — manage.py:498–509
+- [x] [`index_coverage`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L510-L540) — manage.py:510–540
+- [x] [`filesystem_free_bytes`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L541-L544) — manage.py:541–544
+- [x] [`storage_usage`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L545-L627) — manage.py:545–627
+- [x] [`collector_failure_evidence`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L628-L645) — manage.py:628–645
+- [x] [`status`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L646-L685) — manage.py:646–685
+- [x] [`capability`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L686-L706) — manage.py:686–706
+- [x] [`create_run`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L707-L756) — manage.py:707–756
+- [x] [`start`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L757-L775) — manage.py:757–775
+- [x] [`serve`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L776-L857) — manage.py:776–857
+- [x] [`stop_handler`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L778-L780) — manage.py:778–780
+- [x] [`stop_run`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L858-L877) — manage.py:858–877
+- [x] [`decode_record`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L878-L929) — manage.py:878–929
+- [x] [`index_batch`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L930-L1025) — manage.py:930–1025
+- [x] [`index_run`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L1026-L1068) — manage.py:1026–1068
+- [x] [`query`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L1069-L1089) — manage.py:1069–1089
+- [x] [`raw_search`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L1090-L1145) — manage.py:1090–1145
+- [x] [`main`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L1146-L1239) — manage.py:1146–1239
+
+### [ledger.py](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py) — 33개 함수/메서드
+
+- [x] [`_unique`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L43-L51) — ledger.py:43–51
+- [x] [`_json`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L52-L57) — ledger.py:52–57
+- [x] [`_object`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L58-L68) — ledger.py:58–68
+- [x] [`_integer`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L69-L74) — ledger.py:69–74
+- [x] [`_uuid`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L75-L83) — ledger.py:75–83
+- [x] [`_digest`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L84-L91) — ledger.py:84–91
+- [x] [`_lineage`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L92-L119) — ledger.py:92–119
+- [x] [`_bound_lineage`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L120-L125) — ledger.py:120–125
+- [x] [`_lane_names`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L126-L135) — ledger.py:126–135
+- [x] [`_policy`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L136-L178) — ledger.py:136–178
+- [x] [`_snapshot`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L179-L308) — ledger.py:179–308
+- [x] [`_stream_key`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L309-L316) — ledger.py:309–316
+- [x] [`_episode`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L317-L338) — ledger.py:317–338
+- [x] [`_control`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L339-L373) — ledger.py:339–373
+- [x] [`_seq_key`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L374-L378) — ledger.py:374–378
+- [x] [`_loss_witness`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L379-L410) — ledger.py:379–410
+- [x] [`_loss`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L411-L429) — ledger.py:411–429
+- [x] [`_read_journal`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L430-L481) — ledger.py:430–481
+- [x] [`_read_raw`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L482-L534) — ledger.py:482–534
+- [x] [`_ranges`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L535-L556) — ledger.py:535–556
+- [x] [`_gaps`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L557-L593) — ledger.py:557–593
+- [x] [`append`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L561-L574) — ledger.py:561–574
+- [x] [`_contiguous_frontier`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L594-L610) — ledger.py:594–610
+- [x] [`match_truth_candidates`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L611-L648) — ledger.py:611–648
+- [x] [`_raw_counts`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L649-L673) — ledger.py:649–673
+- [x] [`_counter_reconciliation`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L674-L705) — ledger.py:674–705
+- [x] [`_episode_report`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L706-L739) — ledger.py:706–739
+- [x] [`_quarantine_report`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L740-L815) — ledger.py:740–815
+- [x] [`_rule_evidence`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L816-L874) — ledger.py:816–874
+- [x] [`_witness_entry`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L875-L887) — ledger.py:875–887
+- [x] [`_summarize`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L888-L983) — ledger.py:888–983
+- [x] [`recover`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L984-L1074) — ledger.py:984–1074
+- [x] [`main`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L1075-L1087) — ledger.py:1075–1087
+
+### [test_manage.py](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py) — 57개 함수/메서드
+
+- [x] [`record`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L16-L21) — test_manage.py:16–21
+- [x] [`setUp`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L23-L33) — test_manage.py:23–33
+- [x] [`tearDown`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L34-L36) — test_manage.py:34–36
+- [x] [`save_health`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L37-L39) — test_manage.py:37–39
+- [x] [`rows`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L40-L43) — test_manage.py:40–43
+- [x] [`test_abi`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L44-L47) — test_manage.py:44–47
+- [x] [`test_crc`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L48-L51) — test_manage.py:48–51
+- [x] [`test_partial`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L52-L54) — test_manage.py:52–54
+- [x] [`test_query_and_restart`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L55-L65) — test_manage.py:55–65
+- [x] [`test_cursor_replay_dedup`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L66-L72) — test_manage.py:66–72
+- [x] [`test_no_undurable_tail_promotion`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L73-L78) — test_manage.py:73–78
+- [x] [`test_short_committed_file_rejected`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L79-L82) — test_manage.py:79–82
+- [x] [`test_corruption_rolls_back_batch`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L83-L89) — test_manage.py:83–89
+- [x] [`test_duplicate_payload_conflict`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L90-L95) — test_manage.py:90–95
+- [x] [`test_lineage`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L96-L100) — test_manage.py:96–100
+- [x] [`test_bounded_batch`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L101-L113) — test_manage.py:101–113
+- [x] [`test_bounded_final_catchup_and_resume`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L114-L126) — test_manage.py:114–126
+- [x] [`test_read_only_raw_search_reports_partial_and_exact_hit`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L127-L140) — test_manage.py:127–140
+- [x] [`test_live_caught_up_is_not_final_search`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L141-L146) — test_manage.py:141–146
+- [x] [`test_critical_lane`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L147-L152) — test_manage.py:147–152
+- [x] [`test_wrong_lane`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L153-L156) — test_manage.py:153–156
+- [x] [`test_invalid_config`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L157-L169) — test_manage.py:157–169
+- [x] [`test_legacy_config_gets_quarantine_defaults`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L170-L177) — test_manage.py:170–177
+- [x] [`test_removed_cgroup_guard_is_not_reenabled`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L178-L184) — test_manage.py:178–184
+- [x] [`test_rule_identity_and_protected_boolean_validation`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L185-L192) — test_manage.py:185–192
+- [x] [`advanced_config`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L193-L205) — test_manage.py:193–205
+- [x] [`test_advanced_rules_compile_fixed_abi_and_normalize_defaults`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L206-L224) — test_manage.py:206–224
+- [x] [`test_string_operands_encode_utf8_length_and_pool_offset`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L225-L237) — test_manage.py:225–237
+- [x] [`test_advanced_boolean_numeric_string_and_logic`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L238-L260) — test_manage.py:238–260
+- [x] [`test_advanced_rules_reject_unknown_types_and_unobservable_exec_failure`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L261-L283) — test_manage.py:261–283
+- [x] [`test_advanced_rule_limits_and_legacy_exclusion`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L284-L300) — test_manage.py:284–300
+- [x] [`test_advanced_policy_and_quarantine_constraints`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L301-L310) — test_manage.py:301–310
+- [x] [`test_schema3_noncritical_rule_and_policy_versions`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L311-L320) — test_manage.py:311–320
+- [x] [`test_older_raw_does_not_claim_rule_or_policy_version`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L321-L329) — test_manage.py:321–329
+- [x] [`test_schema3_exempt_and_quarantine_raw_lane`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L330-L344) — test_manage.py:330–344
+- [x] [`test_documented_advanced_examples_validate`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L345-L351) — test_manage.py:345–351
+- [x] [`test_new_run_manifest_matches_schema3_collector_for_both_rule_formats`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L352-L370) — test_manage.py:352–370
+- [x] [`test_quarantine_original_priority_and_index_lane`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L371-L382) — test_manage.py:371–382
+- [x] [`test_invalid_schema2_policy_combinations`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L383-L389) — test_manage.py:383–389
+- [x] [`test_protected_tracking_failure_does_not_quarantine`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L390-L395) — test_manage.py:390–395
+- [x] [`test_recover_rejects_output_inside_source`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L396-L403) — test_manage.py:396–403
+- [x] [`test_unknown_and_duplicate_config`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L404-L410) — test_manage.py:404–410
+- [x] [`test_process_identity`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L411-L416) — test_manage.py:411–416
+- [x] [`test_lock_contention`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L417-L421) — test_manage.py:417–421
+- [x] [`test_stale_health`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L422-L426) — test_manage.py:422–426
+- [x] [`test_storage_usage_counts_sqlite_sidecars_and_exports`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L427-L443) — test_manage.py:427–443
+- [x] [`test_storage_pressure_pauses_index_with_hysteresis`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L444-L458) — test_manage.py:444–458
+- [x] [`test_enospc_stderr_overrides_stale_running_health`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L459-L468) — test_manage.py:459–468
+- [x] [`test_validate_config_when_active_run_is_root_owned`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L470-L480) — test_manage.py:470–480
+- [x] [`test_relative_override_is_based_on_source_directory`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L481-L485) — test_manage.py:481–485
+- [x] [`test_read_only_commands_do_not_create_data_or_build`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L486-L504) — test_manage.py:486–504
+- [x] [`test_atomic_json_does_not_follow_predictable_temp_symlink`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L505-L516) — test_manage.py:505–516
+- [x] [`test_data_directory_must_be_private_and_not_a_symlink`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L517-L533) — test_manage.py:517–533
+- [x] [`test_root_rejects_untrusted_data_parent`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L534-L541) — test_manage.py:534–541
+- [x] [`test_query_encodes_sqlite_uri_metacharacters`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L542-L553) — test_manage.py:542–553
+- [x] [`test_foreground_run_releases_control_but_keeps_collector_lock`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L554-L573) — test_manage.py:554–573
+- [x] [`tracked_lock`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L557-L562) — test_manage.py:557–562
+
+### [test_ledger.py](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py) — 64개 함수/메서드
+
+- [x] [`setUp`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L18-L35) — test_ledger.py:18–35
+- [x] [`tearDown`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L36-L38) — test_ledger.py:36–38
+- [x] [`write_json`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L39-L41) — test_ledger.py:39–41
+- [x] [`append`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L42-L48) — test_ledger.py:42–48
+- [x] [`checkpoint`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L49-L59) — test_ledger.py:49–59
+- [x] [`loss`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L60-L64) — test_ledger.py:60–64
+- [x] [`loss_witness`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L65-L71) — test_ledger.py:65–71
+- [x] [`commit`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L72-L77) — test_ledger.py:72–77
+- [x] [`raw`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L78-L82) — test_ledger.py:78–82
+- [x] [`advanced_lineage`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L83-L98) — test_ledger.py:83–98
+- [x] [`advanced_stats`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L99-L107) — test_ledger.py:99–107
+- [x] [`test_schema3_committed_rule_statistics_reconcile_with_raw`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L108-L124) — test_ledger.py:108–124
+- [x] [`test_schema3_unavailable_kernel_stats_keep_committed_raw_recoverable`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L125-L149) — test_ledger.py:125–149
+- [x] [`test_schema3_unavailable_kernel_stats_cannot_claim_complete_snapshot`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L150-L166) — test_ledger.py:150–166
+- [x] [`test_schema3_rule_file_tamper_invalidates_lineage`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L167-L176) — test_ledger.py:167–176
+- [x] [`test_schema3_statistics_mismatch_is_explicitly_incomplete`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L177-L189) — test_ledger.py:177–189
+- [x] [`test_schema3_stats_policy_must_match_config`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L190-L201) — test_ledger.py:190–201
+- [x] [`test_schema3_legacy_rule_has_no_compiled_file`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L202-L220) — test_ledger.py:202–220
+- [x] [`test_schema3_userspace_loss_witness_is_accepted`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L221-L234) — test_ledger.py:221–234
+- [x] [`report`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L235-L237) — test_ledger.py:235–237
+- [x] [`test_legacy_no_ledger_is_explicitly_unsupported`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L238-L240) — test_ledger.py:238–240
+- [x] [`test_missing_fence_never_promotes_even_valid_journal`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L241-L248) — test_ledger.py:241–248
+- [x] [`test_empty_startup_fence_has_no_recovered_raw_boundary`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L249-L256) — test_ledger.py:249–256
+- [x] [`test_committed_loss_without_checkpoint_remains_exact_partial_recovery`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L257-L266) — test_ledger.py:257–266
+- [x] [`test_committed_loss_after_last_checkpoint_is_exact_not_bounded_raw`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L267-L277) — test_ledger.py:267–277
+- [x] [`test_non_utf8_names_do_not_affect_sensor_id_recovery`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L278-L286) — test_ledger.py:278–286
+- [x] [`episode`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L287-L294) — test_ledger.py:287–294
+- [x] [`stream`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L295-L305) — test_ledger.py:295–305
+- [x] [`control`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L306-L315) — test_ledger.py:306–315
+- [x] [`quarantine_checkpoint`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L316-L323) — test_ledger.py:316–323
+- [x] [`quarantine_files`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L324-L328) — test_ledger.py:324–328
+- [x] [`test_quarantine_lane_preserves_durable_union_and_scoped_counts`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L329-L344) — test_ledger.py:329–344
+- [x] [`test_quarantine_missing_control_keeps_episode_metrics_incomplete`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L345-L353) — test_ledger.py:345–353
+- [x] [`test_live_quarantine_difference_is_not_confirmed_loss`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L354-L362) — test_ledger.py:354–362
+- [x] [`test_quarantine_transition_conflicts_and_wrong_lane_flags_are_invalid`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L363-L375) — test_ledger.py:363–375
+- [x] [`test_quarantine_unknown_policy_bits_and_lane_set_change_are_invalid`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L376-L388) — test_ledger.py:376–388
+- [x] [`test_quarantine_episode_membership_uses_time_not_out_of_order_sequence`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L389-L407) — test_ledger.py:389–407
+- [x] [`test_protected_untracked_fallback_stays_critical_and_tracking_degrades_q_counts`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L408-L422) — test_ledger.py:408–422
+- [x] [`test_quarantine_exit_uses_policy_time_and_retains_closed_metadata`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L423-L442) — test_ledger.py:423–442
+- [x] [`test_quarantine_metric_aliases_and_transition_policy_are_preserved`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L443-L456) — test_ledger.py:443–456
+- [x] [`test_quarantine_policy_and_reason_metric_scope_mismatch_are_invalid`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L457-L466) — test_ledger.py:457–466
+- [x] [`test_torn_uncommitted_suffix_is_preserved_and_ignored`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L467-L480) — test_ledger.py:467–480
+- [x] [`test_checkpoint_aggregate_counters_never_create_exact_losses`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L481-L488) — test_ledger.py:481–488
+- [x] [`test_seal_compacts_missing_ids_and_preserves_exact_tombstone_reason`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L489-L500) — test_ledger.py:489–500
+- [x] [`test_known_rejection_witness_frontiers_and_ambiguous_truth_binding`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L501-L527) — test_ledger.py:501–527
+- [x] [`test_legacy_loss_has_no_witness_and_unsealed_tail_is_unknown`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L528-L540) — test_ledger.py:528–540
+- [x] [`test_malformed_loss_witness_cannot_claim_exact_context`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L541-L548) — test_ledger.py:541–548
+- [x] [`test_selected_quarantine_sample_rejected_before_durable_raw`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L549-L563) — test_ledger.py:549–563
+- [x] [`test_failed_seal_remains_unknown_future`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L564-L571) — test_ledger.py:564–571
+- [x] [`test_clean_seal_unsequenced_faults_remain_separate`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L572-L580) — test_ledger.py:572–580
+- [x] [`test_post_sequence_fault_is_not_classified_as_unsequenced`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L581-L588) — test_ledger.py:581–588
+- [x] [`test_overflow_degrades_reasons_not_complete_sealed_absence`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L589-L597) — test_ledger.py:589–597
+- [x] [`test_map_snapshot_incomplete_prevents_exact_absence`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L598-L602) — test_ledger.py:598–602
+- [x] [`test_uint64_sequence_bound_does_not_require_enumeration`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L603-L609) — test_ledger.py:603–609
+- [x] [`test_duplicate_tombstone_is_idempotent_conflict_invalid`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L610-L624) — test_ledger.py:610–624
+- [x] [`test_loss_and_durable_same_id_is_conflicting_evidence`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L625-L631) — test_ledger.py:625–631
+- [x] [`test_committed_crc_or_truncated_frame_is_invalid`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L632-L642) — test_ledger.py:632–642
+- [x] [`test_invalid_raw_reports_only_verified_prefix_without_modifying_source`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L643-L660) — test_ledger.py:643–660
+- [x] [`test_invalid_committed_journal_reports_last_verified_frame`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L661-L674) — test_ledger.py:661–674
+- [x] [`test_fence_sequence_boundary_and_lineage_cannot_be_forged_by_suffix`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L675-L687) — test_ledger.py:675–687
+- [x] [`test_snapshot_raw_offset_alignment_and_short_file_are_invalid`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L688-L696) — test_ledger.py:688–696
+- [x] [`test_records_after_seal_and_regressed_offsets_are_invalid`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L697-L707) — test_ledger.py:697–707
+- [x] [`test_final_snapshot_cannot_omit_or_underbound_durable_tenant`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L708-L713) — test_ledger.py:708–713
+- [x] [`test_output_refuses_source_mutation_and_existing_report`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L714-L724) — test_ledger.py:714–724
+
+### [test_live.py](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_live.py) — 2개 함수/메서드
+
+- [x] [`main`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_live.py#L16-L93) — test_live.py:16–93
+- [x] [`cli`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_live.py#L21-L25) — test_live.py:21–25
+
+### [test_budget.py](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_budget.py) — 2개 함수/메서드
+
+- [x] [`main`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_budget.py#L12-L50) — test_budget.py:12–50
+- [x] [`attempt`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_budget.py#L24-L28) — test_budget.py:24–28
+
+### [validation/2026-10-14/run_benchmark.py](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/run_benchmark.py) — 11개 함수/메서드
+
+- [x] [`write_json`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/run_benchmark.py#L34-L40) — L34–L40
+- [x] [`sha256`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/run_benchmark.py#L41-L48) — L41–L48
+- [x] [`run`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/run_benchmark.py#L49-L55) — L49–L55
+- [x] [`free_resources`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/run_benchmark.py#L56-L63) — L56–L63
+- [x] [`config_for`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/run_benchmark.py#L64-L86) — L64–L86
+- [x] [`load_manage`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/run_benchmark.py#L87-L93) — L87–L93
+- [x] [`inspect_raw`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/run_benchmark.py#L94-L126) — L94–L126
+- [x] [`stop_manage`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/run_benchmark.py#L127-L131) — L127–L131
+- [x] [`one_run`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/run_benchmark.py#L132-L212) — L132–L212
+- [x] [`watchdog`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/run_benchmark.py#L150-L157) — L150–L157
+- [x] [`main`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/run_benchmark.py#L213-L270) — L213–L270
+
+### [validation/2026-10-14/run_benchmark_portable.py](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/run_benchmark_portable.py) — 12개 함수/메서드
+
+- [x] [`write_json`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/run_benchmark_portable.py#L39-L45) — L39–L45
+- [x] [`sha256`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/run_benchmark_portable.py#L46-L53) — L46–L53
+- [x] [`run`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/run_benchmark_portable.py#L54-L60) — L54–L60
+- [x] [`free_resources`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/run_benchmark_portable.py#L61-L68) — L61–L68
+- [x] [`config_for`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/run_benchmark_portable.py#L69-L96) — L69–L96
+- [x] [`verify_condition`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/run_benchmark_portable.py#L97-L107) — L97–L107
+- [x] [`load_manage`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/run_benchmark_portable.py#L108-L114) — L108–L114
+- [x] [`inspect_raw`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/run_benchmark_portable.py#L115-L147) — L115–L147
+- [x] [`stop_manage`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/run_benchmark_portable.py#L148-L152) — L148–L152
+- [x] [`one_run`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/run_benchmark_portable.py#L153-L237) — L153–L237
+- [x] [`watchdog`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/run_benchmark_portable.py#L174-L181) — L174–L181
+- [x] [`main`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/run_benchmark_portable.py#L238-L308) — L238–L308
+
+### [validation/2026-10-14/run_path_matrix.py](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/run_path_matrix.py) — 10개 함수/메서드
+
+- [x] [`write_json`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/run_path_matrix.py#L49-L54) — L49–L54
+- [x] [`sha256`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/run_path_matrix.py#L55-L62) — L55–L62
+- [x] [`command`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/run_path_matrix.py#L63-L77) — L63–L77
+- [x] [`load_manage`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/run_path_matrix.py#L78-L85) — L78–L85
+- [x] [`config_for`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/run_path_matrix.py#L86-L124) — L86–L124
+- [x] [`all_`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/run_path_matrix.py#L100-L102) — L100–L102
+- [x] [`rule`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/run_path_matrix.py#L103-L107) — L103–L107
+- [x] [`read_raw`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/run_path_matrix.py#L125-L145) — L125–L145
+- [x] [`compare_cases`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/run_path_matrix.py#L146-L229) — L146–L229
+- [x] [`main`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/run_path_matrix.py#L230-L333) — L230–L333
+
+### [validation/2026-10-14/test_benchmark_portable.py](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/test_benchmark_portable.py) — 5개 함수/메서드
+
+- [x] [`setUp`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/test_benchmark_portable.py#L18-L36) — L18–L36
+- [x] [`normalized`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/test_benchmark_portable.py#L37-L42) — L37–L42
+- [x] [`test_legacy_condition_has_one_explicit_rule`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/test_benchmark_portable.py#L43-L49) — L43–L49
+- [x] [`test_advanced_conditions_have_declared_binary_rule_counts`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/test_benchmark_portable.py#L51-L58) — L51–L58
+- [x] [`test_mislabeled_legacy_condition_is_rejected`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/test_benchmark_portable.py#L59-L65) — L59–L65
+
+### [validation/2026-10-14/summarize_benchmark.py](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/summarize_benchmark.py) — 4개 함수/메서드
+
+- [x] [`sha256`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/summarize_benchmark.py#L16-L19) — L16–L19
+- [x] [`get_count`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/summarize_benchmark.py#L20-L24) — L20–L24
+- [x] [`summarize_one`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/summarize_benchmark.py#L25-L83) — L25–L83
+- [x] [`main`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/summarize_benchmark.py#L84-L145) — L84–L145
+
+### [validation/2026-10-14/hash_artifacts.py](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/hash_artifacts.py) — 2개 함수/메서드
+
+- [x] [`sha256`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/hash_artifacts.py#L13-L20) — L13–L20
+- [x] [`main`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/hash_artifacts.py#L21-L39) — L21–L39
+
+### [validation/2026-10-14/verify_controlroom_run.py](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/verify_controlroom_run.py) — 2개 함수/메서드
+
+- [x] [`digest`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/verify_controlroom_run.py#L15-L22) — L15–L22
+- [x] [`main`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/verify_controlroom_run.py#L23-L92) — L23–L92
+
+### [validation/2026-10-14/bench_workload.c](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/bench_workload.c) — 6개 함수/메서드
+
+- [x] [`ns_now`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/bench_workload.c#L31-L35) — L31–L35
+- [x] [`sleep_until`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/bench_workload.c#L37-L41) — L37–L41
+- [x] [`run_worker`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/bench_workload.c#L43-L66) — L43–L66
+- [x] [`cmp_u64`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/bench_workload.c#L68-L71) — L68–L71
+- [x] [`percentile_us`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/bench_workload.c#L73-L79) — L73–L79
+- [x] [`main`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/bench_workload.c#L81-L151) — L81–L151
+
+### [validation/2026-10-14/path_matrix_probe.c](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/path_matrix_probe.c) — 5개 함수/메서드
+
+- [x] [`ns`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/path_matrix_probe.c#L18-L22) — L18–L22
+- [x] [`path`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/path_matrix_probe.c#L23-L26) — L23–L26
+- [x] [`mkfile`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/path_matrix_probe.c#L27-L30) — L27–L30
+- [x] [`exercise`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/path_matrix_probe.c#L31-L46) — L31–L46
+- [x] [`main`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/validation/2026-10-14/path_matrix_probe.c#L47-L110) — L47–L110
+
+## 2. 그 밖의 테스트, 헤더, 예제 및 설치 파일
+
+- [x] [`test_writer.c`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c) — C 테스트 원문·단언문·진입점를 기록
+- [x] [`test_rules.c`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_rules.c) — C 테스트 원문·단언문·진입점를 기록
+- [x] [`test_quarantine.c`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_quarantine.c) — C 테스트 원문·단언문·진입점를 기록
+- [x] [`event.h`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/event.h) — 자료구조 ABI/소유권를 기록
+- [x] [`tenant.h`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/tenant.h) — 자료구조 ABI/소유권를 기록
+- [x] [`config.json`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/config.json) — 기본 설정 파일 전체를 기록
+- [x] [`Makefile`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/Makefile) — 빌드 타깃 전체를 기록
+- [x] [`install-ubuntu.sh`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/install-ubuntu.sh) — 설치 스크립트 전체를 기록
+- [x] [`packaging/mglogwh.service`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/packaging/mglogwh.service) — 서비스 운영 설정를 기록
+- [x] [`packaging/mglogwh.logrotate`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/packaging/mglogwh.logrotate) — 서비스 운영 설정를 기록
+- [x] [`examples/A-nonroot-etc-write.json`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/examples/A-nonroot-etc-write.json) — 규칙 JSON 원문를 기록
+- [x] [`examples/B-cgroup-shell-exec.json`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/examples/B-cgroup-shell-exec.json) — 규칙 JSON 원문를 기록
+- [x] [`examples/C-shadow-exempt.json`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/examples/C-shadow-exempt.json) — 규칙 JSON 원문를 기록
+- [x] [`examples/D-uid-specific-file.json`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/examples/D-uid-specific-file.json) — 규칙 JSON 원문를 기록
+
+- [x] 전체 추적 파일 124개는 PART 2에서 이름·크기·원본 링크를 열거했다.
+- [x] Python/C의 main 진입점, eBPF attach, 처리·저장·종료 생명주기, 기본 설정, 데이터 소유권을 설명했다.
+- [x] Mermaid 아키텍처·호출·한 건 이벤트 추적 다이어그램을 포함했다.
+- [x] 정책 요약과 ring/queue/disk 오류, 원장 커밋 경계와 인덱싱 지연을 구분했다.
+
+## 3. 남은 한계(숨기지 않기)
+
+- 검출한 함수/메서드 학습 항목 323개의 소스 위치를 연결했다. 정적 함수 추출만으로 C 매크로가 확장하는 간접 호출과 Python 동적 import/dispatch 전부를 증명하지는 못한다.
+- `validation/`의 시험 스크립트는 함수·주요 검사식·원문 도입부를 설명하고 전체 원본 링크를 제공했다. 실험 아카이브/JSON/바이너리의 내용 전체를 독립 검산하지 않았고 새 성능 시험으로 간주하지 않았다.
+- 이번 작업은 Linux에서 컴파일, BPF verifier 로드, 단위 테스트, 통합 테스트, 실험 재현을 **실행하지 않았다**. 별도 환경에서 재검증해야 한다.
+- 변경 대상은 `docs/CODE_WALKTHROUGH_KO.md` 하나뿐이며 기존 source/README/설정/테스트는 수정하지 않았다.
+
+
 
 ## 한계 및 확인 상태
 
