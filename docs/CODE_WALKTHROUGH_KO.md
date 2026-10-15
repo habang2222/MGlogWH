@@ -4473,7 +4473,4511 @@ key는 `cgroup_id×rule_id×kind`. 완료된 1초 EPS 창을 이어서 진입 �
 
 `manage.py`의 CLI/config/run/index/query 함수와 `ledger.py`의 읽기 전용 복구 함수를 실제 원문으로 각각 분석한다.
 
-<!-- PART9_INSERT -->
+
+## manage.py — 함수 39개
+
+[전체 원본 파일](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L1-L1246)
+
+
+#### setting_path — [manage.py:32–38](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L32-L38)
+
+**정의(원문)**: `def setting_path(name, default):`
+
+**1. 목적**: 환경변수 override를 함수가 있는 저장소 디렉터리 기준 절대 경로로 해석한다.
+
+**2. 인자·자료형·전달**: 서명에 적힌 파이썬 매개변수를 순서대로 확인한다. 위치 인자는 값으로 참조가 전달되고, `Path`는 경로 객체, `run`은 run 디렉터리, `cfg`는 정규화된 dict인 경우가 많다. 변경 가능한 list/dict는 복사 없이 전달되면 함수 안의 수정이 호출자에게도 보일 수 있다. `*` 뒤의 매개변수는 키워드 전용이다. `=...`는 명시한 기본값이다. 이 함수에서 실제로 사용하는 타입·키는 코드의 `[]` 접근과 validation을 참고한다.
+
+**3. 반환/오류**: `return Path(os.path.abspath(path if path.is_absolute() else ROOT / path))`. Python은 `raise`한 에러를 상위 호출자로 전달하며 CLI의 `main` 진입 보호 코드가 일부 오류를 잡는다.
+
+**4. 내부 처리 순서·데이터 변화**: 아래는 실제 선언 내부의 중요한 조건과 루프(원본 정의 번호):
+- 명시 분기 없이 순차 계산/반환한다.
+
+메모리/파일/SQL 관련 식별자: `Path`.
+
+**5. 연결 관계**: 코드에서 직접 참조하는 호출 후보(정적 검색 결과): `setting_path`, `get`, `Path`, `expanduser`, `abspath`, `is_absolute`. 이는 분기별 동적 호출 확정이 아니라 코드를 따라갈 때 찾을 식별자 목록이다. 공유 자원은 전역 `DATA`, `BUILD`, `BINARY`, run의 JSON/SQLite 등이 있는지 본문에서 확인한다.
+
+**6. Python 문법**: `with`는 자원 정리, `try/except/finally`는 오류/항상 수행 경로, `yield`가 있다면 generator, `dict`/list comprehension은 자료 변환, `path / 'file'`은 pathlib 경로 결합, `with db:`는 transaction 문맥 관리다. 반드시 아래 실제 사용 문법만 해당한다고 판단한다.
+
+**7. 구체 예시(실제 실행이 아닌 가상 시나리오)**: 예시 입력에서 반환 조건, 예외 조건, 파일 경로 경계를 한 줄씩 따라가며 함수 실행 전·후 dict/파일/SQLite/프로세스 상태를 기록한다. 숫자나 임계치는 예시이지 측정·고정 값이 아니다.
+
+**8. 경계/성능/보안**: 잘못된 타입, 중복·유실된 JSON 키, 파일 심볼릭링크·권한, 크기 상한, SQLite 부분 커밋, 프로세스 생존 확인, 데이터 내구 경계를 코드 근거로 평가한다. `return` 값만으로 무손실을 단정할 수 없다.
+
+**함수 원본 전체**
+
+```python
+def setting_path(name, default):
+    """Resolve relative overrides against this program, not the caller's cwd."""
+    value = os.environ.get(name)
+    path = Path(value).expanduser() if value else Path(default)
+    return Path(os.path.abspath(path if path.is_absolute() else ROOT / path))
+```
+
+#### validate_rules — [manage.py:97–118](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L97-L118)
+
+**정의(원문)**: `def validate_rules(rules):`
+
+**1. 목적**: legacy critical_rules의 ID/중복/경로/보호 boolean을 검증한다.
+
+**2. 인자·자료형·전달**: 서명에 적힌 파이썬 매개변수를 순서대로 확인한다. 위치 인자는 값으로 참조가 전달되고, `Path`는 경로 객체, `run`은 run 디렉터리, `cfg`는 정규화된 dict인 경우가 많다. 변경 가능한 list/dict는 복사 없이 전달되면 함수 안의 수정이 호출자에게도 보일 수 있다. `*` 뒤의 매개변수는 키워드 전용이다. `=...`는 명시한 기본값이다. 이 함수에서 실제로 사용하는 타입·키는 코드의 `[]` 접근과 validation을 참고한다.
+
+**3. 반환/오류**: `raise ValueError('critical_rules: 1..8개의 규칙이 필요합니다.')` · `raise ValueError('critical_rules: id, event_type, path, protected 키가 필요합니다.')` · `raise ValueError('critical_rules: 중복 없는 정수 id 1..255가 필요합니다.')` · `raise ValueError('critical_rules: openat/exec 종류와 protected boolean이 필요합니다.')` · `raise ValueError('critical_rules: 126바이트 이하의 Linux 절대 경로가 필요합니다.')` · `raise ValueError('critical_rules: 동일 종류·경로를 중복 지정할 수 없습니다.')` · `return rules`. Python은 `raise`한 에러를 상위 호출자로 전달하며 CLI의 `main` 진입 보호 코드가 일부 오류를 잡는다.
+
+**4. 내부 처리 순서·데이터 변화**: 아래는 실제 선언 내부의 중요한 조건과 루프(원본 정의 번호):
+- [L98](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L98-L98) `if not isinstance(rules, list) or not 1 <= len(rules) <= 8:`
+- [L101](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L101-L101) `for rule in rules:`
+- [L102](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L102-L102) `if not isinstance(rule, dict) or set(rule) != {'id', 'event_type', 'path', 'protected'}:`
+- [L104](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L104-L104) `if type(rule['id']) is not int or not 1 <= rule['id'] <= 255 or rule['id'] in ids:`
+- [L106](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L106-L106) `if rule['event_type'] not in ('openat', 'exec') or type(rule['protected']) is not bool:`
+- [L109](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L109-L109) `if (not isinstance(path, str) or not path.startswith('/') or len(path.encode()) > 126 or`
+- [L113](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L113-L113) `if target in targets:`
+
+메모리/파일/SQL 관련 식별자: `Path`.
+
+**5. 연결 관계**: 코드에서 직접 참조하는 호출 후보(정적 검색 결과): `validate_rules`, `isinstance`, `ValueError`, `type`, `in`, `startswith`, `encode`, `any`, `ord`, `Path`, `add`. 이는 분기별 동적 호출 확정이 아니라 코드를 따라갈 때 찾을 식별자 목록이다. 공유 자원은 전역 `DATA`, `BUILD`, `BINARY`, run의 JSON/SQLite 등이 있는지 본문에서 확인한다.
+
+**6. Python 문법**: `with`는 자원 정리, `try/except/finally`는 오류/항상 수행 경로, `yield`가 있다면 generator, `dict`/list comprehension은 자료 변환, `path / 'file'`은 pathlib 경로 결합, `with db:`는 transaction 문맥 관리다. 반드시 아래 실제 사용 문법만 해당한다고 판단한다.
+
+**7. 구체 예시(실제 실행이 아닌 가상 시나리오)**: 예시 입력에서 반환 조건, 예외 조건, 파일 경로 경계를 한 줄씩 따라가며 함수 실행 전·후 dict/파일/SQLite/프로세스 상태를 기록한다. 숫자나 임계치는 예시이지 측정·고정 값이 아니다.
+
+**8. 경계/성능/보안**: 잘못된 타입, 중복·유실된 JSON 키, 파일 심볼릭링크·권한, 크기 상한, SQLite 부분 커밋, 프로세스 생존 확인, 데이터 내구 경계를 코드 근거로 평가한다. `return` 값만으로 무손실을 단정할 수 없다.
+
+**함수 원본 전체**
+
+```python
+def validate_rules(rules):
+    if not isinstance(rules, list) or not 1 <= len(rules) <= 8:
+        raise ValueError('critical_rules: 1..8개의 규칙이 필요합니다.')
+    ids, targets = set(), set()
+    for rule in rules:
+        if not isinstance(rule, dict) or set(rule) != {'id', 'event_type', 'path', 'protected'}:
+            raise ValueError('critical_rules: id, event_type, path, protected 키가 필요합니다.')
+        if type(rule['id']) is not int or not 1 <= rule['id'] <= 255 or rule['id'] in ids:
+            raise ValueError('critical_rules: 중복 없는 정수 id 1..255가 필요합니다.')
+        if rule['event_type'] not in ('openat', 'exec') or type(rule['protected']) is not bool:
+            raise ValueError('critical_rules: openat/exec 종류와 protected boolean이 필요합니다.')
+        path = rule['path']
+        if (not isinstance(path, str) or not path.startswith('/') or len(path.encode()) > 126 or
+                any(ord(char) < 32 for char in path) or '..' in Path(path).parts):
+            raise ValueError('critical_rules: 126바이트 이하의 Linux 절대 경로가 필요합니다.')
+        target = (rule['event_type'], path)
+        if target in targets:
+            raise ValueError('critical_rules: 동일 종류·경로를 중복 지정할 수 없습니다.')
+        ids.add(rule['id']); targets.add(target)
+    return rules
+```
+
+#### _rule_string — [manage.py:119–132](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L119-L132)
+
+**정의(원문)**: `def _rule_string(field, value, prefix=False):`
+
+**1. 목적**: event_rules 문자열의 길이/절대경로/접두경로 경계를 검사한다.
+
+**2. 인자·자료형·전달**: 서명에 적힌 파이썬 매개변수를 순서대로 확인한다. 위치 인자는 값으로 참조가 전달되고, `Path`는 경로 객체, `run`은 run 디렉터리, `cfg`는 정규화된 dict인 경우가 많다. 변경 가능한 list/dict는 복사 없이 전달되면 함수 안의 수정이 호출자에게도 보일 수 있다. `*` 뒤의 매개변수는 키워드 전용이다. `=...`는 명시한 기본값이다. 이 함수에서 실제로 사용하는 타입·키는 코드의 `[]` 접근과 validation을 참고한다.
+
+**3. 반환/오류**: `raise ValueError(f'{field}: 비어 있지 않은 제어문자 없는 문자열이 필요합니다.')` · `raise ValueError('path: 126바이트 이하의 Linux 절대 경로가 필요합니다.')` · `raise ValueError('path prefix: 디렉터리 경계 /로 끝나야 합니다.')` · `raise ValueError('comm: 15바이트 이하여야 합니다.')` · `return value`. Python은 `raise`한 에러를 상위 호출자로 전달하며 CLI의 `main` 진입 보호 코드가 일부 오류를 잡는다.
+
+**4. 내부 처리 순서·데이터 변화**: 아래는 실제 선언 내부의 중요한 조건과 루프(원본 정의 번호):
+- [L120](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L120-L120) `if not isinstance(value, str) or not value or any(ord(c) < 32 or ord(c) == 127 for c in value):`
+- [L123](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L123-L123) `if field == 'path':`
+- [L124](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L124-L124) `if not value.startswith('/') or size > 126 or '..' in value.split('/'):`
+- [L126](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L126-L126) `if prefix and not value.endswith('/'):`
+- [L128](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L128-L128) `elif size > 15:`
+
+메모리/파일/SQL 관련 식별자: 별도 I/O나 자원 호출이 표시되지 않는 단순 유틸리티일 수 있다. 본문 확인 필요.
+
+**5. 연결 관계**: 코드에서 직접 참조하는 호출 후보(정적 검색 결과): `_rule_string`, `isinstance`, `any`, `ord`, `ValueError`, `encode`, `startswith`, `split`, `endswith`. 이는 분기별 동적 호출 확정이 아니라 코드를 따라갈 때 찾을 식별자 목록이다. 공유 자원은 전역 `DATA`, `BUILD`, `BINARY`, run의 JSON/SQLite 등이 있는지 본문에서 확인한다.
+
+**6. Python 문법**: `with`는 자원 정리, `try/except/finally`는 오류/항상 수행 경로, `yield`가 있다면 generator, `dict`/list comprehension은 자료 변환, `path / 'file'`은 pathlib 경로 결합, `with db:`는 transaction 문맥 관리다. 반드시 아래 실제 사용 문법만 해당한다고 판단한다.
+
+**7. 구체 예시(실제 실행이 아닌 가상 시나리오)**: 예시 입력에서 반환 조건, 예외 조건, 파일 경로 경계를 한 줄씩 따라가며 함수 실행 전·후 dict/파일/SQLite/프로세스 상태를 기록한다. 숫자나 임계치는 예시이지 측정·고정 값이 아니다.
+
+**8. 경계/성능/보안**: 잘못된 타입, 중복·유실된 JSON 키, 파일 심볼릭링크·권한, 크기 상한, SQLite 부분 커밋, 프로세스 생존 확인, 데이터 내구 경계를 코드 근거로 평가한다. `return` 값만으로 무손실을 단정할 수 없다.
+
+**함수 원본 전체**
+
+```python
+def _rule_string(field, value, prefix=False):
+    if not isinstance(value, str) or not value or any(ord(c) < 32 or ord(c) == 127 for c in value):
+        raise ValueError(f'{field}: 비어 있지 않은 제어문자 없는 문자열이 필요합니다.')
+    size = len(value.encode('utf-8'))
+    if field == 'path':
+        if not value.startswith('/') or size > 126 or '..' in value.split('/'):
+            raise ValueError('path: 126바이트 이하의 Linux 절대 경로가 필요합니다.')
+        if prefix and not value.endswith('/'):
+            raise ValueError('path prefix: 디렉터리 경계 /로 끝나야 합니다.')
+    elif size > 15:
+        raise ValueError('comm: 15바이트 이하여야 합니다.')
+    return value
+```
+
+#### _rule_value — [manage.py:133–149](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L133-L149)
+
+**정의(원문)**: `def _rule_value(field, value, prefix=False):`
+
+**1. 목적**: 규칙 필드의 타입·정수 범위·열거형 조건을 검증한다.
+
+**2. 인자·자료형·전달**: 서명에 적힌 파이썬 매개변수를 순서대로 확인한다. 위치 인자는 값으로 참조가 전달되고, `Path`는 경로 객체, `run`은 run 디렉터리, `cfg`는 정규화된 dict인 경우가 많다. 변경 가능한 list/dict는 복사 없이 전달되면 함수 안의 수정이 호출자에게도 보일 수 있다. `*` 뒤의 매개변수는 키워드 전용이다. `=...`는 명시한 기본값이다. 이 함수에서 실제로 사용하는 타입·키는 코드의 `[]` 접근과 validation을 참고한다.
+
+**3. 반환/오류**: `raise ValueError(f'{field}: boolean이 필요합니다.')` · `return value` · `raise ValueError(f'{field}: {", ".join(RULE_ENUMS[field])} 중 하나여야 합니다.')` · `return value` · `return _rule_string(field, value, prefix)` · `raise ValueError(f'{field}: 정수 {low}..{high} 범위가 필요합니다.')` · `return value`. Python은 `raise`한 에러를 상위 호출자로 전달하며 CLI의 `main` 진입 보호 코드가 일부 오류를 잡는다.
+
+**4. 내부 처리 순서·데이터 변화**: 아래는 실제 선언 내부의 중요한 조건과 루프(원본 정의 번호):
+- [L134](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L134-L134) `if field in RULE_BOOLEAN_FIELDS:`
+- [L135](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L135-L135) `if type(value) is not bool:`
+- [L138](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L138-L138) `if field in RULE_ENUMS:`
+- [L139](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L139-L139) `if type(value) is not str or value not in RULE_ENUMS[field]:`
+- [L142](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L142-L142) `if field in RULE_STRING_FIELDS:`
+- [L145](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L145-L145) `if type(value) is not int or not low <= value <= high:`
+
+메모리/파일/SQL 관련 식별자: 별도 I/O나 자원 호출이 표시되지 않는 단순 유틸리티일 수 있다. 본문 확인 필요.
+
+**5. 연결 관계**: 코드에서 직접 참조하는 호출 후보(정적 검색 결과): `_rule_value`, `type`, `ValueError`, `join`, `_rule_string`. 이는 분기별 동적 호출 확정이 아니라 코드를 따라갈 때 찾을 식별자 목록이다. 공유 자원은 전역 `DATA`, `BUILD`, `BINARY`, run의 JSON/SQLite 등이 있는지 본문에서 확인한다.
+
+**6. Python 문법**: `with`는 자원 정리, `try/except/finally`는 오류/항상 수행 경로, `yield`가 있다면 generator, `dict`/list comprehension은 자료 변환, `path / 'file'`은 pathlib 경로 결합, `with db:`는 transaction 문맥 관리다. 반드시 아래 실제 사용 문법만 해당한다고 판단한다.
+
+**7. 구체 예시(실제 실행이 아닌 가상 시나리오)**: 예시 입력에서 반환 조건, 예외 조건, 파일 경로 경계를 한 줄씩 따라가며 함수 실행 전·후 dict/파일/SQLite/프로세스 상태를 기록한다. 숫자나 임계치는 예시이지 측정·고정 값이 아니다.
+
+**8. 경계/성능/보안**: 잘못된 타입, 중복·유실된 JSON 키, 파일 심볼릭링크·권한, 크기 상한, SQLite 부분 커밋, 프로세스 생존 확인, 데이터 내구 경계를 코드 근거로 평가한다. `return` 값만으로 무손실을 단정할 수 없다.
+
+**함수 원본 전체**
+
+```python
+def _rule_value(field, value, prefix=False):
+    if field in RULE_BOOLEAN_FIELDS:
+        if type(value) is not bool:
+            raise ValueError(f'{field}: boolean이 필요합니다.')
+        return value
+    if field in RULE_ENUMS:
+        if type(value) is not str or value not in RULE_ENUMS[field]:
+            raise ValueError(f'{field}: {", ".join(RULE_ENUMS[field])} 중 하나여야 합니다.')
+        return value
+    if field in RULE_STRING_FIELDS:
+        return _rule_string(field, value, prefix)
+    low, high = RULE_INTEGER_LIMITS[field]
+    if type(value) is not int or not low <= value <= high:
+        raise ValueError(f'{field}: 정수 {low}..{high} 범위가 필요합니다.')
+    return value
+```
+
+#### _validate_when — [manage.py:150–184](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L150-L184)
+
+**정의(원문)**: `def _validate_when(node, depth=1, budget=None):`
+
+**1. 목적**: all/any/not 조건 트리의 깊이/노드/연산자 제한과 정규화를 수행한다.
+
+**2. 인자·자료형·전달**: 서명에 적힌 파이썬 매개변수를 순서대로 확인한다. 위치 인자는 값으로 참조가 전달되고, `Path`는 경로 객체, `run`은 run 디렉터리, `cfg`는 정규화된 dict인 경우가 많다. 변경 가능한 list/dict는 복사 없이 전달되면 함수 안의 수정이 호출자에게도 보일 수 있다. `*` 뒤의 매개변수는 키워드 전용이다. `=...`는 명시한 기본값이다. 이 함수에서 실제로 사용하는 타입·키는 코드의 `[]` 접근과 validation을 참고한다.
+
+**3. 반환/오류**: `raise ValueError('when: 깊이 4, 노드 24개 이하의 조건 객체가 필요합니다.')` · `raise ValueError(f'when.{op}: 2..8개의 하위 조건이 필요합니다.')` · `return {op: [_validate_when(child, depth + 1, budget) for child in children]}` · `return {'not': _validate_when(node['not'], depth + 1, budget)}` · `raise ValueError('when: all/any/not 또는 field/op/value만 허용합니다.')` · `raise ValueError('when: 지원하지 않는 필드 또는 연산자입니다.')` · `raise ValueError('prefix: path 또는 comm 필드에만 사용할 수 있습니다.')` · `raise ValueError(f'{op}: 정수 필드에만 사용할 수 있습니다.')` · `raise ValueError(f'{op}: 1..4개 값의 목록이 필요합니다.')` · `raise ValueError(f'{op}: 중복 값은 허용하지 않습니다.')` · `return dict(field=field, op=op, value=value)`. Python은 `raise`한 에러를 상위 호출자로 전달하며 CLI의 `main` 진입 보호 코드가 일부 오류를 잡는다.
+
+**4. 내부 처리 순서·데이터 변화**: 아래는 실제 선언 내부의 중요한 조건과 루프(원본 정의 번호):
+- [L151](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L151-L151) `if budget is None:`
+- [L154](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L154-L154) `if depth > 4 or budget[0] > 24 or not isinstance(node, dict):`
+- [L156](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L156-L156) `if set(node) == {'all'} or set(node) == {'any'}:`
+- [L159](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L159-L159) `if not isinstance(children, list) or not 2 <= len(children) <= 8:`
+- [L162](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L162-L162) `if set(node) == {'not'}:`
+- [L164](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L164-L164) `if set(node) != {'field', 'op', 'value'}:`
+- [L167](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L167-L167) `if type(field) is not str or field not in RULE_FIELDS or type(op) is not str or op not in RULE_OPERATORS:`
+- [L169](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L169-L169) `if op == 'prefix' and field not in RULE_STRING_FIELDS:`
+- [L171](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L171-L171) `if op in ('gt', 'ge', 'lt', 'le') and field not in RULE_INTEGER_LIMITS:`
+- [L173](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L173-L173) `if op in ('in', 'not_in'):`
+- [L174](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L174-L174) `if not isinstance(value, list) or not 1 <= len(value) <= 4:`
+- [L177](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L177-L177) `if len({(type(item), item) for item in values}) != len(values):`
+- [L180](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L180-L180) `else:`
+
+메모리/파일/SQL 관련 식별자: 별도 I/O나 자원 호출이 표시되지 않는 단순 유틸리티일 수 있다. 본문 확인 필요.
+
+**5. 연결 관계**: 코드에서 직접 참조하는 호출 후보(정적 검색 결과): `_validate_when`, `isinstance`, `ValueError`, `next`, `iter`, `type`, `in`, `_rule_value`. 이는 분기별 동적 호출 확정이 아니라 코드를 따라갈 때 찾을 식별자 목록이다. 공유 자원은 전역 `DATA`, `BUILD`, `BINARY`, run의 JSON/SQLite 등이 있는지 본문에서 확인한다.
+
+**6. Python 문법**: `with`는 자원 정리, `try/except/finally`는 오류/항상 수행 경로, `yield`가 있다면 generator, `dict`/list comprehension은 자료 변환, `path / 'file'`은 pathlib 경로 결합, `with db:`는 transaction 문맥 관리다. 반드시 아래 실제 사용 문법만 해당한다고 판단한다.
+
+**7. 구체 예시(실제 실행이 아닌 가상 시나리오)**: 예시 입력에서 반환 조건, 예외 조건, 파일 경로 경계를 한 줄씩 따라가며 함수 실행 전·후 dict/파일/SQLite/프로세스 상태를 기록한다. 숫자나 임계치는 예시이지 측정·고정 값이 아니다.
+
+**8. 경계/성능/보안**: 잘못된 타입, 중복·유실된 JSON 키, 파일 심볼릭링크·권한, 크기 상한, SQLite 부분 커밋, 프로세스 생존 확인, 데이터 내구 경계를 코드 근거로 평가한다. `return` 값만으로 무손실을 단정할 수 없다.
+
+**함수 원본 전체**
+
+```python
+def _validate_when(node, depth=1, budget=None):
+    if budget is None:
+        budget = [0]
+    budget[0] += 1
+    if depth > 4 or budget[0] > 24 or not isinstance(node, dict):
+        raise ValueError('when: 깊이 4, 노드 24개 이하의 조건 객체가 필요합니다.')
+    if set(node) == {'all'} or set(node) == {'any'}:
+        op = next(iter(node))
+        children = node[op]
+        if not isinstance(children, list) or not 2 <= len(children) <= 8:
+            raise ValueError(f'when.{op}: 2..8개의 하위 조건이 필요합니다.')
+        return {op: [_validate_when(child, depth + 1, budget) for child in children]}
+    if set(node) == {'not'}:
+        return {'not': _validate_when(node['not'], depth + 1, budget)}
+    if set(node) != {'field', 'op', 'value'}:
+        raise ValueError('when: all/any/not 또는 field/op/value만 허용합니다.')
+    field, op, value = node['field'], node['op'], node['value']
+    if type(field) is not str or field not in RULE_FIELDS or type(op) is not str or op not in RULE_OPERATORS:
+        raise ValueError('when: 지원하지 않는 필드 또는 연산자입니다.')
+    if op == 'prefix' and field not in RULE_STRING_FIELDS:
+        raise ValueError('prefix: path 또는 comm 필드에만 사용할 수 있습니다.')
+    if op in ('gt', 'ge', 'lt', 'le') and field not in RULE_INTEGER_LIMITS:
+        raise ValueError(f'{op}: 정수 필드에만 사용할 수 있습니다.')
+    if op in ('in', 'not_in'):
+        if not isinstance(value, list) or not 1 <= len(value) <= 4:
+            raise ValueError(f'{op}: 1..4개 값의 목록이 필요합니다.')
+        values = [_rule_value(field, item) for item in value]
+        if len({(type(item), item) for item in values}) != len(values):
+            raise ValueError(f'{op}: 중복 값은 허용하지 않습니다.')
+        value = values
+    else:
+        value = _rule_value(field, value, prefix=op == 'prefix')
+    return dict(field=field, op=op, value=value)
+```
+
+#### _rule_comparison — [manage.py:185–197](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L185-L197)
+
+**정의(원문)**: `def _rule_comparison(actual, op, expected):`
+
+**1. 목적**: Python 기준의 비교 연산(eq/ne/in/prefix/관계)을 평가한다.
+
+**2. 인자·자료형·전달**: 서명에 적힌 파이썬 매개변수를 순서대로 확인한다. 위치 인자는 값으로 참조가 전달되고, `Path`는 경로 객체, `run`은 run 디렉터리, `cfg`는 정규화된 dict인 경우가 많다. 변경 가능한 list/dict는 복사 없이 전달되면 함수 안의 수정이 호출자에게도 보일 수 있다. `*` 뒤의 매개변수는 키워드 전용이다. `=...`는 명시한 기본값이다. 이 함수에서 실제로 사용하는 타입·키는 코드의 `[]` 접근과 validation을 참고한다.
+
+**3. 반환/오류**: `raise ValueError('알 수 없는 연산자')`. Python은 `raise`한 에러를 상위 호출자로 전달하며 CLI의 `main` 진입 보호 코드가 일부 오류를 잡는다.
+
+**4. 내부 처리 순서·데이터 변화**: 아래는 실제 선언 내부의 중요한 조건과 루프(원본 정의 번호):
+- [L186](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L186-L186) `if op == 'eq': return actual == expected`
+- [L187](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L187-L187) `if op == 'ne': return actual != expected`
+- [L188](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L188-L188) `if op == 'in': return actual in expected`
+- [L189](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L189-L189) `if op == 'not_in': return actual not in expected`
+- [L190](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L190-L190) `if op == 'prefix': return actual.startswith(expected)`
+- [L191](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L191-L191) `if op == 'gt': return actual > expected`
+- [L192](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L192-L192) `if op == 'ge': return actual >= expected`
+- [L193](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L193-L193) `if op == 'lt': return actual < expected`
+- [L194](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L194-L194) `if op == 'le': return actual <= expected`
+
+메모리/파일/SQL 관련 식별자: 별도 I/O나 자원 호출이 표시되지 않는 단순 유틸리티일 수 있다. 본문 확인 필요.
+
+**5. 연결 관계**: 코드에서 직접 참조하는 호출 후보(정적 검색 결과): `_rule_comparison`, `startswith`, `ValueError`. 이는 분기별 동적 호출 확정이 아니라 코드를 따라갈 때 찾을 식별자 목록이다. 공유 자원은 전역 `DATA`, `BUILD`, `BINARY`, run의 JSON/SQLite 등이 있는지 본문에서 확인한다.
+
+**6. Python 문법**: `with`는 자원 정리, `try/except/finally`는 오류/항상 수행 경로, `yield`가 있다면 generator, `dict`/list comprehension은 자료 변환, `path / 'file'`은 pathlib 경로 결합, `with db:`는 transaction 문맥 관리다. 반드시 아래 실제 사용 문법만 해당한다고 판단한다.
+
+**7. 구체 예시(실제 실행이 아닌 가상 시나리오)**: 예시 입력에서 반환 조건, 예외 조건, 파일 경로 경계를 한 줄씩 따라가며 함수 실행 전·후 dict/파일/SQLite/프로세스 상태를 기록한다. 숫자나 임계치는 예시이지 측정·고정 값이 아니다.
+
+**8. 경계/성능/보안**: 잘못된 타입, 중복·유실된 JSON 키, 파일 심볼릭링크·권한, 크기 상한, SQLite 부분 커밋, 프로세스 생존 확인, 데이터 내구 경계를 코드 근거로 평가한다. `return` 값만으로 무손실을 단정할 수 없다.
+
+**함수 원본 전체**
+
+```python
+def _rule_comparison(actual, op, expected):
+    if op == 'eq': return actual == expected
+    if op == 'ne': return actual != expected
+    if op == 'in': return actual in expected
+    if op == 'not_in': return actual not in expected
+    if op == 'prefix': return actual.startswith(expected)
+    if op == 'gt': return actual > expected
+    if op == 'ge': return actual >= expected
+    if op == 'lt': return actual < expected
+    if op == 'le': return actual <= expected
+    raise ValueError('알 수 없는 연산자')
+```
+
+#### _could_match_kind — [manage.py:198–216](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L198-L216)
+
+**정의(원문)**: `def _could_match_kind(node, kind):`
+
+**1. 목적**: 실패한 exec처럼 애초에 불가능한 관측 조건을 보수적으로 거른다.
+
+**2. 인자·자료형·전달**: 서명에 적힌 파이썬 매개변수를 순서대로 확인한다. 위치 인자는 값으로 참조가 전달되고, `Path`는 경로 객체, `run`은 run 디렉터리, `cfg`는 정규화된 dict인 경우가 많다. 변경 가능한 list/dict는 복사 없이 전달되면 함수 안의 수정이 호출자에게도 보일 수 있다. `*` 뒤의 매개변수는 키워드 전용이다. `=...`는 명시한 기본값이다. 이 함수에서 실제로 사용하는 타입·키는 코드의 `[]` 접근과 validation을 참고한다.
+
+**3. 반환/오류**: `return False if False in outcomes else None if None in outcomes else True` · `return True if True in outcomes else None if None in outcomes else False` · `return None if outcome is None else not outcome` · `return None` · `return _rule_comparison(known[node['field']], node['op'], node['value'])`. Python은 `raise`한 에러를 상위 호출자로 전달하며 CLI의 `main` 진입 보호 코드가 일부 오류를 잡는다.
+
+**4. 내부 처리 순서·데이터 변화**: 아래는 실제 선언 내부의 중요한 조건과 루프(원본 정의 번호):
+- [L200](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L200-L200) `if 'all' in node:`
+- [L203](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L203-L203) `if 'any' in node:`
+- [L206](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L206-L206) `if 'not' in node:`
+- [L210](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L210-L210) `if kind == 'exec':`
+- [L212](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L212-L212) `if node['field'] not in known:`
+
+메모리/파일/SQL 관련 식별자: 별도 I/O나 자원 호출이 표시되지 않는 단순 유틸리티일 수 있다. 본문 확인 필요.
+
+**5. 연결 관계**: 코드에서 직접 참조하는 호출 후보(정적 검색 결과): `_could_match_kind`, `update`, `_rule_comparison`. 이는 분기별 동적 호출 확정이 아니라 코드를 따라갈 때 찾을 식별자 목록이다. 공유 자원은 전역 `DATA`, `BUILD`, `BINARY`, run의 JSON/SQLite 등이 있는지 본문에서 확인한다.
+
+**6. Python 문법**: `with`는 자원 정리, `try/except/finally`는 오류/항상 수행 경로, `yield`가 있다면 generator, `dict`/list comprehension은 자료 변환, `path / 'file'`은 pathlib 경로 결합, `with db:`는 transaction 문맥 관리다. 반드시 아래 실제 사용 문법만 해당한다고 판단한다.
+
+**7. 구체 예시(실제 실행이 아닌 가상 시나리오)**: 예시 입력에서 반환 조건, 예외 조건, 파일 경로 경계를 한 줄씩 따라가며 함수 실행 전·후 dict/파일/SQLite/프로세스 상태를 기록한다. 숫자나 임계치는 예시이지 측정·고정 값이 아니다.
+
+**8. 경계/성능/보안**: 잘못된 타입, 중복·유실된 JSON 키, 파일 심볼릭링크·권한, 크기 상한, SQLite 부분 커밋, 프로세스 생존 확인, 데이터 내구 경계를 코드 근거로 평가한다. `return` 값만으로 무손실을 단정할 수 없다.
+
+**함수 원본 전체**
+
+```python
+def _could_match_kind(node, kind):
+    """Reject plainly impossible exec-failure rules without guessing unknown fields."""
+    if 'all' in node:
+        outcomes = [_could_match_kind(child, kind) for child in node['all']]
+        return False if False in outcomes else None if None in outcomes else True
+    if 'any' in node:
+        outcomes = [_could_match_kind(child, kind) for child in node['any']]
+        return True if True in outcomes else None if None in outcomes else False
+    if 'not' in node:
+        outcome = _could_match_kind(node['not'], kind)
+        return None if outcome is None else not outcome
+    known = {'event_type': kind}
+    if kind == 'exec':
+        known.update(success=True, result=0)
+    if node['field'] not in known:
+        return None
+    return _rule_comparison(known[node['field']], node['op'], node['value'])
+```
+
+#### _rule_tokens — [manage.py:217–231](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L217-L231)
+
+**정의(원문)**: `def _rule_tokens(node):`
+
+**1. 목적**: 조건 트리를 postfix rule token 시퀀스로 변환한다.
+
+**2. 인자·자료형·전달**: 서명에 적힌 파이썬 매개변수를 순서대로 확인한다. 위치 인자는 값으로 참조가 전달되고, `Path`는 경로 객체, `run`은 run 디렉터리, `cfg`는 정규화된 dict인 경우가 많다. 변경 가능한 list/dict는 복사 없이 전달되면 함수 안의 수정이 호출자에게도 보일 수 있다. `*` 뒤의 매개변수는 키워드 전용이다. `=...`는 명시한 기본값이다. 이 함수에서 실제로 사용하는 타입·키는 코드의 `[]` 접근과 validation을 참고한다.
+
+**3. 반환/오류**: `return tokens` · `return _rule_tokens(node['not']) + [(4, 0, 0, [])]` · `return [(1, RULE_FIELDS[node['field']], RULE_OPERATORS[node['op']], values)]`. Python은 `raise`한 에러를 상위 호출자로 전달하며 CLI의 `main` 진입 보호 코드가 일부 오류를 잡는다.
+
+**4. 내부 처리 순서·데이터 변화**: 아래는 실제 선언 내부의 중요한 조건과 루프(원본 정의 번호):
+- [L218](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L218-L218) `if 'all' in node or 'any' in node:`
+- [L222](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L222-L222) `for child in children[1:]:`
+- [L226](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L226-L226) `if 'not' in node:`
+
+메모리/파일/SQL 관련 식별자: 별도 I/O나 자원 호출이 표시되지 않는 단순 유틸리티일 수 있다. 본문 확인 필요.
+
+**5. 연결 관계**: 코드에서 직접 참조하는 호출 후보(정적 검색 결과): `_rule_tokens`, `extend`, `append`, `in`. 이는 분기별 동적 호출 확정이 아니라 코드를 따라갈 때 찾을 식별자 목록이다. 공유 자원은 전역 `DATA`, `BUILD`, `BINARY`, run의 JSON/SQLite 등이 있는지 본문에서 확인한다.
+
+**6. Python 문법**: `with`는 자원 정리, `try/except/finally`는 오류/항상 수행 경로, `yield`가 있다면 generator, `dict`/list comprehension은 자료 변환, `path / 'file'`은 pathlib 경로 결합, `with db:`는 transaction 문맥 관리다. 반드시 아래 실제 사용 문법만 해당한다고 판단한다.
+
+**7. 구체 예시(실제 실행이 아닌 가상 시나리오)**: 예시 입력에서 반환 조건, 예외 조건, 파일 경로 경계를 한 줄씩 따라가며 함수 실행 전·후 dict/파일/SQLite/프로세스 상태를 기록한다. 숫자나 임계치는 예시이지 측정·고정 값이 아니다.
+
+**8. 경계/성능/보안**: 잘못된 타입, 중복·유실된 JSON 키, 파일 심볼릭링크·권한, 크기 상한, SQLite 부분 커밋, 프로세스 생존 확인, 데이터 내구 경계를 코드 근거로 평가한다. `return` 값만으로 무손실을 단정할 수 없다.
+
+**함수 원본 전체**
+
+```python
+def _rule_tokens(node):
+    if 'all' in node or 'any' in node:
+        op = 'all' if 'all' in node else 'any'
+        children = node[op]
+        tokens = _rule_tokens(children[0])
+        for child in children[1:]:
+            tokens.extend(_rule_tokens(child))
+            tokens.append((2 if op == 'all' else 3, 0, 0, []))
+        return tokens
+    if 'not' in node:
+        return _rule_tokens(node['not']) + [(4, 0, 0, [])]
+    values = node['value'] if node['op'] in ('in', 'not_in') else [node['value']]
+    return [(1, RULE_FIELDS[node['field']], RULE_OPERATORS[node['op']], values)]
+```
+
+#### validate_event_rules — [manage.py:232–283](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L232-L283)
+
+**정의(원문)**: `def validate_event_rules(rules, cfg):`
+
+**1. 목적**: advanced event_rules의 precedence/priority/overload/quarantine override 제약을 검사한다.
+
+**2. 인자·자료형·전달**: 서명에 적힌 파이썬 매개변수를 순서대로 확인한다. 위치 인자는 값으로 참조가 전달되고, `Path`는 경로 객체, `run`은 run 디렉터리, `cfg`는 정규화된 dict인 경우가 많다. 변경 가능한 list/dict는 복사 없이 전달되면 함수 안의 수정이 호출자에게도 보일 수 있다. `*` 뒤의 매개변수는 키워드 전용이다. `=...`는 명시한 기본값이다. 이 함수에서 실제로 사용하는 타입·키는 코드의 `[]` 접근과 validation을 참고한다.
+
+**3. 반환/오류**: `raise ValueError('event_rules: 1..8개의 규칙이 필요합니다.')` · `raise ValueError('event_rules: id, when, priority, overload_policy 및 허용된 선택 키만 필요합니다.')` · `raise ValueError('event_rules.id: 중복 없는 정수 1..255가 필요합니다.')` · `raise ValueError('event_rules: enabled boolean과 precedence 정수 0..1000이 필요합니다.')` · `raise ValueError('event_rules: 지원하지 않는 priority/overload_policy입니다.')` · `raise ValueError('BULK/NORMAL은 NORMAL_COLLECTION만 지원합니다.')` · `raise ValueError('when: postfix 실행 토큰은 24개 이하여야 합니다.')` · `raise ValueError('when: 관측 가능한 openat/성공 exec와 일치할 수 없습니다.')` · `raise ValueError('quarantine: CRITICAL+QUARANTINE 규칙의 유효한 override 객체가 필요합니다.')` · `raise ValueError(f'quarantine.{key}: 정수 {low}..{high}가 필요합니다.')` · `raise ValueError('quarantine: 복구 EPS는 진입 EPS보다 작아야 합니다.')` · `return normalized`. Python은 `raise`한 에러를 상위 호출자로 전달하며 CLI의 `main` 진입 보호 코드가 일부 오류를 잡는다.
+
+**4. 내부 처리 순서·데이터 변화**: 아래는 실제 선언 내부의 중요한 조건과 루프(원본 정의 번호):
+- [L233](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L233-L233) `if not isinstance(rules, list) or not 1 <= len(rules) <= 8:`
+- [L236](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L236-L236) `for rule in rules:`
+- [L237](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L237-L237) `if not isinstance(rule, dict) or not {'id', 'when', 'priority', 'overload_policy'} <= set(rule) or \`
+- [L241](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L241-L241) `if type(rid) is not int or not 1 <= rid <= 255 or rid in ids:`
+- [L246](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L246-L246) `if type(enabled) is not bool or type(precedence) is not int or not 0 <= precedence <= 1000:`
+- [L249](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L249-L249) `if type(priority) is not str or priority not in RULE_PRIORITIES or \`
+- [L252](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L252-L252) `if priority != 'CRITICAL' and policy != 'NORMAL_COLLECTION':`
+- [L255](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L255-L255) `if len(_rule_tokens(when)) > 24:`
+- [L257](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L257-L257) `if _could_match_kind(when, 'openat') is False and _could_match_kind(when, 'exec') is False:`
+- [L261](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L261-L261) `if 'quarantine' in rule:`
+- [L263](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L263-L263) `if policy != 'QUARANTINE' or not isinstance(override, dict) or not override or \`
+- [L272](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L272-L272) `for key, value in override.items():`
+- [L274](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L274-L274) `if type(value) is not int or not low <= value <= high:`
+- [L276](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L276-L276) `if override.get('critical_recovery_threshold', cfg['critical_recovery_threshold']) >= \`
+
+메모리/파일/SQL 관련 식별자: 별도 I/O나 자원 호출이 표시되지 않는 단순 유틸리티일 수 있다. 본문 확인 필요.
+
+**5. 연결 관계**: 코드에서 직접 참조하는 호출 후보(정적 검색 결과): `validate_event_rules`, `isinstance`, `ValueError`, `type`, `add`, `get`, `_validate_when`, `_rule_tokens`, `_could_match_kind`, `items`, `append`. 이는 분기별 동적 호출 확정이 아니라 코드를 따라갈 때 찾을 식별자 목록이다. 공유 자원은 전역 `DATA`, `BUILD`, `BINARY`, run의 JSON/SQLite 등이 있는지 본문에서 확인한다.
+
+**6. Python 문법**: `with`는 자원 정리, `try/except/finally`는 오류/항상 수행 경로, `yield`가 있다면 generator, `dict`/list comprehension은 자료 변환, `path / 'file'`은 pathlib 경로 결합, `with db:`는 transaction 문맥 관리다. 반드시 아래 실제 사용 문법만 해당한다고 판단한다.
+
+**7. 구체 예시(실제 실행이 아닌 가상 시나리오)**: 예시 입력에서 반환 조건, 예외 조건, 파일 경로 경계를 한 줄씩 따라가며 함수 실행 전·후 dict/파일/SQLite/프로세스 상태를 기록한다. 숫자나 임계치는 예시이지 측정·고정 값이 아니다.
+
+**8. 경계/성능/보안**: 잘못된 타입, 중복·유실된 JSON 키, 파일 심볼릭링크·권한, 크기 상한, SQLite 부분 커밋, 프로세스 생존 확인, 데이터 내구 경계를 코드 근거로 평가한다. `return` 값만으로 무손실을 단정할 수 없다.
+
+**함수 원본 전체**
+
+```python
+def validate_event_rules(rules, cfg):
+    if not isinstance(rules, list) or not 1 <= len(rules) <= 8:
+        raise ValueError('event_rules: 1..8개의 규칙이 필요합니다.')
+    ids, normalized = set(), []
+    for rule in rules:
+        if not isinstance(rule, dict) or not {'id', 'when', 'priority', 'overload_policy'} <= set(rule) or \
+                set(rule) - {'id', 'enabled', 'precedence', 'when', 'priority', 'overload_policy', 'quarantine'}:
+            raise ValueError('event_rules: id, when, priority, overload_policy 및 허용된 선택 키만 필요합니다.')
+        rid = rule['id']
+        if type(rid) is not int or not 1 <= rid <= 255 or rid in ids:
+            raise ValueError('event_rules.id: 중복 없는 정수 1..255가 필요합니다.')
+        ids.add(rid)
+        enabled = rule.get('enabled', True)
+        precedence = rule.get('precedence', 0)
+        if type(enabled) is not bool or type(precedence) is not int or not 0 <= precedence <= 1000:
+            raise ValueError('event_rules: enabled boolean과 precedence 정수 0..1000이 필요합니다.')
+        priority, policy = rule['priority'], rule['overload_policy']
+        if type(priority) is not str or priority not in RULE_PRIORITIES or \
+                type(policy) is not str or policy not in RULE_POLICIES:
+            raise ValueError('event_rules: 지원하지 않는 priority/overload_policy입니다.')
+        if priority != 'CRITICAL' and policy != 'NORMAL_COLLECTION':
+            raise ValueError('BULK/NORMAL은 NORMAL_COLLECTION만 지원합니다.')
+        when = _validate_when(rule['when'])
+        if len(_rule_tokens(when)) > 24:
+            raise ValueError('when: postfix 실행 토큰은 24개 이하여야 합니다.')
+        if _could_match_kind(when, 'openat') is False and _could_match_kind(when, 'exec') is False:
+            raise ValueError('when: 관측 가능한 openat/성공 exec와 일치할 수 없습니다.')
+        result = dict(id=rid, enabled=enabled, precedence=precedence, when=when,
+                      priority=priority, overload_policy=policy)
+        if 'quarantine' in rule:
+            override = rule['quarantine']
+            if policy != 'QUARANTINE' or not isinstance(override, dict) or not override or \
+                    set(override) - set(RULE_QUARANTINE_KEYS):
+                raise ValueError('quarantine: CRITICAL+QUARANTINE 규칙의 유효한 override 객체가 필요합니다.')
+            limits = {'critical_rate_threshold': (1, 1000000),
+                      'critical_rate_duration_seconds': (1, 60),
+                      'critical_recovery_threshold': (0, 999999),
+                      'critical_recovery_duration_seconds': (1, 600),
+                      'quarantine_initial_full_events': (0, 64),
+                      'quarantine_sample_interval_ms': (10, 60000)}
+            for key, value in override.items():
+                low, high = limits[key]
+                if type(value) is not int or not low <= value <= high:
+                    raise ValueError(f'quarantine.{key}: 정수 {low}..{high}가 필요합니다.')
+            if override.get('critical_recovery_threshold', cfg['critical_recovery_threshold']) >= \
+                    override.get('critical_rate_threshold', cfg['critical_rate_threshold']):
+                raise ValueError('quarantine: 복구 EPS는 진입 EPS보다 작아야 합니다.')
+            result['quarantine'] = override
+        normalized.append(result)
+    return normalized
+```
+
+#### compile_rule_file — [manage.py:284–339](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L284-L339)
+
+**정의(원문)**: `def compile_rule_file(cfg):`
+
+**1. 목적**: 고정 ABI 48B 토큰·2256B 프로그램 및 파일 header/CRC로 rules.bin을 생성한다.
+
+**2. 인자·자료형·전달**: 서명에 적힌 파이썬 매개변수를 순서대로 확인한다. 위치 인자는 값으로 참조가 전달되고, `Path`는 경로 객체, `run`은 run 디렉터리, `cfg`는 정규화된 dict인 경우가 많다. 변경 가능한 list/dict는 복사 없이 전달되면 함수 안의 수정이 호출자에게도 보일 수 있다. `*` 뒤의 매개변수는 키워드 전용이다. `=...`는 명시한 기본값이다. 이 함수에서 실제로 사용하는 타입·키는 코드의 `[]` 접근과 validation을 참고한다.
+
+**3. 반환/오류**: `raise ValueError('event_rules 설정이 필요합니다.')` · `raise ValueError('규칙 실행 토큰은 1..24개여야 합니다.')` · `raise ValueError('규칙 문자열 풀은 1024바이트 이하여야 합니다.')` · `raise AssertionError('규칙 ABI 크기 불일치')` · `return header + payload`. Python은 `raise`한 에러를 상위 호출자로 전달하며 CLI의 `main` 진입 보호 코드가 일부 오류를 잡는다.
+
+**4. 내부 처리 순서·데이터 변화**: 아래는 실제 선언 내부의 중요한 조건과 루프(원본 정의 번호):
+- [L286](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L286-L286) `if 'event_rules' not in cfg:`
+- [L290](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L290-L290) `for rule in cfg['event_rules']:`
+- [L295](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L295-L295) `if not 1 <= len(tokens) <= 24:`
+- [L297](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L297-L297) `for opcode, field_id, comparator, values in tokens:`
+- [L299](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L299-L299) `for value in values:`
+- [L301](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L301-L301) `if field in RULE_STRING_FIELDS:`
+- [L303](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L303-L303) `if raw not in string_offsets:`
+- [L310](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L310-L310) `elif field in RULE_ENUMS:`
+- [L312](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L312-L312) `elif field in RULE_BOOLEAN_FIELDS:`
+- [L314](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L314-L314) `else:`
+- [L318](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L318-L318) `if len(strings) > 1024:`
+- [L331](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L331-L331) `if len(program) != RULE_PROGRAM_SIZE:`
+
+메모리/파일/SQL 관련 식별자: `struct.pack`, `zlib.crc32`.
+
+**5. 연결 관계**: 코드에서 직접 참조하는 호출 후보(정적 검색 결과): `compile_rule_file`, `ValueError`, `items`, `bytearray`, `_rule_tokens`, `encode`, `extend`, `append`, `pack`, `get`, `bytes`, `ljust`, `AssertionError`, `join`, `crc32`. 이는 분기별 동적 호출 확정이 아니라 코드를 따라갈 때 찾을 식별자 목록이다. 공유 자원은 전역 `DATA`, `BUILD`, `BINARY`, run의 JSON/SQLite 등이 있는지 본문에서 확인한다.
+
+**6. Python 문법**: `with`는 자원 정리, `try/except/finally`는 오류/항상 수행 경로, `yield`가 있다면 generator, `dict`/list comprehension은 자료 변환, `path / 'file'`은 pathlib 경로 결합, `with db:`는 transaction 문맥 관리다. 반드시 아래 실제 사용 문법만 해당한다고 판단한다.
+
+**7. 구체 예시(실제 실행이 아닌 가상 시나리오)**: 예시 입력에서 반환 조건, 예외 조건, 파일 경로 경계를 한 줄씩 따라가며 함수 실행 전·후 dict/파일/SQLite/프로세스 상태를 기록한다. 숫자나 임계치는 예시이지 측정·고정 값이 아니다.
+
+**8. 경계/성능/보안**: 잘못된 타입, 중복·유실된 JSON 키, 파일 심볼릭링크·권한, 크기 상한, SQLite 부분 커밋, 프로세스 생존 확인, 데이터 내구 경계를 코드 근거로 평가한다. `return` 값만으로 무손실을 단정할 수 없다.
+
+**함수 원본 전체**
+
+```python
+def compile_rule_file(cfg):
+    """Encode bounded postfix programs for the collector's fixed-size ABI."""
+    if 'event_rules' not in cfg:
+        raise ValueError('event_rules 설정이 필요합니다.')
+    field_names = {number: name for name, number in RULE_FIELDS.items()}
+    programs = []
+    for rule in cfg['event_rules']:
+        strings = bytearray()
+        string_offsets = {}
+        token_bytes = bytearray()
+        tokens = _rule_tokens(rule['when'])
+        if not 1 <= len(tokens) <= 24:
+            raise ValueError('규칙 실행 토큰은 1..24개여야 합니다.')
+        for opcode, field_id, comparator, values in tokens:
+            encoded = []
+            for value in values:
+                field = field_names[field_id]
+                if field in RULE_STRING_FIELDS:
+                    raw = value.encode('utf-8') + b'\0'
+                    if raw not in string_offsets:
+                        string_offsets[raw] = len(strings)
+                        strings.extend(raw)
+                    # bpf_strncmp consumes an explicit byte length. Keep the
+                    # fixed 48-byte token ABI: high 32 bits are UTF-8 bytes,
+                    # low 32 bits are the NUL-terminated pool offset.
+                    encoded.append(((len(raw) - 1) << 32) | string_offsets[raw])
+                elif field in RULE_ENUMS:
+                    encoded.append(RULE_ENUMS[field][value])
+                elif field in RULE_BOOLEAN_FIELDS:
+                    encoded.append(int(value))
+                else:
+                    encoded.append(value)
+            token_bytes.extend(struct.pack('<4I4q', opcode, field_id, comparator,
+                                           len(encoded), *(encoded + [0] * (4 - len(encoded)))))
+        if len(strings) > 1024:
+            raise ValueError('규칙 문자열 풀은 1024바이트 이하여야 합니다.')
+        policy = cfg | rule.get('quarantine', {})
+        quarantine_values = (policy['critical_rate_threshold'],
+                             policy['critical_rate_duration_seconds'] * 1000,
+                             policy['critical_recovery_threshold'],
+                             policy['critical_recovery_duration_seconds'] * 1000,
+                             policy['quarantine_initial_full_events'],
+                             policy['quarantine_sample_interval_ms'])
+        program = (struct.pack('<8I6Q', rule['id'], int(rule['enabled']), rule['precedence'],
+                               RULE_PRIORITIES[rule['priority']], RULE_POLICIES[rule['overload_policy']],
+                               len(tokens), len(strings), 0, *quarantine_values) +
+                   bytes(token_bytes).ljust(24 * 48, b'\0') + bytes(strings).ljust(1024, b'\0'))
+        if len(program) != RULE_PROGRAM_SIZE:
+            raise AssertionError('규칙 ABI 크기 불일치')
+        programs.append(program)
+    payload = b''.join(programs)
+    header = struct.pack('<5I', RULE_FILE_MAGIC, RULE_FILE_VERSION, len(programs),
+                         RULE_PROGRAM_SIZE, zlib.crc32(payload))
+    return header + payload
+```
+
+#### atomic_bytes — [manage.py:340–358](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L340-L358)
+
+**정의(원문)**: `def atomic_bytes(path, value):`
+
+**1. 목적**: 임시파일 생성→flush/fsync→os.replace→디렉터리 fsync로 바이트 파일을 게시한다.
+
+**2. 인자·자료형·전달**: 서명에 적힌 파이썬 매개변수를 순서대로 확인한다. 위치 인자는 값으로 참조가 전달되고, `Path`는 경로 객체, `run`은 run 디렉터리, `cfg`는 정규화된 dict인 경우가 많다. 변경 가능한 list/dict는 복사 없이 전달되면 함수 안의 수정이 호출자에게도 보일 수 있다. `*` 뒤의 매개변수는 키워드 전용이다. `=...`는 명시한 기본값이다. 이 함수에서 실제로 사용하는 타입·키는 코드의 `[]` 접근과 validation을 참고한다.
+
+**3. 반환/오류**: 명시적 return이 없으면 None 반환(예외 발생 시 중단). Python은 `raise`한 에러를 상위 호출자로 전달하며 CLI의 `main` 진입 보호 코드가 일부 오류를 잡는다.
+
+**4. 내부 처리 순서·데이터 변화**: 아래는 실제 선언 내부의 중요한 조건과 루프(원본 정의 번호):
+- [L343](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L343-L343) `try:`
+- [L344](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L344-L344) `with os.fdopen(fd, 'wb') as file:`
+- [L350](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L350-L350) `try:`
+- [L352](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L352-L352) `finally:`
+- [L354](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L354-L354) `finally:`
+- [L355](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L355-L355) `if os.path.exists(temp):`
+
+메모리/파일/SQL 관련 식별자: `os.fsync`, `os.replace`, `tempfile.mkstemp`, `Path`.
+
+**5. 연결 관계**: 코드에서 직접 참조하는 호출 후보(정적 검색 결과): `atomic_bytes`, `Path`, `mkstemp`, `fdopen`, `write`, `flush`, `fsync`, `fileno`, `replace`, `open`, `close`, `exists`, `unlink`. 이는 분기별 동적 호출 확정이 아니라 코드를 따라갈 때 찾을 식별자 목록이다. 공유 자원은 전역 `DATA`, `BUILD`, `BINARY`, run의 JSON/SQLite 등이 있는지 본문에서 확인한다.
+
+**6. Python 문법**: `with`는 자원 정리, `try/except/finally`는 오류/항상 수행 경로, `yield`가 있다면 generator, `dict`/list comprehension은 자료 변환, `path / 'file'`은 pathlib 경로 결합, `with db:`는 transaction 문맥 관리다. 반드시 아래 실제 사용 문법만 해당한다고 판단한다.
+
+**7. 구체 예시(실제 실행이 아닌 가상 시나리오)**: 예시 입력에서 반환 조건, 예외 조건, 파일 경로 경계를 한 줄씩 따라가며 함수 실행 전·후 dict/파일/SQLite/프로세스 상태를 기록한다. 숫자나 임계치는 예시이지 측정·고정 값이 아니다.
+
+**8. 경계/성능/보안**: 잘못된 타입, 중복·유실된 JSON 키, 파일 심볼릭링크·권한, 크기 상한, SQLite 부분 커밋, 프로세스 생존 확인, 데이터 내구 경계를 코드 근거로 평가한다. `return` 값만으로 무손실을 단정할 수 없다.
+
+**함수 원본 전체**
+
+```python
+def atomic_bytes(path, value):
+    path = Path(path)
+    fd, temp = tempfile.mkstemp(prefix='.' + path.name + '.', suffix='.tmp', dir=path.parent)
+    try:
+        with os.fdopen(fd, 'wb') as file:
+            file.write(value)
+            file.flush()
+            os.fsync(file.fileno())
+        os.replace(temp, path)
+        directory_fd = os.open(path.parent, os.O_RDONLY | os.O_DIRECTORY)
+        try:
+            os.fsync(directory_fd)
+        finally:
+            os.close(directory_fd)
+    finally:
+        if os.path.exists(temp):
+            os.unlink(temp)
+```
+
+#### raw_lanes — [manage.py:359–366](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L359-L366)
+
+**정의(원문)**: `def raw_lanes(health):`
+
+**1. 목적**: health snapshot의 durable lane 구성에서 legacy/current 차이를 확인한다.
+
+**2. 인자·자료형·전달**: 서명에 적힌 파이썬 매개변수를 순서대로 확인한다. 위치 인자는 값으로 참조가 전달되고, `Path`는 경로 객체, `run`은 run 디렉터리, `cfg`는 정규화된 dict인 경우가 많다. 변경 가능한 list/dict는 복사 없이 전달되면 함수 안의 수정이 호출자에게도 보일 수 있다. `*` 뒤의 매개변수는 키워드 전용이다. `=...`는 명시한 기본값이다. 이 함수에서 실제로 사용하는 타입·키는 코드의 `[]` 접근과 validation을 참고한다.
+
+**3. 반환/오류**: `raise ValueError('durable lane 구성 불일치')` · `return LANES if 'quarantine.raw' in lanes else LEGACY_LANES`. Python은 `raise`한 에러를 상위 호출자로 전달하며 CLI의 `main` 진입 보호 코드가 일부 오류를 잡는다.
+
+**4. 내부 처리 순서·데이터 변화**: 아래는 실제 선언 내부의 중요한 조건과 루프(원본 정의 번호):
+- [L361](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L361-L361) `if not lanes: return LANES  # The index worker can start before the first health snapshot.`
+- [L362](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L362-L362) `if not isinstance(lanes, dict) or set(lanes) not in (set(LEGACY_LANES), set(LANES)):`
+
+메모리/파일/SQL 관련 식별자: 별도 I/O나 자원 호출이 표시되지 않는 단순 유틸리티일 수 있다. 본문 확인 필요.
+
+**5. 연결 관계**: 코드에서 직접 참조하는 호출 후보(정적 검색 결과): `raw_lanes`, `get`, `isinstance`, `in`, `ValueError`. 이는 분기별 동적 호출 확정이 아니라 코드를 따라갈 때 찾을 식별자 목록이다. 공유 자원은 전역 `DATA`, `BUILD`, `BINARY`, run의 JSON/SQLite 등이 있는지 본문에서 확인한다.
+
+**6. Python 문법**: `with`는 자원 정리, `try/except/finally`는 오류/항상 수행 경로, `yield`가 있다면 generator, `dict`/list comprehension은 자료 변환, `path / 'file'`은 pathlib 경로 결합, `with db:`는 transaction 문맥 관리다. 반드시 아래 실제 사용 문법만 해당한다고 판단한다.
+
+**7. 구체 예시(실제 실행이 아닌 가상 시나리오)**: 예시 입력에서 반환 조건, 예외 조건, 파일 경로 경계를 한 줄씩 따라가며 함수 실행 전·후 dict/파일/SQLite/프로세스 상태를 기록한다. 숫자나 임계치는 예시이지 측정·고정 값이 아니다.
+
+**8. 경계/성능/보안**: 잘못된 타입, 중복·유실된 JSON 키, 파일 심볼릭링크·권한, 크기 상한, SQLite 부분 커밋, 프로세스 생존 확인, 데이터 내구 경계를 코드 근거로 평가한다. `return` 값만으로 무손실을 단정할 수 없다.
+
+**함수 원본 전체**
+
+```python
+def raw_lanes(health):
+    lanes = health.get('durable', {})
+    if not lanes: return LANES  # The index worker can start before the first health snapshot.
+    if not isinstance(lanes, dict) or set(lanes) not in (set(LEGACY_LANES), set(LANES)):
+        raise ValueError('durable lane 구성 불일치')
+    return LANES if 'quarantine.raw' in lanes else LEGACY_LANES
+```
+
+#### read_json — [manage.py:367–373](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L367-L373)
+
+**정의(원문)**: `def read_json(path, default=None):`
+
+**1. 목적**: 부재 시 기본값을 반환하면서 JSON 파일을 읽는다.
+
+**2. 인자·자료형·전달**: 서명에 적힌 파이썬 매개변수를 순서대로 확인한다. 위치 인자는 값으로 참조가 전달되고, `Path`는 경로 객체, `run`은 run 디렉터리, `cfg`는 정규화된 dict인 경우가 많다. 변경 가능한 list/dict는 복사 없이 전달되면 함수 안의 수정이 호출자에게도 보일 수 있다. `*` 뒤의 매개변수는 키워드 전용이다. `=...`는 명시한 기본값이다. 이 함수에서 실제로 사용하는 타입·키는 코드의 `[]` 접근과 validation을 참고한다.
+
+**3. 반환/오류**: `return json.loads(Path(path).read_text())` · `return default`. Python은 `raise`한 에러를 상위 호출자로 전달하며 CLI의 `main` 진입 보호 코드가 일부 오류를 잡는다.
+
+**4. 내부 처리 순서·데이터 변화**: 아래는 실제 선언 내부의 중요한 조건과 루프(원본 정의 번호):
+- [L368](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L368-L368) `try:`
+- [L370](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L370-L370) `except FileNotFoundError:`
+
+메모리/파일/SQL 관련 식별자: `json.loads`, `Path`, `read_json`.
+
+**5. 연결 관계**: 코드에서 직접 참조하는 호출 후보(정적 검색 결과): `read_json`, `loads`, `Path`, `read_text`. 이는 분기별 동적 호출 확정이 아니라 코드를 따라갈 때 찾을 식별자 목록이다. 공유 자원은 전역 `DATA`, `BUILD`, `BINARY`, run의 JSON/SQLite 등이 있는지 본문에서 확인한다.
+
+**6. Python 문법**: `with`는 자원 정리, `try/except/finally`는 오류/항상 수행 경로, `yield`가 있다면 generator, `dict`/list comprehension은 자료 변환, `path / 'file'`은 pathlib 경로 결합, `with db:`는 transaction 문맥 관리다. 반드시 아래 실제 사용 문법만 해당한다고 판단한다.
+
+**7. 구체 예시(실제 실행이 아닌 가상 시나리오)**: 예시 입력에서 반환 조건, 예외 조건, 파일 경로 경계를 한 줄씩 따라가며 함수 실행 전·후 dict/파일/SQLite/프로세스 상태를 기록한다. 숫자나 임계치는 예시이지 측정·고정 값이 아니다.
+
+**8. 경계/성능/보안**: 잘못된 타입, 중복·유실된 JSON 키, 파일 심볼릭링크·권한, 크기 상한, SQLite 부분 커밋, 프로세스 생존 확인, 데이터 내구 경계를 코드 근거로 평가한다. `return` 값만으로 무손실을 단정할 수 없다.
+
+**함수 원본 전체**
+
+```python
+def read_json(path, default=None):
+    try:
+        return json.loads(Path(path).read_text())
+    except FileNotFoundError:
+        return default
+```
+
+#### atomic_json — [manage.py:374–395](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L374-L395)
+
+**정의(원문)**: `def atomic_json(path, value):`
+
+**1. 목적**: JSON을 안전한 새 임시파일에 쓰고 교체하여 부분 게시를 막는다.
+
+**2. 인자·자료형·전달**: 서명에 적힌 파이썬 매개변수를 순서대로 확인한다. 위치 인자는 값으로 참조가 전달되고, `Path`는 경로 객체, `run`은 run 디렉터리, `cfg`는 정규화된 dict인 경우가 많다. 변경 가능한 list/dict는 복사 없이 전달되면 함수 안의 수정이 호출자에게도 보일 수 있다. `*` 뒤의 매개변수는 키워드 전용이다. `=...`는 명시한 기본값이다. 이 함수에서 실제로 사용하는 타입·키는 코드의 `[]` 접근과 validation을 참고한다.
+
+**3. 반환/오류**: 명시적 return이 없으면 None 반환(예외 발생 시 중단). Python은 `raise`한 에러를 상위 호출자로 전달하며 CLI의 `main` 진입 보호 코드가 일부 오류를 잡는다.
+
+**4. 내부 처리 순서·데이터 변화**: 아래는 실제 선언 내부의 중요한 조건과 루프(원본 정의 번호):
+- [L377](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L377-L377) `try:`
+- [L378](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L378-L378) `with os.fdopen(fd, 'w', encoding='utf-8') as file:`
+- [L385](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L385-L385) `try:`
+- [L387](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L387-L387) `finally:`
+- [L389](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L389-L389) `finally:`
+- [L390](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L390-L390) `try:`
+- [L392](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L392-L392) `except FileNotFoundError:`
+
+메모리/파일/SQL 관련 식별자: `os.fsync`, `os.replace`, `tempfile.mkstemp`, `Path`, `atomic_json`.
+
+**5. 연결 관계**: 코드에서 직접 참조하는 호출 후보(정적 검색 결과): `atomic_json`, `Path`, `mkstemp`, `fdopen`, `dump`, `write`, `flush`, `fsync`, `fileno`, `replace`, `open`, `close`, `unlink`. 이는 분기별 동적 호출 확정이 아니라 코드를 따라갈 때 찾을 식별자 목록이다. 공유 자원은 전역 `DATA`, `BUILD`, `BINARY`, run의 JSON/SQLite 등이 있는지 본문에서 확인한다.
+
+**6. Python 문법**: `with`는 자원 정리, `try/except/finally`는 오류/항상 수행 경로, `yield`가 있다면 generator, `dict`/list comprehension은 자료 변환, `path / 'file'`은 pathlib 경로 결합, `with db:`는 transaction 문맥 관리다. 반드시 아래 실제 사용 문법만 해당한다고 판단한다.
+
+**7. 구체 예시(실제 실행이 아닌 가상 시나리오)**: 예시 입력에서 반환 조건, 예외 조건, 파일 경로 경계를 한 줄씩 따라가며 함수 실행 전·후 dict/파일/SQLite/프로세스 상태를 기록한다. 숫자나 임계치는 예시이지 측정·고정 값이 아니다.
+
+**8. 경계/성능/보안**: 잘못된 타입, 중복·유실된 JSON 키, 파일 심볼릭링크·권한, 크기 상한, SQLite 부분 커밋, 프로세스 생존 확인, 데이터 내구 경계를 코드 근거로 평가한다. `return` 값만으로 무손실을 단정할 수 없다.
+
+**함수 원본 전체**
+
+```python
+def atomic_json(path, value):
+    path = Path(path)
+    fd, temp = tempfile.mkstemp(prefix='.' + path.name + '.', suffix='.tmp', dir=path.parent)
+    try:
+        with os.fdopen(fd, 'w', encoding='utf-8') as file:
+            json.dump(value, file, ensure_ascii=False, indent=2)
+            file.write('\n')
+            file.flush()
+            os.fsync(file.fileno())
+        os.replace(temp, path)
+        directory = os.open(path.parent, os.O_RDONLY | os.O_DIRECTORY)
+        try:
+            os.fsync(directory)
+        finally:
+            os.close(directory)
+    finally:
+        try:
+            os.unlink(temp)
+        except FileNotFoundError:
+            pass
+```
+
+#### ensure_data_dir — [manage.py:396–412](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L396-L412)
+
+**정의(원문)**: `def ensure_data_dir():`
+
+**1. 목적**: DATA와 부모 디렉터리의 실제 타입·root 소유·0700 조건을 확인한다.
+
+**2. 인자·자료형·전달**: 서명에 적힌 파이썬 매개변수를 순서대로 확인한다. 위치 인자는 값으로 참조가 전달되고, `Path`는 경로 객체, `run`은 run 디렉터리, `cfg`는 정규화된 dict인 경우가 많다. 변경 가능한 list/dict는 복사 없이 전달되면 함수 안의 수정이 호출자에게도 보일 수 있다. `*` 뒤의 매개변수는 키워드 전용이다. `=...`는 명시한 기본값이다. 이 함수에서 실제로 사용하는 타입·키는 코드의 `[]` 접근과 validation을 참고한다.
+
+**3. 반환/오류**: `raise RuntimeError(f'데이터 경로가 디렉터리가 아닙니다: {directory}')` · `raise RuntimeError(f'root가 신뢰할 수 없는 데이터 상위 경로입니다: {directory}')` · `raise RuntimeError(f'데이터 폴더는 실행 계정 소유의 0700 권한이어야 합니다: {DATA}')`. Python은 `raise`한 에러를 상위 호출자로 전달하며 CLI의 `main` 진입 보호 코드가 일부 오류를 잡는다.
+
+**4. 내부 처리 순서·데이터 변화**: 아래는 실제 선언 내부의 중요한 조건과 루프(원본 정의 번호):
+- [L399](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L399-L399) `for directory in reversed((DATA, *DATA.parents)):`
+- [L400](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L400-L400) `try:`
+- [L402](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L402-L402) `except FileNotFoundError:`
+- [L405](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L405-L405) `if not stat.S_ISDIR(info.st_mode):`
+- [L407](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L407-L407) `if uid == 0 and (info.st_uid != 0 or info.st_mode & 0o022):`
+- [L409](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L409-L409) `if directory == DATA and (info.st_uid != uid or stat.S_IMODE(info.st_mode) != 0o700):`
+
+메모리/파일/SQL 관련 식별자: 별도 I/O나 자원 호출이 표시되지 않는 단순 유틸리티일 수 있다. 본문 확인 필요.
+
+**5. 연결 관계**: 코드에서 직접 참조하는 호출 후보(정적 검색 결과): `ensure_data_dir`, `geteuid`, `reversed`, `lstat`, `mkdir`, `S_ISDIR`, `RuntimeError`, `and`, `S_IMODE`. 이는 분기별 동적 호출 확정이 아니라 코드를 따라갈 때 찾을 식별자 목록이다. 공유 자원은 전역 `DATA`, `BUILD`, `BINARY`, run의 JSON/SQLite 등이 있는지 본문에서 확인한다.
+
+**6. Python 문법**: `with`는 자원 정리, `try/except/finally`는 오류/항상 수행 경로, `yield`가 있다면 generator, `dict`/list comprehension은 자료 변환, `path / 'file'`은 pathlib 경로 결합, `with db:`는 transaction 문맥 관리다. 반드시 아래 실제 사용 문법만 해당한다고 판단한다.
+
+**7. 구체 예시(실제 실행이 아닌 가상 시나리오)**: 예시 입력에서 반환 조건, 예외 조건, 파일 경로 경계를 한 줄씩 따라가며 함수 실행 전·후 dict/파일/SQLite/프로세스 상태를 기록한다. 숫자나 임계치는 예시이지 측정·고정 값이 아니다.
+
+**8. 경계/성능/보안**: 잘못된 타입, 중복·유실된 JSON 키, 파일 심볼릭링크·권한, 크기 상한, SQLite 부분 커밋, 프로세스 생존 확인, 데이터 내구 경계를 코드 근거로 평가한다. `return` 값만으로 무손실을 단정할 수 없다.
+
+**함수 원본 전체**
+
+```python
+def ensure_data_dir():
+    """Keep root-owned evidence out of directories controlled by other users."""
+    uid = os.geteuid()
+    for directory in reversed((DATA, *DATA.parents)):
+        try:
+            info = directory.lstat()
+        except FileNotFoundError:
+            directory.mkdir(mode=0o700)
+            info = directory.lstat()
+        if not stat.S_ISDIR(info.st_mode):
+            raise RuntimeError(f'데이터 경로가 디렉터리가 아닙니다: {directory}')
+        if uid == 0 and (info.st_uid != 0 or info.st_mode & 0o022):
+            raise RuntimeError(f'root가 신뢰할 수 없는 데이터 상위 경로입니다: {directory}')
+        if directory == DATA and (info.st_uid != uid or stat.S_IMODE(info.st_mode) != 0o700):
+            raise RuntimeError(f'데이터 폴더는 실행 계정 소유의 0700 권한이어야 합니다: {DATA}')
+```
+
+#### config — [manage.py:413–461](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L413-L461)
+
+**정의(원문)**: `def config(path):`
+
+**1. 목적**: 64 KiB 이하 설정을 중복키 없이 파싱하고 기본값·교차 제약·규칙 조건을 정규화한다.
+
+**2. 인자·자료형·전달**: 서명에 적힌 파이썬 매개변수를 순서대로 확인한다. 위치 인자는 값으로 참조가 전달되고, `Path`는 경로 객체, `run`은 run 디렉터리, `cfg`는 정규화된 dict인 경우가 많다. 변경 가능한 list/dict는 복사 없이 전달되면 함수 안의 수정이 호출자에게도 보일 수 있다. `*` 뒤의 매개변수는 키워드 전용이다. `=...`는 명시한 기본값이다. 이 함수에서 실제로 사용하는 타입·키는 코드의 `[]` 접근과 validation을 참고한다.
+
+**3. 반환/오류**: `raise ValueError('설정 파일은 64 KiB 이하여야 합니다.')` · `raise ValueError('중복 설정 키: ' + key)` · `return result` · `raise ValueError('지원하는 설정 키만 빠짐없이 입력하세요: ' + ', '.join(sorted(KEYS)))` · `raise ValueError(f'{key}: 정수 {low}..{high} 범위가 필요합니다.')` · `raise ValueError('critical 예약량은 raw 한도보다 작아야 합니다.')` · `raise ValueError('quarantine 저장 한도는 일반 저장 예산 이하여야 합니다.')` · `raise ValueError('복구 임계치는 quarantine 진입 임계치보다 작아야 합니다.')` · `raise ValueError('protected_path: 126바이트 이하의 Linux 절대 경로가 필요합니다.')` · `raise ValueError('event_rules와 critical_rules는 동시에 설정할 수 없습니다.')` · `return value`. Python은 `raise`한 에러를 상위 호출자로 전달하며 CLI의 `main` 진입 보호 코드가 일부 오류를 잡는다.
+
+**4. 내부 처리 순서·데이터 변화**: 아래는 실제 선언 내부의 중요한 조건과 루프(원본 정의 번호):
+- [L414](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L414-L414) `with Path(path).open('rb') as file:`
+- [L416](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L416-L416) `if len(raw) > MAX_CONFIG_BYTES:`
+- [L420](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L420-L420) `for key, value in pairs:`
+- [L421](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L421-L421) `if key in result:`
+- [L426](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L426-L426) `if not isinstance(value, dict) or not REQUIRED_KEYS <= set(value) or set(value) - KEYS:`
+- [L429](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L429-L429) `for key, low, high in [('bulk_rate', 1, 1000000), ('bulk_burst', 1, 1000000),`
+- [L436](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L436-L436) `if type(value[key]) is not int or not low <= value[key] <= high:`
+- [L438](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L438-L438) `if value['critical_reserve_mib'] >= value['max_raw_mib']:`
+- [L440](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L440-L440) `if value['quarantine_max_mib'] > value['max_raw_mib'] - value['critical_reserve_mib']:`
+- [L442](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L442-L442) `if value['critical_recovery_threshold'] >= value['critical_rate_threshold']:`
+- [L445](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L445-L445) `if (not isinstance(target, str) or not target.startswith('/') or`
+- [L449](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L449-L449) `if 'event_rules' in value and 'critical_rules' in value:`
+- [L451](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L451-L451) `if 'event_rules' in value:`
+- [L454](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L454-L454) `else:`
+- [L456](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L456-L456) `if rules == [] or 'critical_rules' not in value:`
+
+메모리/파일/SQL 관련 식별자: `json.loads`, `Path`.
+
+**5. 연결 관계**: 코드에서 직접 참조하는 호출 후보(정적 검색 결과): `config`, `Path`, `open`, `read`, `ValueError`, `unique`, `loads`, `isinstance`, `join`, `sorted`, `type`, `startswith`, `encode`, `any`, `ord`, `validate_event_rules`, `compile_rule_file`, `get`, `validate_rules`. 이는 분기별 동적 호출 확정이 아니라 코드를 따라갈 때 찾을 식별자 목록이다. 공유 자원은 전역 `DATA`, `BUILD`, `BINARY`, run의 JSON/SQLite 등이 있는지 본문에서 확인한다.
+
+**6. Python 문법**: `with`는 자원 정리, `try/except/finally`는 오류/항상 수행 경로, `yield`가 있다면 generator, `dict`/list comprehension은 자료 변환, `path / 'file'`은 pathlib 경로 결합, `with db:`는 transaction 문맥 관리다. 반드시 아래 실제 사용 문법만 해당한다고 판단한다.
+
+**7. 구체 예시(실제 실행이 아닌 가상 시나리오)**: 예시 입력에서 반환 조건, 예외 조건, 파일 경로 경계를 한 줄씩 따라가며 함수 실행 전·후 dict/파일/SQLite/프로세스 상태를 기록한다. 숫자나 임계치는 예시이지 측정·고정 값이 아니다.
+
+**8. 경계/성능/보안**: 잘못된 타입, 중복·유실된 JSON 키, 파일 심볼릭링크·권한, 크기 상한, SQLite 부분 커밋, 프로세스 생존 확인, 데이터 내구 경계를 코드 근거로 평가한다. `return` 값만으로 무손실을 단정할 수 없다.
+
+**함수 원본 전체**
+
+```python
+def config(path):
+    with Path(path).open('rb') as file:
+        raw = file.read(MAX_CONFIG_BYTES + 1)
+    if len(raw) > MAX_CONFIG_BYTES:
+        raise ValueError('설정 파일은 64 KiB 이하여야 합니다.')
+    def unique(pairs):
+        result = {}
+        for key, value in pairs:
+            if key in result:
+                raise ValueError('중복 설정 키: ' + key)
+            result[key] = value
+        return result
+    value = json.loads(raw, object_pairs_hook=unique)
+    if not isinstance(value, dict) or not REQUIRED_KEYS <= set(value) or set(value) - KEYS:
+        raise ValueError('지원하는 설정 키만 빠짐없이 입력하세요: ' + ', '.join(sorted(KEYS)))
+    value = POLICY_DEFAULTS | value
+    for key, low, high in [('bulk_rate', 1, 1000000), ('bulk_burst', 1, 1000000),
+                          ('max_raw_mib', 16, 1024), ('max_index_mib', 16, 512),
+                          ('critical_reserve_mib', 1, 1023), ('minimum_free_mib', 256, 65536),
+                          ('critical_rate_threshold', 1, 1000000), ('critical_rate_duration_seconds', 1, 60),
+                          ('critical_recovery_threshold', 0, 999999), ('critical_recovery_duration_seconds', 1, 600),
+                          ('quarantine_initial_full_events', 0, 64), ('quarantine_sample_interval_ms', 10, 60000),
+                          ('quarantine_max_mib', 1, 256), ('metadata_max_mib', 8, 64)]:
+        if type(value[key]) is not int or not low <= value[key] <= high:
+            raise ValueError(f'{key}: 정수 {low}..{high} 범위가 필요합니다.')
+    if value['critical_reserve_mib'] >= value['max_raw_mib']:
+        raise ValueError('critical 예약량은 raw 한도보다 작아야 합니다.')
+    if value['quarantine_max_mib'] > value['max_raw_mib'] - value['critical_reserve_mib']:
+        raise ValueError('quarantine 저장 한도는 일반 저장 예산 이하여야 합니다.')
+    if value['critical_recovery_threshold'] >= value['critical_rate_threshold']:
+        raise ValueError('복구 임계치는 quarantine 진입 임계치보다 작아야 합니다.')
+    target = value['protected_path']
+    if (not isinstance(target, str) or not target.startswith('/') or
+            len(target.encode()) > 126 or any(ord(c) < 32 for c in target) or
+            '..' in Path(target).parts):
+        raise ValueError('protected_path: 126바이트 이하의 Linux 절대 경로가 필요합니다.')
+    if 'event_rules' in value and 'critical_rules' in value:
+        raise ValueError('event_rules와 critical_rules는 동시에 설정할 수 없습니다.')
+    if 'event_rules' in value:
+        value['event_rules'] = validate_event_rules(value['event_rules'], value)
+        compile_rule_file(value)
+    else:
+        rules = value.get('critical_rules')
+        if rules == [] or 'critical_rules' not in value:
+            rules = [dict(id=1, event_type='openat', path=target, protected=False)]
+        value['critical_rules'] = validate_rules(rules)
+    return value
+```
+
+#### unique — [manage.py:418–424](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L418-L424)
+
+**정의(원문)**: `def unique(pairs):`
+
+**1. 목적**: 원본의 입력·상태를 검증하거나 결과 구조를 생성한다.
+
+**2. 인자·자료형·전달**: 서명에 적힌 파이썬 매개변수를 순서대로 확인한다. 위치 인자는 값으로 참조가 전달되고, `Path`는 경로 객체, `run`은 run 디렉터리, `cfg`는 정규화된 dict인 경우가 많다. 변경 가능한 list/dict는 복사 없이 전달되면 함수 안의 수정이 호출자에게도 보일 수 있다. `*` 뒤의 매개변수는 키워드 전용이다. `=...`는 명시한 기본값이다. 이 함수에서 실제로 사용하는 타입·키는 코드의 `[]` 접근과 validation을 참고한다.
+
+**3. 반환/오류**: `raise ValueError('중복 설정 키: ' + key)` · `return result`. Python은 `raise`한 에러를 상위 호출자로 전달하며 CLI의 `main` 진입 보호 코드가 일부 오류를 잡는다.
+
+**4. 내부 처리 순서·데이터 변화**: 아래는 실제 선언 내부의 중요한 조건과 루프(원본 정의 번호):
+- [L420](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L420-L420) `for key, value in pairs:`
+- [L421](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L421-L421) `if key in result:`
+
+메모리/파일/SQL 관련 식별자: 별도 I/O나 자원 호출이 표시되지 않는 단순 유틸리티일 수 있다. 본문 확인 필요.
+
+**5. 연결 관계**: 코드에서 직접 참조하는 호출 후보(정적 검색 결과): `unique`, `ValueError`. 이는 분기별 동적 호출 확정이 아니라 코드를 따라갈 때 찾을 식별자 목록이다. 공유 자원은 전역 `DATA`, `BUILD`, `BINARY`, run의 JSON/SQLite 등이 있는지 본문에서 확인한다.
+
+**6. Python 문법**: `with`는 자원 정리, `try/except/finally`는 오류/항상 수행 경로, `yield`가 있다면 generator, `dict`/list comprehension은 자료 변환, `path / 'file'`은 pathlib 경로 결합, `with db:`는 transaction 문맥 관리다. 반드시 아래 실제 사용 문법만 해당한다고 판단한다.
+
+**7. 구체 예시(실제 실행이 아닌 가상 시나리오)**: 예시 입력에서 반환 조건, 예외 조건, 파일 경로 경계를 한 줄씩 따라가며 함수 실행 전·후 dict/파일/SQLite/프로세스 상태를 기록한다. 숫자나 임계치는 예시이지 측정·고정 값이 아니다.
+
+**8. 경계/성능/보안**: 잘못된 타입, 중복·유실된 JSON 키, 파일 심볼릭링크·권한, 크기 상한, SQLite 부분 커밋, 프로세스 생존 확인, 데이터 내구 경계를 코드 근거로 평가한다. `return` 값만으로 무손실을 단정할 수 없다.
+
+**함수 원본 전체**
+
+```python
+    def unique(pairs):
+        result = {}
+        for key, value in pairs:
+            if key in result:
+                raise ValueError('중복 설정 키: ' + key)
+            result[key] = value
+        return result
+```
+
+#### fingerprint — [manage.py:462–469](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L462-L469)
+
+**정의(원문)**: `def fingerprint(path):`
+
+**1. 목적**: 파일 SHA-256 해시를 계산한다.
+
+**2. 인자·자료형·전달**: 서명에 적힌 파이썬 매개변수를 순서대로 확인한다. 위치 인자는 값으로 참조가 전달되고, `Path`는 경로 객체, `run`은 run 디렉터리, `cfg`는 정규화된 dict인 경우가 많다. 변경 가능한 list/dict는 복사 없이 전달되면 함수 안의 수정이 호출자에게도 보일 수 있다. `*` 뒤의 매개변수는 키워드 전용이다. `=...`는 명시한 기본값이다. 이 함수에서 실제로 사용하는 타입·키는 코드의 `[]` 접근과 validation을 참고한다.
+
+**3. 반환/오류**: `return digest.hexdigest()`. Python은 `raise`한 에러를 상위 호출자로 전달하며 CLI의 `main` 진입 보호 코드가 일부 오류를 잡는다.
+
+**4. 내부 처리 순서·데이터 변화**: 아래는 실제 선언 내부의 중요한 조건과 루프(원본 정의 번호):
+- [L464](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L464-L464) `with Path(path).open('rb') as file:`
+- [L465](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L465-L465) `for chunk in iter(lambda: file.read(65536), b''):`
+
+메모리/파일/SQL 관련 식별자: `hashlib.sha256`, `Path`.
+
+**5. 연결 관계**: 코드에서 직접 참조하는 호출 후보(정적 검색 결과): `fingerprint`, `sha256`, `Path`, `open`, `iter`, `read`, `update`, `hexdigest`. 이는 분기별 동적 호출 확정이 아니라 코드를 따라갈 때 찾을 식별자 목록이다. 공유 자원은 전역 `DATA`, `BUILD`, `BINARY`, run의 JSON/SQLite 등이 있는지 본문에서 확인한다.
+
+**6. Python 문법**: `with`는 자원 정리, `try/except/finally`는 오류/항상 수행 경로, `yield`가 있다면 generator, `dict`/list comprehension은 자료 변환, `path / 'file'`은 pathlib 경로 결합, `with db:`는 transaction 문맥 관리다. 반드시 아래 실제 사용 문법만 해당한다고 판단한다.
+
+**7. 구체 예시(실제 실행이 아닌 가상 시나리오)**: 예시 입력에서 반환 조건, 예외 조건, 파일 경로 경계를 한 줄씩 따라가며 함수 실행 전·후 dict/파일/SQLite/프로세스 상태를 기록한다. 숫자나 임계치는 예시이지 측정·고정 값이 아니다.
+
+**8. 경계/성능/보안**: 잘못된 타입, 중복·유실된 JSON 키, 파일 심볼릭링크·권한, 크기 상한, SQLite 부분 커밋, 프로세스 생존 확인, 데이터 내구 경계를 코드 근거로 평가한다. `return` 값만으로 무손실을 단정할 수 없다.
+
+**함수 원본 전체**
+
+```python
+def fingerprint(path):
+    digest = hashlib.sha256()
+    with Path(path).open('rb') as file:
+        for chunk in iter(lambda: file.read(65536), b''):
+            digest.update(chunk)
+    return digest.hexdigest()
+```
+
+#### identity — [manage.py:470–480](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L470-L480)
+
+**정의(원문)**: `def identity(pid=None):`
+
+**1. 목적**: PID와 시작 시간을 이용해 프로세스 식별 자료를 만든다.
+
+**2. 인자·자료형·전달**: 서명에 적힌 파이썬 매개변수를 순서대로 확인한다. 위치 인자는 값으로 참조가 전달되고, `Path`는 경로 객체, `run`은 run 디렉터리, `cfg`는 정규화된 dict인 경우가 많다. 변경 가능한 list/dict는 복사 없이 전달되면 함수 안의 수정이 호출자에게도 보일 수 있다. `*` 뒤의 매개변수는 키워드 전용이다. `=...`는 명시한 기본값이다. 이 함수에서 실제로 사용하는 타입·키는 코드의 `[]` 접근과 validation을 참고한다.
+
+**3. 반환/오류**: `return dict(pid=pid, start=fields[19], state=fields[0],` · `return None`. Python은 `raise`한 에러를 상위 호출자로 전달하며 CLI의 `main` 진입 보호 코드가 일부 오류를 잡는다.
+
+**4. 내부 처리 순서·데이터 변화**: 아래는 실제 선언 내부의 중요한 조건과 루프(원본 정의 번호):
+- [L472](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L472-L472) `try:`
+- [L477](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L477-L477) `except (OSError, IndexError):`
+
+메모리/파일/SQL 관련 식별자: `Path`.
+
+**5. 연결 관계**: 코드에서 직접 참조하는 호출 후보(정적 검색 결과): `identity`, `getpid`, `Path`, `read_text`, `rsplit`, `split`, `strip`, `except`. 이는 분기별 동적 호출 확정이 아니라 코드를 따라갈 때 찾을 식별자 목록이다. 공유 자원은 전역 `DATA`, `BUILD`, `BINARY`, run의 JSON/SQLite 등이 있는지 본문에서 확인한다.
+
+**6. Python 문법**: `with`는 자원 정리, `try/except/finally`는 오류/항상 수행 경로, `yield`가 있다면 generator, `dict`/list comprehension은 자료 변환, `path / 'file'`은 pathlib 경로 결합, `with db:`는 transaction 문맥 관리다. 반드시 아래 실제 사용 문법만 해당한다고 판단한다.
+
+**7. 구체 예시(실제 실행이 아닌 가상 시나리오)**: 예시 입력에서 반환 조건, 예외 조건, 파일 경로 경계를 한 줄씩 따라가며 함수 실행 전·후 dict/파일/SQLite/프로세스 상태를 기록한다. 숫자나 임계치는 예시이지 측정·고정 값이 아니다.
+
+**8. 경계/성능/보안**: 잘못된 타입, 중복·유실된 JSON 키, 파일 심볼릭링크·권한, 크기 상한, SQLite 부분 커밋, 프로세스 생존 확인, 데이터 내구 경계를 코드 근거로 평가한다. `return` 값만으로 무손실을 단정할 수 없다.
+
+**함수 원본 전체**
+
+```python
+def identity(pid=None):
+    pid = pid or os.getpid()
+    try:
+        # comm may contain spaces and parentheses; suffix fields start at state.
+        fields = Path(f'/proc/{pid}/stat').read_text().rsplit(')', 1)[1].split()
+        return dict(pid=pid, start=fields[19], state=fields[0],
+                    boot=Path('/proc/sys/kernel/random/boot_id').read_text().strip())
+    except (OSError, IndexError):
+        return None
+```
+
+#### alive — [manage.py:481–486](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L481-L486)
+
+**정의(원문)**: `def alive(expected):`
+
+**1. 목적**: 프로세스 PID 재사용을 고려해 저장한 식별 자료가 현재 살아있는 프로세스와 일치하는지 판별한다.
+
+**2. 인자·자료형·전달**: 서명에 적힌 파이썬 매개변수를 순서대로 확인한다. 위치 인자는 값으로 참조가 전달되고, `Path`는 경로 객체, `run`은 run 디렉터리, `cfg`는 정규화된 dict인 경우가 많다. 변경 가능한 list/dict는 복사 없이 전달되면 함수 안의 수정이 호출자에게도 보일 수 있다. `*` 뒤의 매개변수는 키워드 전용이다. `=...`는 명시한 기본값이다. 이 함수에서 실제로 사용하는 타입·키는 코드의 `[]` 접근과 validation을 참고한다.
+
+**3. 반환/오류**: `return bool(actual and actual['state'] != 'Z' and`. Python은 `raise`한 에러를 상위 호출자로 전달하며 CLI의 `main` 진입 보호 코드가 일부 오류를 잡는다.
+
+**4. 내부 처리 순서·데이터 변화**: 아래는 실제 선언 내부의 중요한 조건과 루프(원본 정의 번호):
+- 명시 분기 없이 순차 계산/반환한다.
+
+메모리/파일/SQL 관련 식별자: 별도 I/O나 자원 호출이 표시되지 않는 단순 유틸리티일 수 있다. 본문 확인 필요.
+
+**5. 연결 관계**: 코드에서 직접 참조하는 호출 후보(정적 검색 결과): `alive`, `identity`, `all`, `in`. 이는 분기별 동적 호출 확정이 아니라 코드를 따라갈 때 찾을 식별자 목록이다. 공유 자원은 전역 `DATA`, `BUILD`, `BINARY`, run의 JSON/SQLite 등이 있는지 본문에서 확인한다.
+
+**6. Python 문법**: `with`는 자원 정리, `try/except/finally`는 오류/항상 수행 경로, `yield`가 있다면 generator, `dict`/list comprehension은 자료 변환, `path / 'file'`은 pathlib 경로 결합, `with db:`는 transaction 문맥 관리다. 반드시 아래 실제 사용 문법만 해당한다고 판단한다.
+
+**7. 구체 예시(실제 실행이 아닌 가상 시나리오)**: 예시 입력에서 반환 조건, 예외 조건, 파일 경로 경계를 한 줄씩 따라가며 함수 실행 전·후 dict/파일/SQLite/프로세스 상태를 기록한다. 숫자나 임계치는 예시이지 측정·고정 값이 아니다.
+
+**8. 경계/성능/보안**: 잘못된 타입, 중복·유실된 JSON 키, 파일 심볼릭링크·권한, 크기 상한, SQLite 부분 커밋, 프로세스 생존 확인, 데이터 내구 경계를 코드 근거로 평가한다. `return` 값만으로 무손실을 단정할 수 없다.
+
+**함수 원본 전체**
+
+```python
+def alive(expected):
+    actual = identity(expected['pid']) if expected else None
+    return bool(actual and actual['state'] != 'Z' and
+                all(actual[k] == expected[k] for k in ('pid', 'start', 'boot')))
+```
+
+#### lock — [manage.py:488–497](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L488-L497)
+
+**정의(원문)**: `def lock(path):`
+
+**1. 목적**: lock 파일을 통해 concurrent supervisor 또는 index 실행을 차단한다.
+
+**2. 인자·자료형·전달**: 서명에 적힌 파이썬 매개변수를 순서대로 확인한다. 위치 인자는 값으로 참조가 전달되고, `Path`는 경로 객체, `run`은 run 디렉터리, `cfg`는 정규화된 dict인 경우가 많다. 변경 가능한 list/dict는 복사 없이 전달되면 함수 안의 수정이 호출자에게도 보일 수 있다. `*` 뒤의 매개변수는 키워드 전용이다. `=...`는 명시한 기본값이다. 이 함수에서 실제로 사용하는 타입·키는 코드의 `[]` 접근과 validation을 참고한다.
+
+**3. 반환/오류**: `raise RuntimeError('이미 작업 또는 수집이 실행 중입니다.') from exc`. Python은 `raise`한 에러를 상위 호출자로 전달하며 CLI의 `main` 진입 보호 코드가 일부 오류를 잡는다.
+
+**4. 내부 처리 순서·데이터 변화**: 아래는 실제 선언 내부의 중요한 조건과 루프(원본 정의 번호):
+- [L490](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L490-L490) `with Path(path).open('a') as file:`
+- [L491](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L491-L491) `try:`
+- [L493](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L493-L493) `except BlockingIOError as exc:`
+
+메모리/파일/SQL 관련 식별자: `Path`, `fcntl`, `lock(`.
+
+**5. 연결 관계**: 코드에서 직접 참조하는 호출 후보(정적 검색 결과): `lock`, `Path`, `open`, `flock`, `RuntimeError`. 이는 분기별 동적 호출 확정이 아니라 코드를 따라갈 때 찾을 식별자 목록이다. 공유 자원은 전역 `DATA`, `BUILD`, `BINARY`, run의 JSON/SQLite 등이 있는지 본문에서 확인한다.
+
+**6. Python 문법**: `with`는 자원 정리, `try/except/finally`는 오류/항상 수행 경로, `yield`가 있다면 generator, `dict`/list comprehension은 자료 변환, `path / 'file'`은 pathlib 경로 결합, `with db:`는 transaction 문맥 관리다. 반드시 아래 실제 사용 문법만 해당한다고 판단한다.
+
+**7. 구체 예시(실제 실행이 아닌 가상 시나리오)**: 예시 입력에서 반환 조건, 예외 조건, 파일 경로 경계를 한 줄씩 따라가며 함수 실행 전·후 dict/파일/SQLite/프로세스 상태를 기록한다. 숫자나 임계치는 예시이지 측정·고정 값이 아니다.
+
+**8. 경계/성능/보안**: 잘못된 타입, 중복·유실된 JSON 키, 파일 심볼릭링크·권한, 크기 상한, SQLite 부분 커밋, 프로세스 생존 확인, 데이터 내구 경계를 코드 근거로 평가한다. `return` 값만으로 무손실을 단정할 수 없다.
+
+**함수 원본 전체**
+
+```python
+def lock(path):
+    import fcntl
+    with Path(path).open('a') as file:
+        try:
+            fcntl.flock(file, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError as exc:
+            raise RuntimeError('이미 작업 또는 수집이 실행 중입니다.') from exc
+        yield
+```
+
+#### current — [manage.py:498–509](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L498-L509)
+
+**정의(원문)**: `def current(run_id=None):`
+
+**1. 목적**: 명시 ID 또는 current.json에서 run 디렉터리를 얻는다.
+
+**2. 인자·자료형·전달**: 서명에 적힌 파이썬 매개변수를 순서대로 확인한다. 위치 인자는 값으로 참조가 전달되고, `Path`는 경로 객체, `run`은 run 디렉터리, `cfg`는 정규화된 dict인 경우가 많다. 변경 가능한 list/dict는 복사 없이 전달되면 함수 안의 수정이 호출자에게도 보일 수 있다. `*` 뒤의 매개변수는 키워드 전용이다. `=...`는 명시한 기본값이다. 이 함수에서 실제로 사용하는 타입·키는 코드의 `[]` 접근과 validation을 참고한다.
+
+**3. 반환/오류**: `return None` · `raise ValueError('잘못된 run ID입니다.')` · `raise ValueError('run 디렉터리를 찾지 못했습니다.')` · `return path`. Python은 `raise`한 에러를 상위 호출자로 전달하며 CLI의 `main` 진입 보호 코드가 일부 오류를 잡는다.
+
+**4. 내부 처리 순서·데이터 변화**: 아래는 실제 선언 내부의 중요한 조건과 루프(원본 정의 번호):
+- [L500](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L500-L500) `if not run_id:`
+- [L502](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L502-L502) `if str(uuid.UUID(run_id)) != run_id:`
+- [L505](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L505-L505) `if not path.is_dir():`
+
+메모리/파일/SQL 관련 식별자: `read_json`.
+
+**5. 연결 관계**: 코드에서 직접 참조하는 호출 후보(정적 검색 결과): `current`, `read_json`, `get`, `UUID`, `ValueError`, `is_dir`. 이는 분기별 동적 호출 확정이 아니라 코드를 따라갈 때 찾을 식별자 목록이다. 공유 자원은 전역 `DATA`, `BUILD`, `BINARY`, run의 JSON/SQLite 등이 있는지 본문에서 확인한다.
+
+**6. Python 문법**: `with`는 자원 정리, `try/except/finally`는 오류/항상 수행 경로, `yield`가 있다면 generator, `dict`/list comprehension은 자료 변환, `path / 'file'`은 pathlib 경로 결합, `with db:`는 transaction 문맥 관리다. 반드시 아래 실제 사용 문법만 해당한다고 판단한다.
+
+**7. 구체 예시(실제 실행이 아닌 가상 시나리오)**: 예시 입력에서 반환 조건, 예외 조건, 파일 경로 경계를 한 줄씩 따라가며 함수 실행 전·후 dict/파일/SQLite/프로세스 상태를 기록한다. 숫자나 임계치는 예시이지 측정·고정 값이 아니다.
+
+**8. 경계/성능/보안**: 잘못된 타입, 중복·유실된 JSON 키, 파일 심볼릭링크·권한, 크기 상한, SQLite 부분 커밋, 프로세스 생존 확인, 데이터 내구 경계를 코드 근거로 평가한다. `return` 값만으로 무손실을 단정할 수 없다.
+
+**함수 원본 전체**
+
+```python
+def current(run_id=None):
+    run_id = run_id or read_json(DATA / 'current.json', {}).get('run_id')
+    if not run_id:
+        return None
+    if str(uuid.UUID(run_id)) != run_id:
+        raise ValueError('잘못된 run ID입니다.')
+    path = DATA / 'runs' / run_id
+    if not path.is_dir():
+        raise ValueError('run 디렉터리를 찾지 못했습니다.')
+    return path
+```
+
+#### index_coverage — [manage.py:510–540](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L510-L540)
+
+**정의(원문)**: `def index_coverage(health, offsets):`
+
+**1. 목적**: durable raw와 인덱스 cursor의 격차/완료 범위를 계산한다.
+
+**2. 인자·자료형·전달**: 서명에 적힌 파이썬 매개변수를 순서대로 확인한다. 위치 인자는 값으로 참조가 전달되고, `Path`는 경로 객체, `run`은 run 디렉터리, `cfg`는 정규화된 dict인 경우가 많다. 변경 가능한 list/dict는 복사 없이 전달되면 함수 안의 수정이 호출자에게도 보일 수 있다. `*` 뒤의 매개변수는 키워드 전용이다. `=...`는 명시한 기본값이다. 이 함수에서 실제로 사용하는 타입·키는 코드의 `[]` 접근과 validation을 참고한다.
+
+**3. 반환/오류**: `return dict(coverage_state='BOUNDARY_UNKNOWN', durable_offsets={}, indexed_offsets=offsets,` · `raise ValueError('색인/원본 durable 경계 불일치: ' + lane)` · `return dict(coverage_state=state, durable_offsets={lane: durable[lane] for lane in lanes},`. Python은 `raise`한 에러를 상위 호출자로 전달하며 CLI의 `main` 진입 보호 코드가 일부 오류를 잡는다.
+
+**4. 내부 처리 순서·데이터 변화**: 아래는 실제 선언 내부의 중요한 조건과 루프(원본 정의 번호):
+- [L517](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L517-L517) `if not isinstance(durable, dict) or not durable:`
+- [L522](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L522-L522) `for lane in lanes:`
+- [L524](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L524-L524) `if (type(boundary) is not int or type(cursor) is not int or boundary < 0 or cursor < 0 or`
+
+메모리/파일/SQL 관련 식별자: 별도 I/O나 자원 호출이 표시되지 않는 단순 유틸리티일 수 있다. 본문 확인 필요.
+
+**5. 연결 관계**: 코드에서 직접 참조하는 호출 후보(정적 검색 결과): `index_coverage`, `get`, `isinstance`, `raw_lanes`, `type`, `ValueError`, `in`. 이는 분기별 동적 호출 확정이 아니라 코드를 따라갈 때 찾을 식별자 목록이다. 공유 자원은 전역 `DATA`, `BUILD`, `BINARY`, run의 JSON/SQLite 등이 있는지 본문에서 확인한다.
+
+**6. Python 문법**: `with`는 자원 정리, `try/except/finally`는 오류/항상 수행 경로, `yield`가 있다면 generator, `dict`/list comprehension은 자료 변환, `path / 'file'`은 pathlib 경로 결합, `with db:`는 transaction 문맥 관리다. 반드시 아래 실제 사용 문법만 해당한다고 판단한다.
+
+**7. 구체 예시(실제 실행이 아닌 가상 시나리오)**: 예시 입력에서 반환 조건, 예외 조건, 파일 경로 경계를 한 줄씩 따라가며 함수 실행 전·후 dict/파일/SQLite/프로세스 상태를 기록한다. 숫자나 임계치는 예시이지 측정·고정 값이 아니다.
+
+**8. 경계/성능/보안**: 잘못된 타입, 중복·유실된 JSON 키, 파일 심볼릭링크·권한, 크기 상한, SQLite 부분 커밋, 프로세스 생존 확인, 데이터 내구 경계를 코드 근거로 평가한다. `return` 값만으로 무손실을 단정할 수 없다.
+
+**함수 원본 전체**
+
+```python
+def index_coverage(health, offsets):
+    """Compare indexed cursor with a published raw fdatasync boundary.
+
+    A live zero lag is a momentary observation, not final search completeness.
+    Missing or invalid health never turns an empty index into complete coverage.
+    """
+    durable = health.get('durable')
+    if not isinstance(durable, dict) or not durable:
+        return dict(coverage_state='BOUNDARY_UNKNOWN', durable_offsets={}, indexed_offsets=offsets,
+                    lane_coverage={}, lag_bytes=None, lag_records=None, complete_to_durable=False)
+    lanes = raw_lanes(health)
+    lane_coverage, lag_bytes = {}, 0
+    for lane in lanes:
+        boundary, cursor = durable[lane], offsets.get(lane, 0)
+        if (type(boundary) is not int or type(cursor) is not int or boundary < 0 or cursor < 0 or
+                boundary % RECORD_SIZE or cursor % RECORD_SIZE or cursor > boundary):
+            raise ValueError('색인/원본 durable 경계 불일치: ' + lane)
+        lag = boundary - cursor
+        lane_coverage[lane] = dict(durable_offset=boundary, indexed_offset=cursor,
+                                   lag_bytes=lag, lag_records=lag // RECORD_SIZE)
+        lag_bytes += lag
+    terminal = health.get('state') in ('STOPPED', 'FAILED')
+    state = ('INDEX_COMPLETE' if terminal and not lag_bytes else
+             'INDEX_LAG' if terminal else 'LIVE_CAUGHT_UP' if not lag_bytes else 'INDEXING')
+    return dict(coverage_state=state, durable_offsets={lane: durable[lane] for lane in lanes},
+                indexed_offsets={lane: offsets.get(lane, 0) for lane in lanes},
+                lane_coverage=lane_coverage, lag_bytes=lag_bytes,
+                lag_records=lag_bytes // RECORD_SIZE,
+                complete_to_durable=bool(terminal and not lag_bytes))
+```
+
+#### filesystem_free_bytes — [manage.py:541–544](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L541-L544)
+
+**정의(원문)**: `def filesystem_free_bytes(path):`
+
+**1. 목적**: statvfs의 free block 정보를 byte로 계산한다.
+
+**2. 인자·자료형·전달**: 서명에 적힌 파이썬 매개변수를 순서대로 확인한다. 위치 인자는 값으로 참조가 전달되고, `Path`는 경로 객체, `run`은 run 디렉터리, `cfg`는 정규화된 dict인 경우가 많다. 변경 가능한 list/dict는 복사 없이 전달되면 함수 안의 수정이 호출자에게도 보일 수 있다. `*` 뒤의 매개변수는 키워드 전용이다. `=...`는 명시한 기본값이다. 이 함수에서 실제로 사용하는 타입·키는 코드의 `[]` 접근과 validation을 참고한다.
+
+**3. 반환/오류**: `return shutil.disk_usage(path).free`. Python은 `raise`한 에러를 상위 호출자로 전달하며 CLI의 `main` 진입 보호 코드가 일부 오류를 잡는다.
+
+**4. 내부 처리 순서·데이터 변화**: 아래는 실제 선언 내부의 중요한 조건과 루프(원본 정의 번호):
+- 명시 분기 없이 순차 계산/반환한다.
+
+메모리/파일/SQL 관련 식별자: 별도 I/O나 자원 호출이 표시되지 않는 단순 유틸리티일 수 있다. 본문 확인 필요.
+
+**5. 연결 관계**: 코드에서 직접 참조하는 호출 후보(정적 검색 결과): `filesystem_free_bytes`, `disk_usage`. 이는 분기별 동적 호출 확정이 아니라 코드를 따라갈 때 찾을 식별자 목록이다. 공유 자원은 전역 `DATA`, `BUILD`, `BINARY`, run의 JSON/SQLite 등이 있는지 본문에서 확인한다.
+
+**6. Python 문법**: `with`는 자원 정리, `try/except/finally`는 오류/항상 수행 경로, `yield`가 있다면 generator, `dict`/list comprehension은 자료 변환, `path / 'file'`은 pathlib 경로 결합, `with db:`는 transaction 문맥 관리다. 반드시 아래 실제 사용 문법만 해당한다고 판단한다.
+
+**7. 구체 예시(실제 실행이 아닌 가상 시나리오)**: 예시 입력에서 반환 조건, 예외 조건, 파일 경로 경계를 한 줄씩 따라가며 함수 실행 전·후 dict/파일/SQLite/프로세스 상태를 기록한다. 숫자나 임계치는 예시이지 측정·고정 값이 아니다.
+
+**8. 경계/성능/보안**: 잘못된 타입, 중복·유실된 JSON 키, 파일 심볼릭링크·권한, 크기 상한, SQLite 부분 커밋, 프로세스 생존 확인, 데이터 내구 경계를 코드 근거로 평가한다. `return` 값만으로 무손실을 단정할 수 없다.
+
+**함수 원본 전체**
+
+```python
+def filesystem_free_bytes(path):
+    return shutil.disk_usage(path).free
+```
+
+#### storage_usage — [manage.py:545–627](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L545-L627)
+
+**정의(원문)**: `def storage_usage(run, max_entries=STORAGE_SCAN_MAX_ENTRIES):`
+
+**1. 목적**: run 저장소 트리의 사용량과 보조 SQLite 파일도 점검한다.
+
+**2. 인자·자료형·전달**: 서명에 적힌 파이썬 매개변수를 순서대로 확인한다. 위치 인자는 값으로 참조가 전달되고, `Path`는 경로 객체, `run`은 run 디렉터리, `cfg`는 정규화된 dict인 경우가 많다. 변경 가능한 list/dict는 복사 없이 전달되면 함수 안의 수정이 호출자에게도 보일 수 있다. `*` 뒤의 매개변수는 키워드 전용이다. `=...`는 명시한 기본값이다. 이 함수에서 실제로 사용하는 타입·키는 코드의 `[]` 접근과 validation을 참고한다.
+
+**3. 반환/오류**: `return dict(scope='RUN_DIRECTORY_TREE_ONLY', external_exports_included=False,`. Python은 `raise`한 에러를 상위 호출자로 전달하며 CLI의 `main` 진입 보호 코드가 일부 오류를 잡는다.
+
+**4. 내부 처리 순서·데이터 변화**: 아래는 실제 선언 내부의 중요한 조건과 루프(원본 정의 번호):
+- [L559](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L559-L559) `while pending:`
+- [L561](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L561-L561) `try:`
+- [L562](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L562-L562) `with os.scandir(directory) as listing:`
+- [L563](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L563-L563) `for entry in listing:`
+- [L564](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L564-L564) `if entries >= max_entries:`
+- [L568](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L568-L568) `try:`
+- [L571](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L571-L571) `if allocated is not None:`
+- [L573](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L573-L573) `if entry.is_dir(follow_symlinks=False):`
+- [L574](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L574-L574) `if depth < 4:`
+- [L576](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L576-L576) `else:`
+- [L583](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L583-L583) `if parts & {'export', 'exports', 'derived', 'analysis'}:`
+- [L585](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L585-L585) `elif name in LANES:`
+- [L587](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L587-L587) `elif name == 'index.sqlite':`
+- [L589](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L589-L589) `elif (name.startswith('index.sqlite-') or name.startswith('etilqs_') or`
+- [L592](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L592-L592) `elif name.startswith('evidence.meta') or name.endswith(('health.json', 'service.json')):`
+- [L594](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L594-L594) `else:`
+
+메모리/파일/SQL 관련 식별자: `Path`, `read_json`.
+
+**5. 연결 관계**: 코드에서 직접 참조하는 호출 후보(정적 검색 결과): `storage_usage`, `read_json`, `filesystem_free_bytes`, `get`, `type`, `in`, `pop`, `scandir`, `stat`, `hasattr`, `is_dir`, `append`, `Path`, `relative_to`, `elif`, `startswith`, `endswith`. 이는 분기별 동적 호출 확정이 아니라 코드를 따라갈 때 찾을 식별자 목록이다. 공유 자원은 전역 `DATA`, `BUILD`, `BINARY`, run의 JSON/SQLite 등이 있는지 본문에서 확인한다.
+
+**6. Python 문법**: `with`는 자원 정리, `try/except/finally`는 오류/항상 수행 경로, `yield`가 있다면 generator, `dict`/list comprehension은 자료 변환, `path / 'file'`은 pathlib 경로 결합, `with db:`는 transaction 문맥 관리다. 반드시 아래 실제 사용 문법만 해당한다고 판단한다.
+
+**7. 구체 예시(실제 실행이 아닌 가상 시나리오)**: 예시 입력에서 반환 조건, 예외 조건, 파일 경로 경계를 한 줄씩 따라가며 함수 실행 전·후 dict/파일/SQLite/프로세스 상태를 기록한다. 숫자나 임계치는 예시이지 측정·고정 값이 아니다.
+
+**8. 경계/성능/보안**: 잘못된 타입, 중복·유실된 JSON 키, 파일 심볼릭링크·권한, 크기 상한, SQLite 부분 커밋, 프로세스 생존 확인, 데이터 내구 경계를 코드 근거로 평가한다. `return` 값만으로 무손실을 단정할 수 없다.
+
+**함수 원본 전체**
+
+```python
+def storage_usage(run, max_entries=STORAGE_SCAN_MAX_ENTRIES):
+    """Bounded run-tree usage, including transient SQLite sidecars when present.
+
+    st_blocks is an observed allocation estimate, not a physical reservation;
+    exports outside this run tree require the experiment harness inventory.
+    """
+    cfg = read_json(run / 'config.json', {})
+    free = filesystem_free_bytes(run)
+    threshold = cfg.get('minimum_free_mib')
+    threshold_bytes = threshold * 1024**2 if type(threshold) is int else None
+    categories = {name: dict(logical_bytes=0, allocated_bytes=0, file_count=0) for name in
+                  ('raw', 'metadata_control', 'sqlite_main', 'sqlite_sidecars_temp', 'export_derived', 'other')}
+    tree_allocated, logical, files, entries, truncated, unreadable = 0, 0, 0, 0, False, 0
+    pending = [(run, 0)]
+    while pending:
+        directory, depth = pending.pop()
+        try:
+            with os.scandir(directory) as listing:
+                for entry in listing:
+                    if entries >= max_entries:
+                        truncated = True
+                        break
+                    entries += 1
+                    try:
+                        meta = entry.stat(follow_symlinks=False)
+                        allocated = meta.st_blocks * 512 if hasattr(meta, 'st_blocks') else None
+                        if allocated is not None:
+                            tree_allocated += allocated
+                        if entry.is_dir(follow_symlinks=False):
+                            if depth < 4:
+                                pending.append((Path(entry.path), depth + 1))
+                            else:
+                                truncated = True
+                            continue
+                        files += 1
+                        logical += meta.st_size
+                        name = entry.name
+                        parts = set(Path(entry.path).relative_to(run).parts[:-1])
+                        if parts & {'export', 'exports', 'derived', 'analysis'}:
+                            category = 'export_derived'
+                        elif name in LANES:
+                            category = 'raw'
+                        elif name == 'index.sqlite':
+                            category = 'sqlite_main'
+                        elif (name.startswith('index.sqlite-') or name.startswith('etilqs_') or
+                              name.endswith(('-wal', '-journal', '-shm'))):
+                            category = 'sqlite_sidecars_temp'
+                        elif name.startswith('evidence.meta') or name.endswith(('health.json', 'service.json')):
+                            category = 'metadata_control'
+                        else:
+                            category = 'other'
+                        categories[category]['logical_bytes'] += meta.st_size
+                        categories[category]['allocated_bytes'] += allocated or 0
+                        categories[category]['file_count'] += 1
+                    except OSError:
+                        unreadable += 1
+        except OSError:
+            unreadable += 1
+        if truncated and entries >= max_entries:
+            break
+    previous = read_json(run / 'index-health.json', {})
+    was_paused = previous.get('state') == 'INDEX_PAUSED_STORAGE_PRESSURE'
+    if threshold_bytes is None:
+        pressure = 'UNKNOWN'
+    elif free == 0:
+        pressure = 'EXHAUSTED_NOW'
+    elif free < threshold_bytes:
+        pressure = 'LOW_FREE'
+    elif was_paused and free < threshold_bytes + INDEX_PRESSURE_RESUME_EXTRA_BYTES:
+        pressure = 'RECOVERY_HYSTERESIS'
+    else:
+        pressure = 'NORMAL'
+    return dict(scope='RUN_DIRECTORY_TREE_ONLY', external_exports_included=False,
+                measurement='FILE_ST_BLOCKS_TIMES_512_AND_STATVFS_FREE; NOT_A_PHYSICAL_RESERVATION',
+                filesystem_free_bytes=free, configured_minimum_free_bytes=threshold_bytes,
+                pressure=pressure, file_logical_bytes=logical, tree_allocated_bytes=tree_allocated,
+                file_count=files, entries_seen=entries, scan_limit_entries=max_entries,
+                scan_truncated=truncated, unreadable_entries=unreadable,
+                allocation_total_complete=not truncated and not unreadable,
+                critical_reserve_physical=False, external_writers_can_exhaust_filesystem=True,
+                categories=categories)
+```
+
+#### collector_failure_evidence — [manage.py:628–645](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L628-L645)
+
+**정의(원문)**: `def collector_failure_evidence(run, health):`
+
+**1. 목적**: collector 장애 단서를 읽어 상태 분류를 보강한다.
+
+**2. 인자·자료형·전달**: 서명에 적힌 파이썬 매개변수를 순서대로 확인한다. 위치 인자는 값으로 참조가 전달되고, `Path`는 경로 객체, `run`은 run 디렉터리, `cfg`는 정규화된 dict인 경우가 많다. 변경 가능한 list/dict는 복사 없이 전달되면 함수 안의 수정이 호출자에게도 보일 수 있다. `*` 뒤의 매개변수는 키워드 전용이다. `=...`는 명시한 기본값이다. 이 함수에서 실제로 사용하는 타입·키는 코드의 `[]` 접근과 validation을 참고한다.
+
+**3. 반환/오류**: `return dict(physical_enospc_observed=bool(sources), evidence_sources=sources,`. Python은 `raise`한 에러를 상위 호출자로 전달하며 CLI의 `main` 진입 보호 코드가 일부 오류를 잡는다.
+
+**4. 내부 처리 순서·데이터 변화**: 아래는 실제 선언 내부의 중요한 조건과 루프(원본 정의 번호):
+- [L630](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L630-L630) `if health.get('error_errno') == 28:`
+- [L633](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L633-L633) `try:`
+- [L634](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L634-L634) `with log.open('rb') as file:`
+- [L638](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L638-L638) `if any('collector failed:' in line and '(28)' in line for line in tail.splitlines()):`
+- [L640](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L640-L640) `except OSError:`
+
+메모리/파일/SQL 관련 식별자: 별도 I/O나 자원 호출이 표시되지 않는 단순 유틸리티일 수 있다. 본문 확인 필요.
+
+**5. 연결 관계**: 코드에서 직접 참조하는 호출 후보(정적 검색 결과): `collector_failure_evidence`, `get`, `append`, `open`, `seek`, `max`, `tell`, `read`, `decode`, `any`, `splitlines`. 이는 분기별 동적 호출 확정이 아니라 코드를 따라갈 때 찾을 식별자 목록이다. 공유 자원은 전역 `DATA`, `BUILD`, `BINARY`, run의 JSON/SQLite 등이 있는지 본문에서 확인한다.
+
+**6. Python 문법**: `with`는 자원 정리, `try/except/finally`는 오류/항상 수행 경로, `yield`가 있다면 generator, `dict`/list comprehension은 자료 변환, `path / 'file'`은 pathlib 경로 결합, `with db:`는 transaction 문맥 관리다. 반드시 아래 실제 사용 문법만 해당한다고 판단한다.
+
+**7. 구체 예시(실제 실행이 아닌 가상 시나리오)**: 예시 입력에서 반환 조건, 예외 조건, 파일 경로 경계를 한 줄씩 따라가며 함수 실행 전·후 dict/파일/SQLite/프로세스 상태를 기록한다. 숫자나 임계치는 예시이지 측정·고정 값이 아니다.
+
+**8. 경계/성능/보안**: 잘못된 타입, 중복·유실된 JSON 키, 파일 심볼릭링크·권한, 크기 상한, SQLite 부분 커밋, 프로세스 생존 확인, 데이터 내구 경계를 코드 근거로 평가한다. `return` 값만으로 무손실을 단정할 수 없다.
+
+**함수 원본 전체**
+
+```python
+def collector_failure_evidence(run, health):
+    sources = []
+    if health.get('error_errno') == 28:
+        sources.append('COLLECTOR_HEALTH_ERRNO_28')
+    log = run / 'collector.log'
+    try:
+        with log.open('rb') as file:
+            file.seek(0, os.SEEK_END)
+            file.seek(max(0, file.tell() - 8192))
+            tail = file.read().decode('utf-8', 'replace')
+        if any('collector failed:' in line and '(28)' in line for line in tail.splitlines()):
+            sources.append('COLLECTOR_STDERR_ERRNO_28')
+    except OSError:
+        pass
+    return dict(physical_enospc_observed=bool(sources), evidence_sources=sources,
+                evidence_scope='COLLECTOR_HEALTH_OR_BOUNDED_STDERR_TAIL_ONLY')
+```
+
+#### status — [manage.py:646–685](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L646-L685)
+
+**정의(원문)**: `def status(run):`
+
+**1. 목적**: health/service/index/pid 정보를 결합해 실제 run 상태와 증거 완전성을 보고한다.
+
+**2. 인자·자료형·전달**: 서명에 적힌 파이썬 매개변수를 순서대로 확인한다. 위치 인자는 값으로 참조가 전달되고, `Path`는 경로 객체, `run`은 run 디렉터리, `cfg`는 정규화된 dict인 경우가 많다. 변경 가능한 list/dict는 복사 없이 전달되면 함수 안의 수정이 호출자에게도 보일 수 있다. `*` 뒤의 매개변수는 키워드 전용이다. `=...`는 명시한 기본값이다. 이 함수에서 실제로 사용하는 타입·키는 코드의 `[]` 접근과 validation을 참고한다.
+
+**3. 반환/오류**: `return dict(state='UNCONFIGURED', version=VERSION)` · `return dict(version=VERSION, run_id=run.name, run_path=str(run), state=state,`. Python은 `raise`한 에러를 상위 호출자로 전달하며 CLI의 `main` 진입 보호 코드가 일부 오류를 잡는다.
+
+**4. 내부 처리 순서·데이터 변화**: 아래는 실제 선언 내부의 중요한 조건과 루프(원본 정의 번호):
+- [L647](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L647-L647) `if run is None:`
+- [L658](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L658-L658) `if running:`
+- [L660](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L660-L660) `if raw_state == 'RUNNING' and not alive(service.get('collector')):`
+- [L662](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L662-L662) `elif raw_state == 'RUNNING' and time.monotonic() * 1000 - health.get('monotonic_ms', 0) > 5000:`
+- [L664](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L664-L664) `else:`
+- [L667](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L667-L667) `if failure_evidence['physical_enospc_observed'] and not alive(service.get('collector')):`
+- [L672](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L672-L672) `if running and not index_alive and index_state not in ('FAILED', 'INDEX_PARTIAL'):`
+
+메모리/파일/SQL 관련 식별자: `time.monotonic`, `read_json`.
+
+**5. 연결 관계**: 코드에서 직접 참조하는 호출 후보(정적 검색 결과): `status`, `read_json`, `collector_failure_evidence`, `alive`, `get`, `monotonic`, `index_coverage`, `in`, `storage_usage`. 이는 분기별 동적 호출 확정이 아니라 코드를 따라갈 때 찾을 식별자 목록이다. 공유 자원은 전역 `DATA`, `BUILD`, `BINARY`, run의 JSON/SQLite 등이 있는지 본문에서 확인한다.
+
+**6. Python 문법**: `with`는 자원 정리, `try/except/finally`는 오류/항상 수행 경로, `yield`가 있다면 generator, `dict`/list comprehension은 자료 변환, `path / 'file'`은 pathlib 경로 결합, `with db:`는 transaction 문맥 관리다. 반드시 아래 실제 사용 문법만 해당한다고 판단한다.
+
+**7. 구체 예시(실제 실행이 아닌 가상 시나리오)**: 예시 입력에서 반환 조건, 예외 조건, 파일 경로 경계를 한 줄씩 따라가며 함수 실행 전·후 dict/파일/SQLite/프로세스 상태를 기록한다. 숫자나 임계치는 예시이지 측정·고정 값이 아니다.
+
+**8. 경계/성능/보안**: 잘못된 타입, 중복·유실된 JSON 키, 파일 심볼릭링크·권한, 크기 상한, SQLite 부분 커밋, 프로세스 생존 확인, 데이터 내구 경계를 코드 근거로 평가한다. `return` 값만으로 무손실을 단정할 수 없다.
+
+**함수 원본 전체**
+
+```python
+def status(run):
+    if run is None:
+        return dict(state='UNCONFIGURED', version=VERSION)
+    service = read_json(run / 'service.json', {})
+    index = read_json(run / 'index-health.json', {})
+    manifest = read_json(run / 'manifest.json', {})
+    # Read the published raw boundary after index health: a concurrent writer
+    # can advance health between reads, but this order cannot invent coverage.
+    health = read_json(run / 'health.json', {})
+    failure_evidence = collector_failure_evidence(run, health)
+    running = alive(service.get('supervisor'))
+    raw_state = health.get('state', 'STARTING')
+    if running:
+        state = raw_state
+        if raw_state == 'RUNNING' and not alive(service.get('collector')):
+            state = 'FAILED_COLLECTOR'
+        elif raw_state == 'RUNNING' and time.monotonic() * 1000 - health.get('monotonic_ms', 0) > 5000:
+            state = 'STALE_HEARTBEAT'
+    else:
+        state = ('FAILED' if service.get('state') == 'FAILED' or raw_state == 'FAILED' else
+                 'STOPPED' if service.get('state') == 'STOPPED' and raw_state == 'STOPPED' else 'UNEXPECTED_EXIT')
+    if failure_evidence['physical_enospc_observed'] and not alive(service.get('collector')):
+        state = 'FAILED_STORAGE_ENOSPC'
+    coverage = index_coverage(health, index.get('offsets', {}))
+    index_alive = alive(service.get('indexer'))
+    index_state = index.get('state') if index.get('state') in ('FAILED', 'INDEX_PARTIAL', 'INDEX_PAUSED_STORAGE_PRESSURE') else coverage['coverage_state']
+    if running and not index_alive and index_state not in ('FAILED', 'INDEX_PARTIAL'):
+        index_state = 'UNAVAILABLE' if index_state != 'FAILED' else index_state
+    return dict(version=VERSION, run_id=run.name, run_path=str(run), state=state,
+                collector=health, index=dict(index, **coverage, state=index_state, alive=index_alive), service=service,
+                storage=storage_usage(run), failure_evidence=failure_evidence,
+                evidence_metadata=health.get('metadata', {'state': 'LEGACY_NOT_AVAILABLE'}),
+                rule_engine_schema_version=manifest.get('rule_engine_schema_version'),
+                policy_version=manifest.get('policy_version'),
+                config_sha256=manifest.get('config_sha256'),
+                rule_stats=health.get('rule_stats'),
+                rule_stats_scope=health.get('rule_stats_scope'),
+                rule_stats_snapshot_complete=health.get('rule_stats_snapshot_complete'))
+```
+
+#### capability — [manage.py:686–706](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L686-L706)
+
+**정의(원문)**: `def capability():`
+
+**1. 목적**: 운영체제/아키텍처/커널 BPF 기능/빌드물/권한/파일을 검사한다.
+
+**2. 인자·자료형·전달**: 서명에 적힌 파이썬 매개변수를 순서대로 확인한다. 위치 인자는 값으로 참조가 전달되고, `Path`는 경로 객체, `run`은 run 디렉터리, `cfg`는 정규화된 dict인 경우가 많다. 변경 가능한 list/dict는 복사 없이 전달되면 함수 안의 수정이 호출자에게도 보일 수 있다. `*` 뒤의 매개변수는 키워드 전용이다. `=...`는 명시한 기본값이다. 이 함수에서 실제로 사용하는 타입·키는 코드의 `[]` 접근과 validation을 참고한다.
+
+**3. 반환/오류**: `return dict(checks=checks, ready=all(checks.values()), events=['exec_success', 'openat_enter_exit'],`. Python은 `raise`한 에러를 상위 호출자로 전달하며 CLI의 `main` 진입 보호 코드가 일부 오류를 잡는다.
+
+**4. 내부 처리 순서·데이터 변화**: 아래는 실제 선언 내부의 중요한 조건과 루프(원본 정의 번호):
+- [L691](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L691-L691) `for p in ('syscalls/sys_enter_openat', 'syscalls/sys_exit_openat',`
+- [L697](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L697-L697) `if 'microsoft' in platform.release().lower()`
+
+메모리/파일/SQL 관련 식별자: `Path`.
+
+**5. 연결 관계**: 코드에서 직접 참조하는 호출 후보(정적 검색 결과): `capability`, `system`, `machine`, `geteuid`, `Path`, `is_file`, `all`, `in`, `values`, `release`, `lower`. 이는 분기별 동적 호출 확정이 아니라 코드를 따라갈 때 찾을 식별자 목록이다. 공유 자원은 전역 `DATA`, `BUILD`, `BINARY`, run의 JSON/SQLite 등이 있는지 본문에서 확인한다.
+
+**6. Python 문법**: `with`는 자원 정리, `try/except/finally`는 오류/항상 수행 경로, `yield`가 있다면 generator, `dict`/list comprehension은 자료 변환, `path / 'file'`은 pathlib 경로 결합, `with db:`는 transaction 문맥 관리다. 반드시 아래 실제 사용 문법만 해당한다고 판단한다.
+
+**7. 구체 예시(실제 실행이 아닌 가상 시나리오)**: 예시 입력에서 반환 조건, 예외 조건, 파일 경로 경계를 한 줄씩 따라가며 함수 실행 전·후 dict/파일/SQLite/프로세스 상태를 기록한다. 숫자나 임계치는 예시이지 측정·고정 값이 아니다.
+
+**8. 경계/성능/보안**: 잘못된 타입, 중복·유실된 JSON 키, 파일 심볼릭링크·권한, 크기 상한, SQLite 부분 커밋, 프로세스 생존 확인, 데이터 내구 경계를 코드 근거로 평가한다. `return` 값만으로 무손실을 단정할 수 없다.
+
+**함수 원본 전체**
+
+```python
+def capability():
+    checks = dict(linux=platform.system() == 'Linux', x86_64=platform.machine() == 'x86_64',
+                  root=os.geteuid() == 0, btf=Path('/sys/kernel/btf/vmlinux').is_file(),
+                  binary=BINARY.is_file(), bpf_object=OBJECT.is_file())
+    checks['tracepoints'] = all(Path('/sys/kernel/tracing/events', p, 'format').is_file()
+                               for p in ('syscalls/sys_enter_openat', 'syscalls/sys_exit_openat',
+                                         'sched/sched_process_exec', 'sched/sched_process_exit'))
+    return dict(checks=checks, ready=all(checks.values()), events=['exec_success', 'openat_enter_exit'],
+                all_uid=True, all_syscall=False, file_identity='EXACT_CAPTURED_ABSOLUTE_PATH_ONLY',
+                pid_namespace='HOST_INITIAL_PID_NAMESPACE', uid_namespace='HOST_INITIAL_USER_NAMESPACE',
+                observation_scope=('SHARED_WSL_KERNEL_NOT_QEMU_VM'
+                                   if 'microsoft' in platform.release().lower()
+                                   else 'HOST_LINUX_KERNEL'),
+                signing='UNSIGNED_CRC32_ONLY', independent_index_process=True,
+                remote_collector=False, metadata='BOUNDED_COMMITTED_JOURNAL_AND_AGGREGATE_COUNTERS',
+                critical_guard='PER_STREAM_QUARANTINE_WITH_ORIGINAL_PRIORITY_RETAINED',
+                critical_stream_key='CGROUP_RULE_EVENT_KIND', protected_critical='CONFIGURED_RULE_EXEMPTION',
+                quarantine_release='EVENT_DRIVEN_HYSTERESIS', ledger_recovery='READ_ONLY_COMMITTED_PREFIX',
+                bpf_load_verified_only_after_start=True)
+```
+
+#### create_run — [manage.py:707–756](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L707-L756)
+
+**정의(원문)**: `def create_run(cfg):`
+
+**1. 목적**: 공간 사전검사 후 UUID run, immutable config/manifest/rules.bin을 만들고 current를 게시한다.
+
+**2. 인자·자료형·전달**: 서명에 적힌 파이썬 매개변수를 순서대로 확인한다. 위치 인자는 값으로 참조가 전달되고, `Path`는 경로 객체, `run`은 run 디렉터리, `cfg`는 정규화된 dict인 경우가 많다. 변경 가능한 list/dict는 복사 없이 전달되면 함수 안의 수정이 호출자에게도 보일 수 있다. `*` 뒤의 매개변수는 키워드 전용이다. `=...`는 명시한 기본값이다. 이 함수에서 실제로 사용하는 타입·키는 코드의 `[]` 접근과 validation을 참고한다.
+
+**3. 반환/오류**: `raise RuntimeError('시작 조건 실패: ' + json.dumps(cap['checks']))` · `raise RuntimeError('이미 수집 중입니다. 먼저 중지하세요.')` · `raise RuntimeError('저장 공간이 부족합니다. 기존 run은 자동 삭제하지 않습니다.')` · `return run`. Python은 `raise`한 에러를 상위 호출자로 전달하며 CLI의 `main` 진입 보호 코드가 일부 오류를 잡는다.
+
+**4. 내부 처리 순서·데이터 변화**: 아래는 실제 선언 내부의 중요한 조건과 루프(원본 정의 번호):
+- [L710](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L710-L710) `if not cap['ready']:`
+- [L713](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L713-L713) `if old and (alive(read_json(old / 'service.json', {}).get('supervisor')) or`
+- [L718](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L718-L718) `if free_before < need:`
+- [L725](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L725-L725) `if rule_file is not None:`
+- [L747](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L747-L747) `if rule_file is not None:`
+
+메모리/파일/SQL 관련 식별자: `json.dumps`, `hashlib.sha256`, `Path`, `time.monotonic`, `read_json`, `atomic_json`.
+
+**5. 연결 관계**: 코드에서 직접 참조하는 호출 후보(정적 검색 결과): `create_run`, `capability`, `RuntimeError`, `dumps`, `current`, `and`, `alive`, `read_json`, `get`, `filesystem_free_bytes`, `uuid4`, `mkdir`, `encode`, `compile_rule_file`, `atomic_bytes`, `chmod`, `now`, `isoformat`, `monotonic_ns`, `time_ns`. 이는 분기별 동적 호출 확정이 아니라 코드를 따라갈 때 찾을 식별자 목록이다. 공유 자원은 전역 `DATA`, `BUILD`, `BINARY`, run의 JSON/SQLite 등이 있는지 본문에서 확인한다.
+
+**6. Python 문법**: `with`는 자원 정리, `try/except/finally`는 오류/항상 수행 경로, `yield`가 있다면 generator, `dict`/list comprehension은 자료 변환, `path / 'file'`은 pathlib 경로 결합, `with db:`는 transaction 문맥 관리다. 반드시 아래 실제 사용 문법만 해당한다고 판단한다.
+
+**7. 구체 예시(실제 실행이 아닌 가상 시나리오)**: 새 run 이름은 UUID이고 설정 해시·BPF 실행 파일 해시가 manifest에 묶인다. 공간 검사 미통과 시 시작을 거부하므로 기존 run을 삭제하지 않는다.
+
+**8. 경계/성능/보안**: 잘못된 타입, 중복·유실된 JSON 키, 파일 심볼릭링크·권한, 크기 상한, SQLite 부분 커밋, 프로세스 생존 확인, 데이터 내구 경계를 코드 근거로 평가한다. `return` 값만으로 무손실을 단정할 수 없다.
+
+**함수 원본 전체**
+
+```python
+def create_run(cfg):
+    """Create and publish a run with control.lock and collector.lock held."""
+    cap = capability()
+    if not cap['ready']:
+        raise RuntimeError('시작 조건 실패: ' + json.dumps(cap['checks']))
+    old = current()
+    if old and (alive(read_json(old / 'service.json', {}).get('supervisor')) or
+                alive(read_json(old / 'service.json', {}).get('collector'))):
+        raise RuntimeError('이미 수집 중입니다. 먼저 중지하세요.')
+    need = (cfg['minimum_free_mib'] + cfg['max_raw_mib'] + cfg['max_index_mib'] + cfg['metadata_max_mib']) * 1024**2
+    free_before = filesystem_free_bytes(DATA)
+    if free_before < need:
+        raise RuntimeError('저장 공간이 부족합니다. 기존 run은 자동 삭제하지 않습니다.')
+    run = DATA / 'runs' / str(uuid.uuid4())
+    run.mkdir(parents=True, mode=0o700)
+    canonical = json.dumps(cfg, sort_keys=True, separators=(',', ':')).encode()
+    advanced_rules = 'event_rules' in cfg
+    rule_file = compile_rule_file(cfg) if advanced_rules else None
+    if rule_file is not None:
+        atomic_bytes(run / 'rules.bin', rule_file)
+        os.chmod(run / 'rules.bin', 0o400)
+    manifest = dict(version=VERSION, schema=1, raw_schema=3,
+                    raw_record_size=240,
+                    quality_extension='RULE_ID_POLICY_AND_VERSIONS_V1',
+                    rule_engine_schema_version=1, policy_version=1,
+                    run_id=run.name, created_utc=dt.datetime.now(dt.UTC).isoformat(),
+                    clock_anchor=dict(monotonic_ns=time.monotonic_ns(), realtime_ns=time.time_ns(),
+                                      precision='SEQUENTIAL_READS_APPROXIMATE_NOT_CLOCK_STEP_PROOF'),
+                    kernel=platform.release(), boot_id=Path('/proc/sys/kernel/random/boot_id').read_text().strip(),
+                    config_sha256=hashlib.sha256(canonical).hexdigest(),
+                    collector_sha256=fingerprint(BINARY), bpf_sha256=fingerprint(OBJECT),
+                    storage_preflight=dict(filesystem_free_bytes=free_before, required_free_bytes=need,
+                        raw_limit_bytes=cfg['max_raw_mib'] * 1024**2,
+                        sqlite_main_limit_bytes=cfg['max_index_mib'] * 1024**2,
+                        metadata_limit_bytes=cfg['metadata_max_mib'] * 1024**2,
+                        auxiliary_headroom_bytes=cfg['minimum_free_mib'] * 1024**2,
+                        physical_reservation=False, critical_reserve_physical=False,
+                        external_writers_can_exhaust_filesystem=True,
+                        sqlite_journal_not_hard_capped=True, sqlite_temp_store='MEMORY'),
+                    capability=cap, ordering='PER_CGROUP_SEQUENCE_NOT_GLOBAL_CAUSAL_ORDER')
+    if rule_file is not None:
+        manifest['rules_bin_sha256'] = hashlib.sha256(rule_file).hexdigest()
+    atomic_json(run / 'config.json', cfg)
+    atomic_json(run / 'manifest.json', manifest)
+    os.chmod(run / 'config.json', 0o400)
+    os.chmod(run / 'manifest.json', 0o400)
+    atomic_json(DATA / 'current.json', dict(run_id=run.name))
+    return run
+```
+
+#### start — [manage.py:757–775](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L757-L775)
+
+**정의(원문)**: `def start(cfg):`
+
+**1. 목적**: 잠금으로 중복 실행을 막고 serve 자식을 띄운 후 RUNNING을 확인한다.
+
+**2. 인자·자료형·전달**: 서명에 적힌 파이썬 매개변수를 순서대로 확인한다. 위치 인자는 값으로 참조가 전달되고, `Path`는 경로 객체, `run`은 run 디렉터리, `cfg`는 정규화된 dict인 경우가 많다. 변경 가능한 list/dict는 복사 없이 전달되면 함수 안의 수정이 호출자에게도 보일 수 있다. `*` 뒤의 매개변수는 키워드 전용이다. `=...`는 명시한 기본값이다. 이 함수에서 실제로 사용하는 타입·키는 코드의 `[]` 접근과 validation을 참고한다.
+
+**3. 반환/오류**: `return state` · `raise RuntimeError(f'시작 실패. {run}/collector.log 및 service.log 확인')` · `raise RuntimeError(f'시작 제한 시간 초과. {run}에서 실제 상태를 확인하세요.')`. Python은 `raise`한 에러를 상위 호출자로 전달하며 CLI의 `main` 진입 보호 코드가 일부 오류를 잡는다.
+
+**4. 내부 처리 순서·데이터 변화**: 아래는 실제 선언 내부의 중요한 조건과 루프(원본 정의 번호):
+- [L760](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L760-L760) `with lock(DATA / 'collector.lock'):`
+- [L762](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L762-L762) `with (run / 'service.log').open('ab') as log:`
+- [L765](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L765-L765) `for _ in range(70):`
+- [L767](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L767-L767) `if state['state'] == 'RUNNING':`
+- [L769](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L769-L769) `if process.poll() is not None:`
+
+메모리/파일/SQL 관련 식별자: `subprocess.Popen`, `lock(`.
+
+**5. 연결 관계**: 코드에서 직접 참조하는 호출 후보(정적 검색 결과): `start`, `main`, `lock`, `create_run`, `with`, `open`, `Popen`, `status`, `poll`, `RuntimeError`, `sleep`, `terminate`. 이는 분기별 동적 호출 확정이 아니라 코드를 따라갈 때 찾을 식별자 목록이다. 공유 자원은 전역 `DATA`, `BUILD`, `BINARY`, run의 JSON/SQLite 등이 있는지 본문에서 확인한다.
+
+**6. Python 문법**: `with`는 자원 정리, `try/except/finally`는 오류/항상 수행 경로, `yield`가 있다면 generator, `dict`/list comprehension은 자료 변환, `path / 'file'`은 pathlib 경로 결합, `with db:`는 transaction 문맥 관리다. 반드시 아래 실제 사용 문법만 해당한다고 판단한다.
+
+**7. 구체 예시(실제 실행이 아닌 가상 시나리오)**: 예시 입력에서 반환 조건, 예외 조건, 파일 경로 경계를 한 줄씩 따라가며 함수 실행 전·후 dict/파일/SQLite/프로세스 상태를 기록한다. 숫자나 임계치는 예시이지 측정·고정 값이 아니다.
+
+**8. 경계/성능/보안**: 잘못된 타입, 중복·유실된 JSON 키, 파일 심볼릭링크·권한, 크기 상한, SQLite 부분 커밋, 프로세스 생존 확인, 데이터 내구 경계를 코드 근거로 평가한다. `return` 값만으로 무손실을 단정할 수 없다.
+
+**함수 원본 전체**
+
+```python
+def start(cfg):
+    # main() holds control.lock. Take collector.lock before publishing a run
+    # so an active foreground collector cannot be superseded.
+    with lock(DATA / 'collector.lock'):
+        run = create_run(cfg)
+    with (run / 'service.log').open('ab') as log:
+        process = subprocess.Popen([sys.executable, str(ROOT / 'manage.py'), 'serve', '--run', run.name],
+                                   stdin=subprocess.DEVNULL, stdout=log, stderr=log, start_new_session=True)
+    for _ in range(70):
+        state = status(run)
+        if state['state'] == 'RUNNING':
+            return state
+        if process.poll() is not None:
+            raise RuntimeError(f'시작 실패. {run}/collector.log 및 service.log 확인')
+        time.sleep(0.1)
+    process.terminate()
+    raise RuntimeError(f'시작 제한 시간 초과. {run}에서 실제 상태를 확인하세요.')
+```
+
+#### serve — [manage.py:776–857](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L776-L857)
+
+**정의(원문)**: `def serve(run, collector_lock_held=False):`
+
+**1. 목적**: collector와 indexer subprocess를 띄우며 stop 시그널, 설정 해시, 종료 상태를 관리한다.
+
+**2. 인자·자료형·전달**: 서명에 적힌 파이썬 매개변수를 순서대로 확인한다. 위치 인자는 값으로 참조가 전달되고, `Path`는 경로 객체, `run`은 run 디렉터리, `cfg`는 정규화된 dict인 경우가 많다. 변경 가능한 list/dict는 복사 없이 전달되면 함수 안의 수정이 호출자에게도 보일 수 있다. `*` 뒤의 매개변수는 키워드 전용이다. `=...`는 명시한 기본값이다. 이 함수에서 실제로 사용하는 타입·키는 코드의 `[]` 접근과 validation을 참고한다.
+
+**3. 반환/오류**: `raise ValueError('규칙 바이너리와 manifest 해시가 다릅니다.')` · `raise RuntimeError(f'collector 비정상 종료: {child.returncode}; {run}/collector.log 확인')`. Python은 `raise`한 에러를 상위 호출자로 전달하며 CLI의 `main` 진입 보호 코드가 일부 오류를 잡는다.
+
+**4. 내부 처리 순서·데이터 변화**: 아래는 실제 선언 내부의 중요한 조건과 루프(원본 정의 번호):
+- [L786](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L786-L786) `if advanced_rules and fingerprint(run / 'rules.bin') != manifest.get('rules_bin_sha256'):`
+- [L797](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L797-L797) `if advanced_rules:`
+- [L799](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L799-L799) `else:`
+- [L801](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L801-L801) `for rule in cfg['critical_rules']:`
+- [L805](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L805-L805) `with collector_guard, (run / 'collector.log').open('ab') as log:`
+- [L813](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L813-L813) `try:`
+- [L814](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L814-L814) `with (run / 'indexer.log').open('ab') as index_log:`
+- [L819](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L819-L819) `while child.poll() is None and not quit_:`
+- [L821](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L821-L821) `finally:`
+- [L822](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L822-L822) `if child.poll() is None:`
+- [L824](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L824-L824) `try:`
+- [L826](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L826-L826) `except subprocess.TimeoutExpired:`
+- [L829](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L829-L829) `if indexer:`
+- [L830](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L830-L830) `try:`
+- [L832](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L832-L832) `except subprocess.TimeoutExpired:`
+- [L834](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L834-L834) `try:`
+
+메모리/파일/SQL 관련 식별자: `subprocess.Popen`, `signal.signal`, `time.monotonic`, `read_json`, `atomic_json`, `lock(`.
+
+**5. 연결 관계**: 코드에서 직접 참조하는 호출 후보(정적 검색 결과): `serve`, `stop_handler`, `signal`, `read_json`, `fingerprint`, `get`, `ValueError`, `copy`, `update`, `extend`, `append`, `nullcontext`, `lock`, `open`, `identity`, `atomic_json`, `Popen`, `with`, `poll`, `sleep`. 이는 분기별 동적 호출 확정이 아니라 코드를 따라갈 때 찾을 식별자 목록이다. 공유 자원은 전역 `DATA`, `BUILD`, `BINARY`, run의 JSON/SQLite 등이 있는지 본문에서 확인한다.
+
+**6. Python 문법**: `with`는 자원 정리, `try/except/finally`는 오류/항상 수행 경로, `yield`가 있다면 generator, `dict`/list comprehension은 자료 변환, `path / 'file'`은 pathlib 경로 결합, `with db:`는 transaction 문맥 관리다. 반드시 아래 실제 사용 문법만 해당한다고 판단한다.
+
+**7. 구체 예시(실제 실행이 아닌 가상 시나리오)**: 예시 입력에서 반환 조건, 예외 조건, 파일 경로 경계를 한 줄씩 따라가며 함수 실행 전·후 dict/파일/SQLite/프로세스 상태를 기록한다. 숫자나 임계치는 예시이지 측정·고정 값이 아니다.
+
+**8. 경계/성능/보안**: 잘못된 타입, 중복·유실된 JSON 키, 파일 심볼릭링크·권한, 크기 상한, SQLite 부분 커밋, 프로세스 생존 확인, 데이터 내구 경계를 코드 근거로 평가한다. `return` 값만으로 무손실을 단정할 수 없다.
+
+**함수 원본 전체**
+
+```python
+def serve(run, collector_lock_held=False):
+    quit_ = False
+    def stop_handler(*_):
+        nonlocal quit_
+        quit_ = True
+    signal.signal(signal.SIGTERM, stop_handler)
+    signal.signal(signal.SIGINT, stop_handler)
+    cfg = read_json(run / 'config.json')
+    manifest = read_json(run / 'manifest.json')
+    advanced_rules = 'event_rules' in cfg
+    if advanced_rules and fingerprint(run / 'rules.bin') != manifest.get('rules_bin_sha256'):
+        raise ValueError('규칙 바이너리와 manifest 해시가 다릅니다.')
+    child_env = os.environ.copy()
+    child_env.update(MGLOGWH_RUN_ID=run.name, MGLOGWH_MANIFEST_SHA256=fingerprint(run / 'manifest.json'),
+                     MGLOGWH_CONFIG_SHA256=manifest['config_sha256'], MGLOGWH_BOOT_ID=manifest['boot_id'])
+    collector_command = [str(BINARY), str(run), str(cfg['bulk_rate']), str(cfg['bulk_burst']),
+                         cfg['protected_path'], str(cfg['max_raw_mib']), str(cfg['critical_reserve_mib']),
+                         str(cfg['metadata_max_mib']), str(cfg['quarantine_max_mib']),
+                         str(cfg['critical_rate_threshold']), str(cfg['critical_rate_duration_seconds'] * 1000),
+                         str(cfg['critical_recovery_threshold']), str(cfg['critical_recovery_duration_seconds'] * 1000),
+                         str(cfg['quarantine_initial_full_events']), str(cfg['quarantine_sample_interval_ms'])]
+    if advanced_rules:
+        collector_command.extend(['--rules-file', str(run / 'rules.bin')])
+    else:
+        collector_command.append(str(len(cfg['critical_rules'])))
+        for rule in cfg['critical_rules']:
+            collector_command.extend([str(rule['id']), '2' if rule['event_type'] == 'openat' else '1',
+                                      '1' if rule['protected'] else '0', rule['path']])
+    collector_guard = contextlib.nullcontext() if collector_lock_held else lock(DATA / 'collector.lock')
+    with collector_guard, (run / 'collector.log').open('ab') as log:
+        service = dict(supervisor=identity(), state='STARTING')
+        atomic_json(run / 'service.json', service)
+        child = subprocess.Popen(collector_command,
+                                 stdin=subprocess.DEVNULL, stdout=log, stderr=log, env=child_env)
+        service.update(collector=identity(child.pid), state='RUNNING')
+        atomic_json(run / 'service.json', service)
+        indexer = None
+        try:
+            with (run / 'indexer.log').open('ab') as index_log:
+                indexer = subprocess.Popen([sys.executable, str(ROOT / 'manage.py'), 'index-worker', '--run', run.name],
+                                           stdin=subprocess.DEVNULL, stdout=index_log, stderr=index_log)
+            service['indexer'] = identity(indexer.pid)
+            atomic_json(run / 'service.json', service)
+            while child.poll() is None and not quit_:
+                time.sleep(0.2)
+        finally:
+            if child.poll() is None:
+                child.terminate()
+                try:
+                    child.wait(timeout=8)
+                except subprocess.TimeoutExpired:
+                    child.kill()
+                    child.wait()
+            if indexer:
+                try:
+                    indexer.wait(timeout=INDEX_FINAL_CATCHUP_SECONDS + INDEX_JOIN_GRACE_SECONDS)
+                except subprocess.TimeoutExpired:
+                    indexer.terminate()
+                    try:
+                        indexer.wait(timeout=3)
+                    except subprocess.TimeoutExpired:
+                        indexer.kill()
+                        indexer.wait()
+                service['indexer_exit'] = indexer.returncode
+                if indexer.returncode != 0:
+                    old = read_json(run / 'index-health.json', {})
+                    try:
+                        coverage = index_coverage(read_json(run / 'health.json', {}), old.get('offsets', {}))
+                        if not coverage['complete_to_durable']:
+                            atomic_json(run / 'index-health.json', dict(old, **coverage,
+                                state='INDEX_PARTIAL', error=old.get('error', 'index worker exited before catch-up'),
+                                last_error_monotonic_ns=time.monotonic_ns()))
+                    except (OSError, ValueError):
+                        # External service/indexer exit status still exposes a failed stop
+                        # when a full filesystem prevents writing the index health file.
+                        pass
+            service.update(state='STOPPED' if child.returncode == 0 else 'FAILED', collector_exit=child.returncode)
+            atomic_json(run / 'service.json', service)
+    if child.returncode != 0:
+        raise RuntimeError(f'collector 비정상 종료: {child.returncode}; {run}/collector.log 확인')
+```
+
+#### stop_handler — [manage.py:778–780](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L778-L780)
+
+**정의(원문)**: `def stop_handler(*_):`
+
+**1. 목적**: SIGINT·SIGTERM에서 외부 변수 quit_를 바꿔 main supervisor loop 종료를 요청한다.
+
+**2. 인자·자료형·전달**: 서명에 적힌 파이썬 매개변수를 순서대로 확인한다. 위치 인자는 값으로 참조가 전달되고, `Path`는 경로 객체, `run`은 run 디렉터리, `cfg`는 정규화된 dict인 경우가 많다. 변경 가능한 list/dict는 복사 없이 전달되면 함수 안의 수정이 호출자에게도 보일 수 있다. `*` 뒤의 매개변수는 키워드 전용이다. `=...`는 명시한 기본값이다. 이 함수에서 실제로 사용하는 타입·키는 코드의 `[]` 접근과 validation을 참고한다.
+
+**3. 반환/오류**: 명시적 return이 없으면 None 반환(예외 발생 시 중단). Python은 `raise`한 에러를 상위 호출자로 전달하며 CLI의 `main` 진입 보호 코드가 일부 오류를 잡는다.
+
+**4. 내부 처리 순서·데이터 변화**: 아래는 실제 선언 내부의 중요한 조건과 루프(원본 정의 번호):
+- 명시 분기 없이 순차 계산/반환한다.
+
+메모리/파일/SQL 관련 식별자: 별도 I/O나 자원 호출이 표시되지 않는 단순 유틸리티일 수 있다. 본문 확인 필요.
+
+**5. 연결 관계**: 코드에서 직접 참조하는 호출 후보(정적 검색 결과): `stop_handler`. 이는 분기별 동적 호출 확정이 아니라 코드를 따라갈 때 찾을 식별자 목록이다. 공유 자원은 전역 `DATA`, `BUILD`, `BINARY`, run의 JSON/SQLite 등이 있는지 본문에서 확인한다.
+
+**6. Python 문법**: `with`는 자원 정리, `try/except/finally`는 오류/항상 수행 경로, `yield`가 있다면 generator, `dict`/list comprehension은 자료 변환, `path / 'file'`은 pathlib 경로 결합, `with db:`는 transaction 문맥 관리다. 반드시 아래 실제 사용 문법만 해당한다고 판단한다.
+
+**7. 구체 예시(실제 실행이 아닌 가상 시나리오)**: 예시 입력에서 반환 조건, 예외 조건, 파일 경로 경계를 한 줄씩 따라가며 함수 실행 전·후 dict/파일/SQLite/프로세스 상태를 기록한다. 숫자나 임계치는 예시이지 측정·고정 값이 아니다.
+
+**8. 경계/성능/보안**: 잘못된 타입, 중복·유실된 JSON 키, 파일 심볼릭링크·권한, 크기 상한, SQLite 부분 커밋, 프로세스 생존 확인, 데이터 내구 경계를 코드 근거로 평가한다. `return` 값만으로 무손실을 단정할 수 없다.
+
+**함수 원본 전체**
+
+```python
+    def stop_handler(*_):
+        nonlocal quit_
+        quit_ = True
+```
+
+#### stop_run — [manage.py:858–877](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L858-L877)
+
+**정의(원문)**: `def stop_run(run):`
+
+**1. 목적**: 현재 supervisor PID 정체성을 검사해 신호를 전달하고 중단을 확인한다.
+
+**2. 인자·자료형·전달**: 서명에 적힌 파이썬 매개변수를 순서대로 확인한다. 위치 인자는 값으로 참조가 전달되고, `Path`는 경로 객체, `run`은 run 디렉터리, `cfg`는 정규화된 dict인 경우가 많다. 변경 가능한 list/dict는 복사 없이 전달되면 함수 안의 수정이 호출자에게도 보일 수 있다. `*` 뒤의 매개변수는 키워드 전용이다. `=...`는 명시한 기본값이다. 이 함수에서 실제로 사용하는 타입·키는 코드의 `[]` 접근과 validation을 참고한다.
+
+**3. 반환/오류**: `return status(None)` · `return status(run)` · `raise RuntimeError('중지 지연: collector.log와 상태를 확인하세요. 강제 삭제하지 않았습니다.')` · `return status(run)`. Python은 `raise`한 에러를 상위 호출자로 전달하며 CLI의 `main` 진입 보호 코드가 일부 오류를 잡는다.
+
+**4. 내부 처리 순서·데이터 변화**: 아래는 실제 선언 내부의 중요한 조건과 루프(원본 정의 번호):
+- [L859](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L859-L859) `if run is None:`
+- [L863](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L863-L863) `if alive(expected):`
+- [L865](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L865-L865) `try:`
+- [L866](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L866-L866) `if alive(expected):`
+- [L868](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L868-L868) `finally:`
+- [L870](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L870-L870) `for _ in range(int((INDEX_FINAL_CATCHUP_SECONDS + INDEX_JOIN_GRACE_SECONDS + 20) * 10)):`
+- [L871](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L871-L871) `if not alive(expected):`
+
+메모리/파일/SQL 관련 식별자: `read_json`.
+
+**5. 연결 관계**: 코드에서 직접 참조하는 호출 후보(정적 검색 결과): `stop_run`, `status`, `read_json`, `get`, `alive`, `pidfd_open`, `pidfd_send_signal`, `close`, `sleep`, `RuntimeError`. 이는 분기별 동적 호출 확정이 아니라 코드를 따라갈 때 찾을 식별자 목록이다. 공유 자원은 전역 `DATA`, `BUILD`, `BINARY`, run의 JSON/SQLite 등이 있는지 본문에서 확인한다.
+
+**6. Python 문법**: `with`는 자원 정리, `try/except/finally`는 오류/항상 수행 경로, `yield`가 있다면 generator, `dict`/list comprehension은 자료 변환, `path / 'file'`은 pathlib 경로 결합, `with db:`는 transaction 문맥 관리다. 반드시 아래 실제 사용 문법만 해당한다고 판단한다.
+
+**7. 구체 예시(실제 실행이 아닌 가상 시나리오)**: 예시 입력에서 반환 조건, 예외 조건, 파일 경로 경계를 한 줄씩 따라가며 함수 실행 전·후 dict/파일/SQLite/프로세스 상태를 기록한다. 숫자나 임계치는 예시이지 측정·고정 값이 아니다.
+
+**8. 경계/성능/보안**: 잘못된 타입, 중복·유실된 JSON 키, 파일 심볼릭링크·권한, 크기 상한, SQLite 부분 커밋, 프로세스 생존 확인, 데이터 내구 경계를 코드 근거로 평가한다. `return` 값만으로 무손실을 단정할 수 없다.
+
+**함수 원본 전체**
+
+```python
+def stop_run(run):
+    if run is None:
+        return status(None)
+    expected = read_json(run / 'service.json', {}).get('supervisor')
+    # pidfd pins the process: no signalling a reused PID between check and kill.
+    if alive(expected):
+        fd = os.pidfd_open(expected['pid'])
+        try:
+            if alive(expected):
+                signal.pidfd_send_signal(fd, signal.SIGTERM)
+        finally:
+            os.close(fd)
+        for _ in range(int((INDEX_FINAL_CATCHUP_SECONDS + INDEX_JOIN_GRACE_SECONDS + 20) * 10)):
+            if not alive(expected):
+                return status(run)
+            time.sleep(0.1)
+        raise RuntimeError('중지 지연: collector.log와 상태를 확인하세요. 강제 삭제하지 않았습니다.')
+    return status(run)
+```
+
+#### decode_record — [manage.py:878–929](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L878-L929)
+
+**정의(원문)**: `def decode_record(raw):`
+
+**1. 목적**: 240B raw를 CRC32/schema/priority/quality/lane의 의미에 맞춰 Python dict로 만든다.
+
+**2. 인자·자료형·전달**: 서명에 적힌 파이썬 매개변수를 순서대로 확인한다. 위치 인자는 값으로 참조가 전달되고, `Path`는 경로 객체, `run`은 run 디렉터리, `cfg`는 정규화된 dict인 경우가 많다. 변경 가능한 list/dict는 복사 없이 전달되면 함수 안의 수정이 호출자에게도 보일 수 있다. `*` 뒤의 매개변수는 키워드 전용이다. `=...`는 명시한 기본값이다. 이 함수에서 실제로 사용하는 타입·키는 코드의 `[]` 접근과 validation을 참고한다.
+
+**3. 반환/오류**: `raise ValueError('잘린 레코드')` · `raise ValueError('CRC32 불일치 또는 예약 필드 손상')` · `raise ValueError('지원하지 않는 schema/event')` · `raise ValueError('지원하지 않는 quality/policy')` · `raise ValueError('priority·rule·effective policy 불일치')` · `raise ValueError('schema 3 규칙·priority·policy·버전 불일치')` · `return value`. Python은 `raise`한 에러를 상위 호출자로 전달하며 CLI의 `main` 진입 보호 코드가 일부 오류를 잡는다.
+
+**4. 내부 처리 순서·데이터 변화**: 아래는 실제 선언 내부의 중요한 조건과 루프(원본 정의 번호):
+- [L879](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L879-L879) `if len(raw) != RECORD_SIZE:`
+- [L882](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L882-L882) `if reserved or zlib.crc32(payload) != checksum:`
+- [L885](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L885-L885) `if value['magic'] != 0x31514f45 or value['schema'] not in (1, 2, 3) or value['kind'] not in (1, 2) or value['priority'] not in (0, 1, 2):`
+- [L889](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L889-L889) `if quality & ~allowed:`
+- [L894](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L894-L894) `if value['schema'] == 2 and ((value['priority'] == 2) != bool(rule_id) or`
+- [L902](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L902-L902) `if value['schema'] == 3 and (rule_version != 1 or policy_version != 1 or policy == 3 or`
+- [L911](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L911-L911) `if value['schema'] == 3 else None)`
+- [L925](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L925-L925) `for name in ('comm', 'path'):`
+
+메모리/파일/SQL 관련 식별자: `struct.unpack`, `zlib.crc32`, `decode_record`.
+
+**5. 연결 관계**: 코드에서 직접 참조하는 호출 후보(정적 검색 결과): `decode_record`, `ValueError`, `unpack`, `crc32`, `zip`, `in`, `and`, `or`, `not`, `else`, `update`, `split`, `decode`. 이는 분기별 동적 호출 확정이 아니라 코드를 따라갈 때 찾을 식별자 목록이다. 공유 자원은 전역 `DATA`, `BUILD`, `BINARY`, run의 JSON/SQLite 등이 있는지 본문에서 확인한다.
+
+**6. Python 문법**: `with`는 자원 정리, `try/except/finally`는 오류/항상 수행 경로, `yield`가 있다면 generator, `dict`/list comprehension은 자료 변환, `path / 'file'`은 pathlib 경로 결합, `with db:`는 transaction 문맥 관리다. 반드시 아래 실제 사용 문법만 해당한다고 판단한다.
+
+**7. 구체 예시(실제 실행이 아닌 가상 시나리오)**: 길이 240바이트 raw를 넘기면 앞쪽 event와 마지막 CRC/예약 8바이트로 나눈다. CRC가 다르면 ValueError로 중단하고 정상인 경우 schema/quality/policy를 검증해 dict를 만든다.
+
+**8. 경계/성능/보안**: 잘못된 타입, 중복·유실된 JSON 키, 파일 심볼릭링크·권한, 크기 상한, SQLite 부분 커밋, 프로세스 생존 확인, 데이터 내구 경계를 코드 근거로 평가한다. `return` 값만으로 무손실을 단정할 수 없다.
+
+**함수 원본 전체**
+
+```python
+def decode_record(raw):
+    if len(raw) != RECORD_SIZE:
+        raise ValueError('잘린 레코드')
+    payload, checksum, reserved = raw[:-8], *struct.unpack('<II', raw[-8:])
+    if reserved or zlib.crc32(payload) != checksum:
+        raise ValueError('CRC32 불일치 또는 예약 필드 손상')
+    value = dict(zip(FIELDS, EVENT.unpack(payload)))
+    if value['magic'] != 0x31514f45 or value['schema'] not in (1, 2, 3) or value['kind'] not in (1, 2) or value['priority'] not in (0, 1, 2):
+        raise ValueError('지원하지 않는 schema/event')
+    quality = value['quality']
+    allowed = 3 if value['schema'] == 1 else QUALITY_MASK if value['schema'] == 2 else QUALITY_MASK_V3
+    if quality & ~allowed:
+        raise ValueError('지원하지 않는 quality/policy')
+    q, protected = bool(quality & Q_QUARANTINED), bool(quality & Q_PROTECTED)
+    initial, periodic = bool(quality & Q_INITIAL), bool(quality & Q_PERIODIC)
+    rule_id = (quality >> 16) & 255 if value['schema'] >= 2 else None
+    if value['schema'] == 2 and ((value['priority'] == 2) != bool(rule_id) or
+            (q and protected) or (q and initial == periodic) or
+            (not q and (initial or periodic or (quality & Q_UNTRACKED and not protected))) or
+            (value['priority'] != 2 and (q or protected))):
+        raise ValueError('priority·rule·effective policy 불일치')
+    policy = (quality >> Q_POLICY_SHIFT) & 3 if value['schema'] == 3 else None
+    rule_version = (quality >> Q_RULE_VERSION_SHIFT) & 15 if value['schema'] == 3 else None
+    policy_version = (quality >> Q_POLICY_VERSION_SHIFT) & 15 if value['schema'] == 3 else None
+    if value['schema'] == 3 and (rule_version != 1 or policy_version != 1 or policy == 3 or
+            (value['priority'] == 2 and not rule_id) or
+            (value['priority'] != 2 and (policy != 0 or q or protected or initial or periodic or quality & Q_UNTRACKED)) or
+            (policy == 0 and (q or protected or initial or periodic or quality & Q_UNTRACKED)) or
+            (policy == 1 and protected) or (policy == 2 and (not protected or q)) or
+            (q and initial == periodic) or (not q and (initial or periodic)) or
+            (quality & Q_UNTRACKED and not (q or protected))):
+        raise ValueError('schema 3 규칙·priority·policy·버전 불일치')
+    configured_policy = (('NORMAL_COLLECTION', 'QUARANTINE', 'QUARANTINE_EXEMPT')[policy]
+                         if value['schema'] == 3 else None)
+    effective_policy = ('QUARANTINE' if q else 'QUARANTINE_EXEMPT' if protected else
+                        'CRITICAL' if value['priority'] == 2 else
+                        'NORMAL' if value['priority'] == 1 else 'BULK') if value['schema'] == 3 else (
+                        'QUARANTINE' if q else 'PROTECTED_CRITICAL' if protected else
+                        'CRITICAL' if value['priority'] == 2 else 'NORMAL' if value['priority'] == 1 else 'BULK')
+    value.update(original_priority=value['priority'], rule_id=rule_id, capture_quality=quality & 3,
+                 priority_name=('BULK', 'NORMAL', 'CRITICAL')[value['priority']],
+                 configured_overload_policy=configured_policy,
+                 rule_version=rule_version, policy_version=policy_version,
+                 effective_policy=effective_policy,
+                 quarantine_sample_kind='INITIAL_FULL' if initial else 'PERIODIC_SAMPLE' if periodic else None,
+                 stream_tracking_complete=not bool(quality & Q_UNTRACKED),
+                 quarantine_tracking_complete=not bool(quality & Q_UNTRACKED))
+    for name in ('comm', 'path'):
+        value[name] = value[name].split(b'\0', 1)[0].decode('utf-8', 'replace')
+    return value
+```
+
+#### index_batch — [manage.py:930–1025](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L930-L1025)
+
+**정의(원문)**: `def index_batch(run, max_records=2048):`
+
+**1. 목적**: health가 공개한 durable 범위의 raw를 SQLite events와 cursor에 같은 transaction으로 반영한다.
+
+**2. 인자·자료형·전달**: 서명에 적힌 파이썬 매개변수를 순서대로 확인한다. 위치 인자는 값으로 참조가 전달되고, `Path`는 경로 객체, `run`은 run 디렉터리, `cfg`는 정규화된 dict인 경우가 많다. 변경 가능한 list/dict는 복사 없이 전달되면 함수 안의 수정이 호출자에게도 보일 수 있다. `*` 뒤의 매개변수는 키워드 전용이다. `=...`는 명시한 기본값이다. 이 함수에서 실제로 사용하는 타입·키는 코드의 `[]` 접근과 validation을 참고한다.
+
+**3. 반환/오류**: `return 0` · `raise ValueError('다른 run/config의 인덱스입니다. 원본은 변경하지 않습니다.')` · `raise ValueError('durable 경계 불일치')` · `raise ValueError('durable 경계보다 원본 파일이 짧습니다.')` · `raise ValueError('lane 분류 불일치')` · `raise ValueError('동일 event ID의 다른 payload: 원본 보존, 인덱싱 중단')` · `return processed`. Python은 `raise`한 에러를 상위 호출자로 전달하며 CLI의 `main` 진입 보호 코드가 일부 오류를 잡는다.
+
+**4. 내부 처리 순서·데이터 변화**: 아래는 실제 선언 내부의 중요한 조건과 루프(원본 정의 번호):
+- [L943](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L943-L943) `if free < pressure_floor or (previous.get('state') == 'INDEX_PAUSED_STORAGE_PRESSURE' and free < resume_floor):`
+- [L945](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L945-L945) `try:`
+- [L950](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L950-L950) `except OSError:`
+- [L959](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L959-L959) `try:`
+- [L977](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L977-L977) `with db:`
+- [L978](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L978-L978) `for key in ('run_id', 'config_sha256', 'bpf_sha256'):`
+- [L980](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L980-L980) `if old and old[0] != manifest[key]:`
+- [L984](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L984-L984) `for lane in lanes:`
+- [L988](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L988-L988) `if type(limit) is not int or limit < offset or limit % RECORD_SIZE:`
+- [L991](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L991-L991) `if limit > (path.stat().st_size if path.exists() else 0):`
+- [L993](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L993-L993) `if limit > offset:`
+- [L994](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L994-L994) `with path.open('rb') as file:`
+- [L996](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L996-L996) `for _ in range(min((limit - offset) // RECORD_SIZE, max_records // len(lanes))):`
+- [L1000](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L1000-L1000) `if expected_lane != lane:`
+- [L1004](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L1004-L1004) `if old and old[0] != raw:`
+- [L1021](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L1021-L1021) `finally:`
+
+메모리/파일/SQL 관련 식별자: `sqlite3.connect`, `db.execute`, `db.executescript`, `time.monotonic`, `read_json`, `atomic_json`, `decode_record`.
+
+**5. 연결 관계**: 코드에서 직접 참조하는 호출 후보(정적 검색 결과): `index_batch`, `read_json`, `filesystem_free_bytes`, `or`, `get`, `index_coverage`, `atomic_json`, `monotonic_ns`, `raw_lanes`, `connect`, `execute`, `fetchone`, `executescript`, `events`, `KEY`, `cursor`, `lineage`, `in`, `ValueError`, `VALUES`. 이는 분기별 동적 호출 확정이 아니라 코드를 따라갈 때 찾을 식별자 목록이다. 공유 자원은 전역 `DATA`, `BUILD`, `BINARY`, run의 JSON/SQLite 등이 있는지 본문에서 확인한다.
+
+**6. Python 문법**: `with`는 자원 정리, `try/except/finally`는 오류/항상 수행 경로, `yield`가 있다면 generator, `dict`/list comprehension은 자료 변환, `path / 'file'`은 pathlib 경로 결합, `with db:`는 transaction 문맥 관리다. 반드시 아래 실제 사용 문법만 해당한다고 판단한다.
+
+**7. 구체 예시(실제 실행이 아닌 가상 시나리오)**: health durable=480B, cursor=240B, 레코드 크기=240B이면 최소 다음 한 레코드를 읽을 수 있다. SQLite events 행과 cursor가 같은 transaction으로 커밋되어 재실행 시 중복을 방지한다.
+
+**8. 경계/성능/보안**: 잘못된 타입, 중복·유실된 JSON 키, 파일 심볼릭링크·권한, 크기 상한, SQLite 부분 커밋, 프로세스 생존 확인, 데이터 내구 경계를 코드 근거로 평가한다. `return` 값만으로 무손실을 단정할 수 없다.
+
+**함수 원본 전체**
+
+```python
+def index_batch(run, max_records=2048):
+    """A transaction commits rows and offsets together; repeat is idempotent.
+
+    Only published fdatasync boundaries are used, including after a crash.
+    Uncommitted tails are preserved, not silently promoted to durable evidence.
+    """
+    previous = read_json(run / 'index-health.json', {})
+    health = read_json(run / 'health.json', {})
+    manifest = read_json(run / 'manifest.json')
+    cfg = read_json(run / 'config.json')
+    free = filesystem_free_bytes(run)
+    pressure_floor = cfg['minimum_free_mib'] * 1024**2
+    resume_floor = pressure_floor + INDEX_PRESSURE_RESUME_EXTRA_BYTES
+    if free < pressure_floor or (previous.get('state') == 'INDEX_PAUSED_STORAGE_PRESSURE' and free < resume_floor):
+        coverage = index_coverage(health, previous.get('offsets', {}))
+        try:
+            atomic_json(run / 'index-health.json', dict(previous, **coverage,
+                state='INDEX_PAUSED_STORAGE_PRESSURE', filesystem_free_bytes=free,
+                pressure_floor_bytes=pressure_floor, resume_floor_bytes=resume_floor,
+                last_pressure_monotonic_ns=time.monotonic_ns()))
+        except OSError:
+            # The external status path can still report free space and stale
+            # process identity if the filesystem cannot accept this small file.
+            pass
+        return 0
+    lanes = raw_lanes(health)
+    db = sqlite3.connect(run / 'index.sqlite', timeout=2)
+    processed = 0
+    offsets = {}
+    try:
+        db.execute('PRAGMA journal_mode=DELETE')
+        db.execute('PRAGMA synchronous=FULL')
+        db.execute('PRAGMA cache_size=-4096')
+        # Keep SQLite sort/work tables out of an untracked /tmp filesystem.
+        # SQLite's rollback journal remains beside index.sqlite and is included
+        # in the observed run-tree allocation; it is not physically reserved.
+        db.execute('PRAGMA temp_store=MEMORY')
+        pages = cfg['max_index_mib'] * 1024 * 1024 // db.execute('PRAGMA page_size').fetchone()[0]
+        db.execute(f'PRAGMA max_page_count={pages}')
+        db.executescript('''CREATE TABLE IF NOT EXISTS events (
+            cgroup TEXT NOT NULL, seq INTEGER NOT NULL, monotonic_ns INTEGER,
+            priority INTEGER, pid INTEGER, uid INTEGER, kind INTEGER, path TEXT,
+            payload BLOB NOT NULL, PRIMARY KEY(cgroup,seq));
+            CREATE INDEX IF NOT EXISTS recent ON events(monotonic_ns DESC);
+            CREATE INDEX IF NOT EXISTS priority_recent ON events(priority,monotonic_ns DESC);
+            CREATE TABLE IF NOT EXISTS cursor(lane TEXT PRIMARY KEY, offset INTEGER NOT NULL);
+            CREATE TABLE IF NOT EXISTS lineage(key TEXT PRIMARY KEY, value TEXT NOT NULL);''')
+        with db:
+            for key in ('run_id', 'config_sha256', 'bpf_sha256'):
+                old = db.execute('SELECT value FROM lineage WHERE key=?', (key,)).fetchone()
+                if old and old[0] != manifest[key]:
+                    raise ValueError('다른 run/config의 인덱스입니다. 원본은 변경하지 않습니다.')
+                db.execute('INSERT OR IGNORE INTO lineage VALUES (?,?)', (key, manifest[key]))
+            # Critical first; every lane gets a bounded per-iteration quota.
+            for lane in lanes:
+                row = db.execute('SELECT offset FROM cursor WHERE lane=?', (lane,)).fetchone()
+                offset = row[0] if row else 0
+                limit = health.get('durable', {}).get(lane, 0)
+                if type(limit) is not int or limit < offset or limit % RECORD_SIZE:
+                    raise ValueError('durable 경계 불일치')
+                path = run / lane
+                if limit > (path.stat().st_size if path.exists() else 0):
+                    raise ValueError('durable 경계보다 원본 파일이 짧습니다.')
+                if limit > offset:
+                    with path.open('rb') as file:
+                        file.seek(offset)
+                        for _ in range(min((limit - offset) // RECORD_SIZE, max_records // len(lanes))):
+                            raw = file.read(RECORD_SIZE)
+                            e = decode_record(raw)
+                            expected_lane = 'quarantine.raw' if e['effective_policy'] == 'QUARANTINE' else 'critical.raw' if e['priority'] == 2 else 'general.raw'
+                            if expected_lane != lane:
+                                raise ValueError('lane 분류 불일치')
+                            key = (str(e['cgroup_id']), e['sequence'])
+                            old = db.execute('SELECT payload FROM events WHERE cgroup=? AND seq=?', key).fetchone()
+                            if old and old[0] != raw:
+                                raise ValueError('동일 event ID의 다른 payload: 원본 보존, 인덱싱 중단')
+                            db.execute('INSERT OR IGNORE INTO events VALUES (?,?,?,?,?,?,?,?,?)',
+                                       (*key, e['monotonic_ns'], e['priority'], e['pid'], e['uid'], e['kind'], e['path'], raw))
+                            offset += RECORD_SIZE
+                            processed += 1
+                offsets[lane] = offset
+                db.execute('INSERT OR REPLACE INTO cursor VALUES (?,?)', (lane, offset))
+        previous = read_json(run / 'index-health.json', {})
+        previous.pop('error', None)
+        coverage = index_coverage(health, offsets)
+        now_ns = time.monotonic_ns()
+        atomic_json(run / 'index-health.json', dict(previous, **coverage, state=coverage['coverage_state'],
+                    offsets=offsets, indexed_records=sum(offsets.values()) // RECORD_SIZE,
+                    last_progress_monotonic_ns=now_ns if processed else previous.get('last_progress_monotonic_ns'),
+                    updated_monotonic_ns=now_ns, updated_utc=dt.datetime.now(dt.UTC).isoformat(),
+                    config_sha256=manifest['config_sha256']))
+    finally:
+        db.close()
+    return processed
+```
+
+#### index_run — [manage.py:1026–1068](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L1026-L1068)
+
+**정의(원문)**: `def index_run(run, worker=False, max_seconds=INDEX_FINAL_CATCHUP_SECONDS):`
+
+**1. 목적**: index.lock과 별도 worker 자원 상한을 이용해 bounded catch-up을 반복한다.
+
+**2. 인자·자료형·전달**: 서명에 적힌 파이썬 매개변수를 순서대로 확인한다. 위치 인자는 값으로 참조가 전달되고, `Path`는 경로 객체, `run`은 run 디렉터리, `cfg`는 정규화된 dict인 경우가 많다. 변경 가능한 list/dict는 복사 없이 전달되면 함수 안의 수정이 호출자에게도 보일 수 있다. `*` 뒤의 매개변수는 키워드 전용이다. `=...`는 명시한 기본값이다. 이 함수에서 실제로 사용하는 타입·키는 코드의 `[]` 접근과 validation을 참고한다.
+
+**3. 반환/오류**: `raise ValueError('먼저 수집을 시작하세요.')` · `raise ValueError('색인 시간 한도는 0~120초여야 합니다.')` · `raise` · `return read_json(run / 'index-health.json', {})`. Python은 `raise`한 에러를 상위 호출자로 전달하며 CLI의 `main` 진입 보호 코드가 일부 오류를 잡는다.
+
+**4. 내부 처리 순서·데이터 변화**: 아래는 실제 선언 내부의 중요한 조건과 루프(원본 정의 번호):
+- [L1027](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L1027-L1027) `if run is None:`
+- [L1029](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L1029-L1029) `if not math.isfinite(max_seconds) or not 0 <= max_seconds <= 120:`
+- [L1031](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L1031-L1031) `with lock(run / 'index.lock'):`
+- [L1032](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L1032-L1032) `if worker:`
+- [L1037](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L1037-L1037) `try:`
+- [L1039](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L1039-L1039) `while True:`
+- [L1046](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L1046-L1046) `if coverage['complete_to_durable'] or (not worker and not count):`
+- [L1048](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L1048-L1048) `if worker and deadline is None and (terminal or not alive(svc.get('collector')) or`
+- [L1051](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L1051-L1051) `if deadline is not None and time.monotonic() >= deadline:`
+- [L1052](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L1052-L1052) `if coverage['lag_bytes']:`
+- [L1055](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L1055-L1055) `elif not terminal:`
+- [L1061](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L1061-L1061) `except Exception as exc:`
+
+메모리/파일/SQL 관련 식별자: `time.monotonic`, `read_json`, `atomic_json`, `lock(`.
+
+**5. 연결 관계**: 코드에서 직접 참조하는 호출 후보(정적 검색 결과): `index_run`, `ValueError`, `isfinite`, `lock`, `nice`, `setrlimit`, `monotonic`, `index_batch`, `read_json`, `index_coverage`, `get`, `in`, `or`, `and`, `alive`, `atomic_json`, `monotonic_ns`, `sleep`. 이는 분기별 동적 호출 확정이 아니라 코드를 따라갈 때 찾을 식별자 목록이다. 공유 자원은 전역 `DATA`, `BUILD`, `BINARY`, run의 JSON/SQLite 등이 있는지 본문에서 확인한다.
+
+**6. Python 문법**: `with`는 자원 정리, `try/except/finally`는 오류/항상 수행 경로, `yield`가 있다면 generator, `dict`/list comprehension은 자료 변환, `path / 'file'`은 pathlib 경로 결합, `with db:`는 transaction 문맥 관리다. 반드시 아래 실제 사용 문법만 해당한다고 판단한다.
+
+**7. 구체 예시(실제 실행이 아닌 가상 시나리오)**: 예시 입력에서 반환 조건, 예외 조건, 파일 경로 경계를 한 줄씩 따라가며 함수 실행 전·후 dict/파일/SQLite/프로세스 상태를 기록한다. 숫자나 임계치는 예시이지 측정·고정 값이 아니다.
+
+**8. 경계/성능/보안**: 잘못된 타입, 중복·유실된 JSON 키, 파일 심볼릭링크·권한, 크기 상한, SQLite 부분 커밋, 프로세스 생존 확인, 데이터 내구 경계를 코드 근거로 평가한다. `return` 값만으로 무손실을 단정할 수 없다.
+
+**함수 원본 전체**
+
+```python
+def index_run(run, worker=False, max_seconds=INDEX_FINAL_CATCHUP_SECONDS):
+    if run is None:
+        raise ValueError('먼저 수집을 시작하세요.')
+    if not math.isfinite(max_seconds) or not 0 <= max_seconds <= 120:
+        raise ValueError('색인 시간 한도는 0~120초여야 합니다.')
+    with lock(run / 'index.lock'):
+        if worker:
+            os.nice(10)
+            import resource
+            resource.setrlimit(resource.RLIMIT_NOFILE, (64, 64))
+            resource.setrlimit(resource.RLIMIT_AS, (256 * 1024**2, 256 * 1024**2))
+        try:
+            deadline = None if worker else time.monotonic() + max_seconds
+            while True:
+                count = index_batch(run)
+                index = read_json(run / 'index-health.json', {})
+                health = read_json(run / 'health.json', {})
+                svc = read_json(run / 'service.json', {})
+                coverage = index_coverage(health, index.get('offsets', {}))
+                terminal = health.get('state') in ('STOPPED', 'FAILED')
+                if coverage['complete_to_durable'] or (not worker and not count):
+                    break
+                if worker and deadline is None and (terminal or not alive(svc.get('collector')) or
+                                                    not alive(svc.get('supervisor'))):
+                    deadline = time.monotonic() + max_seconds
+                if deadline is not None and time.monotonic() >= deadline:
+                    if coverage['lag_bytes']:
+                        atomic_json(run / 'index-health.json', dict(index, **coverage, state='INDEX_LAG',
+                            catchup_limit_seconds=max_seconds, catchup_deadline_monotonic_ns=time.monotonic_ns()))
+                    elif not terminal:
+                        atomic_json(run / 'index-health.json', dict(index, **coverage, state='INDEX_PARTIAL',
+                            error='collector ended without a final raw health boundary',
+                            last_error_monotonic_ns=time.monotonic_ns()))
+                    break
+                time.sleep(0.1 if count else 0.5)
+        except Exception as exc:
+            old = read_json(run / 'index-health.json', {})
+            atomic_json(run / 'index-health.json', dict(old, state='FAILED', error=str(exc),
+                        last_error_monotonic_ns=time.monotonic_ns()))
+            raise
+    return read_json(run / 'index-health.json', {})
+```
+
+#### query — [manage.py:1069–1089](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L1069-L1089)
+
+**정의(원문)**: `def query(run, critical=False, limit=30):`
+
+**1. 목적**: SQLite에서 최근 raw를 조회하고 decode_record로 검증한다.
+
+**2. 인자·자료형·전달**: 서명에 적힌 파이썬 매개변수를 순서대로 확인한다. 위치 인자는 값으로 참조가 전달되고, `Path`는 경로 객체, `run`은 run 디렉터리, `cfg`는 정규화된 dict인 경우가 많다. 변경 가능한 list/dict는 복사 없이 전달되면 함수 안의 수정이 호출자에게도 보일 수 있다. `*` 뒤의 매개변수는 키워드 전용이다. `=...`는 명시한 기본값이다. 이 함수에서 실제로 사용하는 타입·키는 코드의 `[]` 접근과 validation을 참고한다.
+
+**3. 반환/오류**: `raise ValueError('아직 인덱스가 없습니다. 상태 확인 또는 인덱스 재개를 실행하세요.')` · `return dict(run_id=run.name, source='INDEX', index=dict(index_health, **coverage, state=index_state),`. Python은 `raise`한 에러를 상위 호출자로 전달하며 CLI의 `main` 진입 보호 코드가 일부 오류를 잡는다.
+
+**4. 내부 처리 순서·데이터 변화**: 아래는 실제 선언 내부의 중요한 조건과 루프(원본 정의 번호):
+- [L1070](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L1070-L1070) `if run is None or not (run / 'index.sqlite').exists():`
+- [L1073](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L1073-L1073) `with sqlite3.connect(database_uri, uri=True, timeout=2) as db:`
+
+메모리/파일/SQL 관련 식별자: `sqlite3.connect`, `db.execute`, `read_json`, `decode_record`.
+
+**5. 연결 관계**: 코드에서 직접 참조하는 호출 후보(정적 검색 결과): `query`, `not`, `exists`, `ValueError`, `resolve`, `as_uri`, `connect`, `execute`, `fetchall`, `read_json`, `index_coverage`, `get`, `in`, `decode_record`. 이는 분기별 동적 호출 확정이 아니라 코드를 따라갈 때 찾을 식별자 목록이다. 공유 자원은 전역 `DATA`, `BUILD`, `BINARY`, run의 JSON/SQLite 등이 있는지 본문에서 확인한다.
+
+**6. Python 문법**: `with`는 자원 정리, `try/except/finally`는 오류/항상 수행 경로, `yield`가 있다면 generator, `dict`/list comprehension은 자료 변환, `path / 'file'`은 pathlib 경로 결합, `with db:`는 transaction 문맥 관리다. 반드시 아래 실제 사용 문법만 해당한다고 판단한다.
+
+**7. 구체 예시(실제 실행이 아닌 가상 시나리오)**: 예시 입력에서 반환 조건, 예외 조건, 파일 경로 경계를 한 줄씩 따라가며 함수 실행 전·후 dict/파일/SQLite/프로세스 상태를 기록한다. 숫자나 임계치는 예시이지 측정·고정 값이 아니다.
+
+**8. 경계/성능/보안**: 잘못된 타입, 중복·유실된 JSON 키, 파일 심볼릭링크·권한, 크기 상한, SQLite 부분 커밋, 프로세스 생존 확인, 데이터 내구 경계를 코드 근거로 평가한다. `return` 값만으로 무손실을 단정할 수 없다.
+
+**함수 원본 전체**
+
+```python
+def query(run, critical=False, limit=30):
+    if run is None or not (run / 'index.sqlite').exists():
+        raise ValueError('아직 인덱스가 없습니다. 상태 확인 또는 인덱스 재개를 실행하세요.')
+    database_uri = (run / 'index.sqlite').resolve().as_uri() + '?mode=ro'
+    with sqlite3.connect(database_uri, uri=True, timeout=2) as db:
+        db.execute('PRAGMA temp_store=MEMORY')
+        db.execute('BEGIN')  # Cursor and search rows come from one SQLite read snapshot.
+        offsets = dict(db.execute('SELECT lane,offset FROM cursor'))
+        sql = 'SELECT payload FROM events' + (' WHERE priority=2' if critical else '')
+        rows = db.execute(sql + ' ORDER BY monotonic_ns DESC LIMIT ?', (limit,)).fetchall()
+    health = read_json(run / 'health.json', {})
+    coverage = index_coverage(health, offsets)
+    index_health = read_json(run / 'index-health.json', {})
+    index_state = index_health.get('state') if index_health.get('state') in ('FAILED', 'INDEX_PARTIAL', 'INDEX_PAUSED_STORAGE_PRESSURE') else coverage['coverage_state']
+    return dict(run_id=run.name, source='INDEX', index=dict(index_health, **coverage, state=index_state),
+                search_complete_to_durable=bool(coverage['complete_to_durable'] and health.get('state') == 'STOPPED'),
+                zero_results_mean='ABSENT_FROM_INDEXED_DURABLE_RAW_ONLY' if
+                    coverage['complete_to_durable'] and health.get('state') == 'STOPPED' else 'INDEX_INCOMPLETE_OR_RUN_OPEN',
+                records=[decode_record(row[0]) for row in rows])
+```
+
+#### raw_search — [manage.py:1090–1145](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L1090-L1145)
+
+**정의(원문)**: `def raw_search(run, path, limit=30, max_bytes=RAW_SEARCH_DEFAULT_MAX_BYTES, max_seconds=15.0):`
+
+**1. 목적**: 인덱스에 의존하지 않고 durable 원본에서 경로를 범위 제한하에 검색한다.
+
+**2. 인자·자료형·전달**: 서명에 적힌 파이썬 매개변수를 순서대로 확인한다. 위치 인자는 값으로 참조가 전달되고, `Path`는 경로 객체, `run`은 run 디렉터리, `cfg`는 정규화된 dict인 경우가 많다. 변경 가능한 list/dict는 복사 없이 전달되면 함수 안의 수정이 호출자에게도 보일 수 있다. `*` 뒤의 매개변수는 키워드 전용이다. `=...`는 명시한 기본값이다. 이 함수에서 실제로 사용하는 타입·키는 코드의 `[]` 접근과 validation을 참고한다.
+
+**3. 반환/오류**: `raise ValueError('검색할 Linux 절대 경로가 필요합니다.')` · `raise ValueError('raw 검색의 결과·바이트·시간 한도가 잘못됐습니다.')` · `raise ValueError('공표된 raw durable 경계가 없어 검색할 수 없습니다.')` · `raise ValueError('raw durable 경계/파일 불일치: ' + lane)` · `return dict(run_id=run.name, source='RAW_DURABLE_READ_ONLY', match_path=path, records=records,`. Python은 `raise`한 에러를 상위 호출자로 전달하며 CLI의 `main` 진입 보호 코드가 일부 오류를 잡는다.
+
+**4. 내부 처리 순서·데이터 변화**: 아래는 실제 선언 내부의 중요한 조건과 루프(원본 정의 번호):
+- [L1096](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L1096-L1096) `if run is None or not isinstance(path, str) or not path.startswith('/') or '\x00' in path:`
+- [L1098](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L1098-L1098) `if (not 1 <= limit <= 100 or not RECORD_SIZE <= max_bytes <= 1024**3 or`
+- [L1103](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L1103-L1103) `if not isinstance(durable, dict) or not durable:`
+- [L1106](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L1106-L1106) `for lane in lanes:`
+- [L1109](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L1109-L1109) `if type(boundary) is not int or boundary < 0 or boundary % RECORD_SIZE or (source.stat().st_size if source.exists() else 0) < boundary:`
+- [L1115](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L1115-L1115) `for lane in lanes:`
+- [L1117](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L1117-L1117) `if not boundary:`
+- [L1119](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L1119-L1119) `with (run / lane).open('rb') as file:`
+- [L1120](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L1120-L1120) `while offsets[lane] < boundary:`
+- [L1121](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L1121-L1121) `if searched + RECORD_SIZE > max_bytes:`
+- [L1124](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L1124-L1124) `if time.monotonic() - start >= max_seconds:`
+- [L1130](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L1130-L1130) `if event['path'] == path:`
+- [L1132](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L1132-L1132) `if len(records) >= limit:`
+- [L1135](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L1135-L1135) `if limit_reason:`
+
+메모리/파일/SQL 관련 식별자: `time.monotonic`, `read_json`, `decode_record`.
+
+**5. 연결 관계**: 코드에서 직접 참조하는 호출 후보(정적 검색 결과): `raw_search`, `isinstance`, `startswith`, `ValueError`, `isfinite`, `read_json`, `get`, `raw_lanes`, `type`, `or`, `stat`, `exists`, `monotonic`, `with`, `open`, `decode_record`, `read`, `append`. 이는 분기별 동적 호출 확정이 아니라 코드를 따라갈 때 찾을 식별자 목록이다. 공유 자원은 전역 `DATA`, `BUILD`, `BINARY`, run의 JSON/SQLite 등이 있는지 본문에서 확인한다.
+
+**6. Python 문법**: `with`는 자원 정리, `try/except/finally`는 오류/항상 수행 경로, `yield`가 있다면 generator, `dict`/list comprehension은 자료 변환, `path / 'file'`은 pathlib 경로 결합, `with db:`는 transaction 문맥 관리다. 반드시 아래 실제 사용 문법만 해당한다고 판단한다.
+
+**7. 구체 예시(실제 실행이 아닌 가상 시나리오)**: 예시 입력에서 반환 조건, 예외 조건, 파일 경로 경계를 한 줄씩 따라가며 함수 실행 전·후 dict/파일/SQLite/프로세스 상태를 기록한다. 숫자나 임계치는 예시이지 측정·고정 값이 아니다.
+
+**8. 경계/성능/보안**: 잘못된 타입, 중복·유실된 JSON 키, 파일 심볼릭링크·권한, 크기 상한, SQLite 부분 커밋, 프로세스 생존 확인, 데이터 내구 경계를 코드 근거로 평가한다. `return` 값만으로 무손실을 단정할 수 없다.
+
+**함수 원본 전체**
+
+```python
+def raw_search(run, path, limit=30, max_bytes=RAW_SEARCH_DEFAULT_MAX_BYTES, max_seconds=15.0):
+    """Bounded read-only exact-path search of the published durable raw prefix.
+
+    This never expands the indexed boundary, repairs an index, or searches an
+    uncommitted suffix. A cap hit is reported as partial even if matches exist.
+    """
+    if run is None or not isinstance(path, str) or not path.startswith('/') or '\x00' in path:
+        raise ValueError('검색할 Linux 절대 경로가 필요합니다.')
+    if (not 1 <= limit <= 100 or not RECORD_SIZE <= max_bytes <= 1024**3 or
+            not math.isfinite(max_seconds) or not 0 < max_seconds <= 120):
+        raise ValueError('raw 검색의 결과·바이트·시간 한도가 잘못됐습니다.')
+    health = read_json(run / 'health.json', {})
+    durable = health.get('durable')
+    if not isinstance(durable, dict) or not durable:
+        raise ValueError('공표된 raw durable 경계가 없어 검색할 수 없습니다.')
+    lanes = raw_lanes(health)
+    for lane in lanes:
+        boundary = durable[lane]
+        source = run / lane
+        if type(boundary) is not int or boundary < 0 or boundary % RECORD_SIZE or (source.stat().st_size if source.exists() else 0) < boundary:
+            raise ValueError('raw durable 경계/파일 불일치: ' + lane)
+    start = time.monotonic()
+    offsets = {lane: 0 for lane in lanes}
+    records, searched = [], 0
+    limit_reason = None
+    for lane in lanes:
+        boundary = durable[lane]
+        if not boundary:
+            continue
+        with (run / lane).open('rb') as file:
+            while offsets[lane] < boundary:
+                if searched + RECORD_SIZE > max_bytes:
+                    limit_reason = 'MAX_BYTES'
+                    break
+                if time.monotonic() - start >= max_seconds:
+                    limit_reason = 'MAX_SECONDS'
+                    break
+                event = decode_record(file.read(RECORD_SIZE))
+                offsets[lane] += RECORD_SIZE
+                searched += RECORD_SIZE
+                if event['path'] == path:
+                    records.append(event)
+                    if len(records) >= limit:
+                        limit_reason = 'MAX_RESULTS'
+                        break
+        if limit_reason:
+            break
+    remaining = {lane: dict(start=offsets[lane], end=durable[lane]) for lane in lanes if offsets[lane] < durable[lane]}
+    complete = not remaining and health.get('state') == 'STOPPED'
+    return dict(run_id=run.name, source='RAW_DURABLE_READ_ONLY', match_path=path, records=records,
+                published_durable_offsets={lane: durable[lane] for lane in lanes}, searched_offsets=offsets,
+                searched_bytes=searched, unsearched_ranges=remaining,
+                search_complete_to_durable=complete, limit_reason=limit_reason,
+                zero_results_mean='ABSENT_FROM_DURABLE_RAW_ONLY' if complete else 'PARTIAL_OR_RUN_OPEN')
+```
+
+#### main — [manage.py:1146–1239](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L1146-L1239)
+
+**정의(원문)**: `def main():`
+
+**1. 목적**: argparse CLI를 action별 validate/prepare/run/start/stop/query/index/recover 구현으로 분배한다.
+
+**2. 인자·자료형·전달**: 서명에 적힌 파이썬 매개변수를 순서대로 확인한다. 위치 인자는 값으로 참조가 전달되고, `Path`는 경로 객체, `run`은 run 디렉터리, `cfg`는 정규화된 dict인 경우가 많다. 변경 가능한 list/dict는 복사 없이 전달되면 함수 안의 수정이 호출자에게도 보일 수 있다. `*` 뒤의 매개변수는 키워드 전용이다. `=...`는 명시한 기본값이다. 이 함수에서 실제로 사용하는 타입·키는 코드의 `[]` 접근과 validation을 참고한다.
+
+**3. 반환/오류**: `return` · `raise RuntimeError('수집 중인 run은 복구 보고서 대신 상태 확인을 사용하세요.')` · `return` · `raise RuntimeError(json.dumps(result))` · `return` · `return` · `return`. Python은 `raise`한 에러를 상위 호출자로 전달하며 CLI의 `main` 진입 보호 코드가 일부 오류를 잡는다.
+
+**4. 내부 처리 순서·데이터 변화**: 아래는 실제 선언 내부의 중요한 조건과 루프(원본 정의 번호):
+- [L1160](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L1160-L1160) `if args.action == 'version':`
+- [L1163](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L1163-L1163) `if args.action == 'recover':`
+- [L1166](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L1166-L1166) `if run is None: raise ValueError('복구할 run이 없습니다.')`
+- [L1168](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L1168-L1168) `if alive(service.get('supervisor')) or alive(service.get('collector')):`
+- [L1172](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L1172-L1172) `if report.get('status') == 'INVALID': sys.exit(2)`
+- [L1174](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L1174-L1174) `if args.action in ('validate', 'prepare', 'start', 'run'):`
+- [L1176](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L1176-L1176) `if args.action in ('capability', 'prepare'):`
+- [L1180](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L1180-L1180) `if not result['ready']:`
+- [L1184](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L1184-L1184) `if args.action in ('validate', 'status', 'path', 'query', 'critical', 'raw-search'):`
+- [L1185](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L1185-L1185) `if args.action == 'validate':`
+- [L1186](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L1186-L1186) `try:`
+- [L1190](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L1190-L1190) `except PermissionError:`
+- [L1199](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L1199-L1199) `elif args.action == 'status':`
+- [L1202](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L1202-L1202) `elif args.action == 'path':`
+- [L1204](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L1204-L1204) `if run is None: raise ValueError('저장된 run이 없습니다.')`
+- [L1205](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/manage.py#L1205-L1205) `if status(run)['state'] != 'STOPPED': raise ValueError('중지 완료 후 저장하세요.')`
+
+메모리/파일/SQL 관련 식별자: `argparse.ArgumentParser`, `parse_args`, `json.dumps`, `Path`, `read_json`, `lock(`.
+
+**5. 연결 관계**: 코드에서 직접 참조하는 호출 후보(정적 검색 결과): `main`, `ArgumentParser`, `add_argument`, `input`, `parse_args`, `umask`, `resolve`, `current`, `ValueError`, `read_json`, `alive`, `get`, `RuntimeError`, `recover`, `dumps`, `exit`, `in`, `config`, `capability`, `unified_diff`. 이는 분기별 동적 호출 확정이 아니라 코드를 따라갈 때 찾을 식별자 목록이다. 공유 자원은 전역 `DATA`, `BUILD`, `BINARY`, run의 JSON/SQLite 등이 있는지 본문에서 확인한다.
+
+**6. Python 문법**: `with`는 자원 정리, `try/except/finally`는 오류/항상 수행 경로, `yield`가 있다면 generator, `dict`/list comprehension은 자료 변환, `path / 'file'`은 pathlib 경로 결합, `with db:`는 transaction 문맥 관리다. 반드시 아래 실제 사용 문법만 해당한다고 판단한다.
+
+**7. 구체 예시(실제 실행이 아닌 가상 시나리오)**: 예시 입력에서 반환 조건, 예외 조건, 파일 경로 경계를 한 줄씩 따라가며 함수 실행 전·후 dict/파일/SQLite/프로세스 상태를 기록한다. 숫자나 임계치는 예시이지 측정·고정 값이 아니다.
+
+**8. 경계/성능/보안**: 잘못된 타입, 중복·유실된 JSON 키, 파일 심볼릭링크·권한, 크기 상한, SQLite 부분 커밋, 프로세스 생존 확인, 데이터 내구 경계를 코드 근거로 평가한다. `return` 값만으로 무손실을 단정할 수 없다.
+
+**함수 원본 전체**
+
+```python
+def main():
+    parser = argparse.ArgumentParser(description='MGlogWH local sensor')
+    parser.add_argument('action', choices=['version', 'capability', 'validate', 'prepare', 'start', 'run', 'stop',
+                         'status', 'path', 'query', 'critical', 'raw-search', 'index', 'serve', 'index-worker', 'recover'])
+    parser.add_argument('--config', default=str(DEFAULT_CONFIG))
+    parser.add_argument('--run')
+    parser.add_argument('--run-dir', type=Path, help='read-only recovery input (exported UUID directory)')
+    parser.add_argument('--out', type=Path, help='recovery report JSON output; source is never repaired')
+    parser.add_argument('--limit', type=int, default=30, choices=range(1, 101), metavar='1..100')
+    parser.add_argument('--match-path', help='raw-search의 정확한 Linux 절대 경로')
+    parser.add_argument('--max-bytes', type=int, default=RAW_SEARCH_DEFAULT_MAX_BYTES)
+    parser.add_argument('--max-seconds', type=float, default=15.0)
+    args = parser.parse_args()
+    os.umask(0o077)
+    if args.action == 'version':
+        print('MGlogWH ' + VERSION)
+        return
+    if args.action == 'recover':
+        import ledger
+        run = args.run_dir.resolve() if args.run_dir else current(args.run)
+        if run is None: raise ValueError('복구할 run이 없습니다.')
+        service = read_json(run / 'service.json', {})
+        if alive(service.get('supervisor')) or alive(service.get('collector')):
+            raise RuntimeError('수집 중인 run은 복구 보고서 대신 상태 확인을 사용하세요.')
+        report = ledger.recover(run, args.out)
+        print(json.dumps(report, ensure_ascii=False, indent=2))
+        if report.get('status') == 'INVALID': sys.exit(2)
+        return
+    if args.action in ('validate', 'prepare', 'start', 'run'):
+        cfg = config(args.config)
+    if args.action in ('capability', 'prepare'):
+        # Build explicitly as an unprivileged user. Do not execute Makefile
+        # recipes as root from a writable source checkout.
+        result = capability()
+        if not result['ready']:
+            raise RuntimeError(json.dumps(result))
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+        return
+    if args.action in ('validate', 'status', 'path', 'query', 'critical', 'raw-search'):
+        if args.action == 'validate':
+            try:
+                run = current(args.run)
+                before = read_json(run / 'config.json', {}) if run else {}
+                active_run_access = 'READABLE' if run else 'NOT_CONFIGURED'
+            except PermissionError:
+                # Configuration validation is read-only and must still work for
+                # operators who cannot inspect a root-owned active run.
+                before, active_run_access = {}, 'PERMISSION_DENIED'
+            diff = list(difflib.unified_diff(json.dumps(before, indent=2, sort_keys=True).splitlines(),
+                                           json.dumps(cfg, indent=2, sort_keys=True).splitlines(),
+                                           fromfile='active_run', tofile='next_run', lineterm=''))
+            result = dict(valid=True, applies='NEXT_START_ONLY', config=cfg, diff=diff,
+                          active_run_access=active_run_access)
+        elif args.action == 'status':
+            run = current(args.run)
+            result = status(run)
+        elif args.action == 'path':
+            run = current(args.run)
+            if run is None: raise ValueError('저장된 run이 없습니다.')
+            if status(run)['state'] != 'STOPPED': raise ValueError('중지 완료 후 저장하세요.')
+            print(run); return
+        elif args.action in ('query', 'critical'):
+            run = current(args.run)
+            result = query(run, args.action == 'critical', args.limit)
+        elif args.action == 'raw-search':
+            run = current(args.run)
+            result = raw_search(run, args.match_path, args.limit, args.max_bytes, args.max_seconds)
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+        return
+    ensure_data_dir()
+    if args.action == 'serve':
+        serve(current(args.run)); return
+    if args.action == 'index-worker':
+        index_run(current(args.run), worker=True); return
+    if args.action == 'run':
+        # Hold the collector lock from publication through foreground exit.
+        # Release control.lock while serving so `stop` can signal this process.
+        with contextlib.ExitStack() as held:
+            with lock(DATA / 'control.lock'):
+                held.enter_context(lock(DATA / 'collector.lock'))
+                run = create_run(cfg)
+            serve(run, collector_lock_held=True)
+        return
+    with lock(DATA / 'control.lock'):
+        run = current(args.run)
+        if args.action == 'start':
+            result = start(cfg)
+        elif args.action == 'stop':
+            result = stop_run(run)
+        elif args.action == 'index':
+            result = index_run(run)
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+```
+
+## ledger.py — 함수 33개
+
+[전체 원본 파일](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L1-L1090)
+
+
+#### _unique — [ledger.py:43–51](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L43-L51)
+
+**정의(원문)**: `def _unique(pairs):`
+
+**1. 목적**: JSON에서 중복되는 이름의 키를 거부한다.
+
+**2. 인자·자료형·전달**: 서명에 적힌 파이썬 매개변수를 순서대로 확인한다. 위치 인자는 값으로 참조가 전달되고, `Path`는 경로 객체, `run`은 run 디렉터리, `cfg`는 정규화된 dict인 경우가 많다. 변경 가능한 list/dict는 복사 없이 전달되면 함수 안의 수정이 호출자에게도 보일 수 있다. `*` 뒤의 매개변수는 키워드 전용이다. `=...`는 명시한 기본값이다. 이 함수에서 실제로 사용하는 타입·키는 코드의 `[]` 접근과 validation을 참고한다.
+
+**3. 반환/오류**: `raise LedgerError('duplicate JSON key: ' + key)` · `return result`. Python은 `raise`한 에러를 상위 호출자로 전달하며 CLI의 `main` 진입 보호 코드가 일부 오류를 잡는다.
+
+**4. 내부 처리 순서·데이터 변화**: 아래는 실제 선언 내부의 중요한 조건과 루프(원본 정의 번호):
+- [L45](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L45-L45) `for key, value in pairs:`
+- [L46](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L46-L46) `if key in result:`
+
+메모리/파일/SQL 관련 식별자: 별도 I/O나 자원 호출이 표시되지 않는 단순 유틸리티일 수 있다. 본문 확인 필요.
+
+**5. 연결 관계**: 코드에서 직접 참조하는 호출 후보(정적 검색 결과): `_unique`, `LedgerError`. 이는 분기별 동적 호출 확정이 아니라 코드를 따라갈 때 찾을 식별자 목록이다. 공유 자원은 전역 `DATA`, `BUILD`, `BINARY`, run의 JSON/SQLite 등이 있는지 본문에서 확인한다.
+
+**6. Python 문법**: `with`는 자원 정리, `try/except/finally`는 오류/항상 수행 경로, `yield`가 있다면 generator, `dict`/list comprehension은 자료 변환, `path / 'file'`은 pathlib 경로 결합, `with db:`는 transaction 문맥 관리다. 반드시 아래 실제 사용 문법만 해당한다고 판단한다.
+
+**7. 구체 예시(실제 실행이 아닌 가상 시나리오)**: 예시 입력에서 반환 조건, 예외 조건, 파일 경로 경계를 한 줄씩 따라가며 함수 실행 전·후 dict/파일/SQLite/프로세스 상태를 기록한다. 숫자나 임계치는 예시이지 측정·고정 값이 아니다.
+
+**8. 경계/성능/보안**: 잘못된 타입, 중복·유실된 JSON 키, 파일 심볼릭링크·권한, 크기 상한, SQLite 부분 커밋, 프로세스 생존 확인, 데이터 내구 경계를 코드 근거로 평가한다. `return` 값만으로 무손실을 단정할 수 없다.
+
+**함수 원본 전체**
+
+```python
+def _unique(pairs):
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            raise LedgerError('duplicate JSON key: ' + key)
+        result[key] = value
+    return result
+```
+
+#### _json — [ledger.py:52–57](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L52-L57)
+
+**정의(원문)**: `def _json(raw):`
+
+**1. 목적**: 중복키·비유한 숫자를 금지해 metadata JSON을 파싱한다.
+
+**2. 인자·자료형·전달**: 서명에 적힌 파이썬 매개변수를 순서대로 확인한다. 위치 인자는 값으로 참조가 전달되고, `Path`는 경로 객체, `run`은 run 디렉터리, `cfg`는 정규화된 dict인 경우가 많다. 변경 가능한 list/dict는 복사 없이 전달되면 함수 안의 수정이 호출자에게도 보일 수 있다. `*` 뒤의 매개변수는 키워드 전용이다. `=...`는 명시한 기본값이다. 이 함수에서 실제로 사용하는 타입·키는 코드의 `[]` 접근과 validation을 참고한다.
+
+**3. 반환/오류**: `return json.loads(raw, object_pairs_hook=_unique,`. Python은 `raise`한 에러를 상위 호출자로 전달하며 CLI의 `main` 진입 보호 코드가 일부 오류를 잡는다.
+
+**4. 내부 처리 순서·데이터 변화**: 아래는 실제 선언 내부의 중요한 조건과 루프(원본 정의 번호):
+- 명시 분기 없이 순차 계산/반환한다.
+
+메모리/파일/SQL 관련 식별자: `json.loads`.
+
+**5. 연결 관계**: 코드에서 직접 참조하는 호출 후보(정적 검색 결과): `_json`, `loads`, `in`, `throw`, `LedgerError`. 이는 분기별 동적 호출 확정이 아니라 코드를 따라갈 때 찾을 식별자 목록이다. 공유 자원은 전역 `DATA`, `BUILD`, `BINARY`, run의 JSON/SQLite 등이 있는지 본문에서 확인한다.
+
+**6. Python 문법**: `with`는 자원 정리, `try/except/finally`는 오류/항상 수행 경로, `yield`가 있다면 generator, `dict`/list comprehension은 자료 변환, `path / 'file'`은 pathlib 경로 결합, `with db:`는 transaction 문맥 관리다. 반드시 아래 실제 사용 문법만 해당한다고 판단한다.
+
+**7. 구체 예시(실제 실행이 아닌 가상 시나리오)**: 예시 입력에서 반환 조건, 예외 조건, 파일 경로 경계를 한 줄씩 따라가며 함수 실행 전·후 dict/파일/SQLite/프로세스 상태를 기록한다. 숫자나 임계치는 예시이지 측정·고정 값이 아니다.
+
+**8. 경계/성능/보안**: 잘못된 타입, 중복·유실된 JSON 키, 파일 심볼릭링크·권한, 크기 상한, SQLite 부분 커밋, 프로세스 생존 확인, 데이터 내구 경계를 코드 근거로 평가한다. `return` 값만으로 무손실을 단정할 수 없다.
+
+**함수 원본 전체**
+
+```python
+def _json(raw):
+    return json.loads(raw, object_pairs_hook=_unique,
+                      parse_constant=lambda value: (_ for _ in ()).throw(
+                          LedgerError('nonfinite JSON: ' + value)))
+```
+
+#### _object — [ledger.py:58–68](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L58-L68)
+
+**정의(원문)**: `def _object(path, limit=MAX_FRAME):`
+
+**1. 목적**: 최대 크기 안의 객체 JSON 파일을 읽는다.
+
+**2. 인자·자료형·전달**: 서명에 적힌 파이썬 매개변수를 순서대로 확인한다. 위치 인자는 값으로 참조가 전달되고, `Path`는 경로 객체, `run`은 run 디렉터리, `cfg`는 정규화된 dict인 경우가 많다. 변경 가능한 list/dict는 복사 없이 전달되면 함수 안의 수정이 호출자에게도 보일 수 있다. `*` 뒤의 매개변수는 키워드 전용이다. `=...`는 명시한 기본값이다. 이 함수에서 실제로 사용하는 타입·키는 코드의 `[]` 접근과 validation을 참고한다.
+
+**3. 반환/오류**: `raise LedgerError('metadata size limit: ' + str(path))` · `raise LedgerError('JSON object required: ' + str(path))` · `return value`. Python은 `raise`한 에러를 상위 호출자로 전달하며 CLI의 `main` 진입 보호 코드가 일부 오류를 잡는다.
+
+**4. 내부 처리 순서·데이터 변화**: 아래는 실제 선언 내부의 중요한 조건과 루프(원본 정의 번호):
+- [L59](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L59-L59) `with Path(path).open('rb') as handle:`
+- [L61](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L61-L61) `if len(raw) > limit:`
+- [L64](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L64-L64) `if not isinstance(value, dict):`
+
+메모리/파일/SQL 관련 식별자: `Path`.
+
+**5. 연결 관계**: 코드에서 직접 참조하는 호출 후보(정적 검색 결과): `_object`, `Path`, `open`, `read`, `LedgerError`, `_json`, `isinstance`. 이는 분기별 동적 호출 확정이 아니라 코드를 따라갈 때 찾을 식별자 목록이다. 공유 자원은 전역 `DATA`, `BUILD`, `BINARY`, run의 JSON/SQLite 등이 있는지 본문에서 확인한다.
+
+**6. Python 문법**: `with`는 자원 정리, `try/except/finally`는 오류/항상 수행 경로, `yield`가 있다면 generator, `dict`/list comprehension은 자료 변환, `path / 'file'`은 pathlib 경로 결합, `with db:`는 transaction 문맥 관리다. 반드시 아래 실제 사용 문법만 해당한다고 판단한다.
+
+**7. 구체 예시(실제 실행이 아닌 가상 시나리오)**: 예시 입력에서 반환 조건, 예외 조건, 파일 경로 경계를 한 줄씩 따라가며 함수 실행 전·후 dict/파일/SQLite/프로세스 상태를 기록한다. 숫자나 임계치는 예시이지 측정·고정 값이 아니다.
+
+**8. 경계/성능/보안**: 잘못된 타입, 중복·유실된 JSON 키, 파일 심볼릭링크·권한, 크기 상한, SQLite 부분 커밋, 프로세스 생존 확인, 데이터 내구 경계를 코드 근거로 평가한다. `return` 값만으로 무손실을 단정할 수 없다.
+
+**함수 원본 전체**
+
+```python
+def _object(path, limit=MAX_FRAME):
+    with Path(path).open('rb') as handle:
+        raw = handle.read(limit + 1)
+    if len(raw) > limit:
+        raise LedgerError('metadata size limit: ' + str(path))
+    value = _json(raw)
+    if not isinstance(value, dict):
+        raise LedgerError('JSON object required: ' + str(path))
+    return value
+```
+
+#### _integer — [ledger.py:69–74](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L69-L74)
+
+**정의(원문)**: `def _integer(value, label, minimum=0, maximum=UINT64):`
+
+**1. 목적**: bool과 잘못된 범위를 배제하는 unsigned 정수 검증이다.
+
+**2. 인자·자료형·전달**: 서명에 적힌 파이썬 매개변수를 순서대로 확인한다. 위치 인자는 값으로 참조가 전달되고, `Path`는 경로 객체, `run`은 run 디렉터리, `cfg`는 정규화된 dict인 경우가 많다. 변경 가능한 list/dict는 복사 없이 전달되면 함수 안의 수정이 호출자에게도 보일 수 있다. `*` 뒤의 매개변수는 키워드 전용이다. `=...`는 명시한 기본값이다. 이 함수에서 실제로 사용하는 타입·키는 코드의 `[]` 접근과 validation을 참고한다.
+
+**3. 반환/오류**: `raise LedgerError(f'{label}: integer {minimum}..{maximum} required')` · `return value`. Python은 `raise`한 에러를 상위 호출자로 전달하며 CLI의 `main` 진입 보호 코드가 일부 오류를 잡는다.
+
+**4. 내부 처리 순서·데이터 변화**: 아래는 실제 선언 내부의 중요한 조건과 루프(원본 정의 번호):
+- [L70](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L70-L70) `if type(value) is not int or not minimum <= value <= maximum:`
+
+메모리/파일/SQL 관련 식별자: 별도 I/O나 자원 호출이 표시되지 않는 단순 유틸리티일 수 있다. 본문 확인 필요.
+
+**5. 연결 관계**: 코드에서 직접 참조하는 호출 후보(정적 검색 결과): `_integer`, `type`, `LedgerError`. 이는 분기별 동적 호출 확정이 아니라 코드를 따라갈 때 찾을 식별자 목록이다. 공유 자원은 전역 `DATA`, `BUILD`, `BINARY`, run의 JSON/SQLite 등이 있는지 본문에서 확인한다.
+
+**6. Python 문법**: `with`는 자원 정리, `try/except/finally`는 오류/항상 수행 경로, `yield`가 있다면 generator, `dict`/list comprehension은 자료 변환, `path / 'file'`은 pathlib 경로 결합, `with db:`는 transaction 문맥 관리다. 반드시 아래 실제 사용 문법만 해당한다고 판단한다.
+
+**7. 구체 예시(실제 실행이 아닌 가상 시나리오)**: 예시 입력에서 반환 조건, 예외 조건, 파일 경로 경계를 한 줄씩 따라가며 함수 실행 전·후 dict/파일/SQLite/프로세스 상태를 기록한다. 숫자나 임계치는 예시이지 측정·고정 값이 아니다.
+
+**8. 경계/성능/보안**: 잘못된 타입, 중복·유실된 JSON 키, 파일 심볼릭링크·권한, 크기 상한, SQLite 부분 커밋, 프로세스 생존 확인, 데이터 내구 경계를 코드 근거로 평가한다. `return` 값만으로 무손실을 단정할 수 없다.
+
+**함수 원본 전체**
+
+```python
+def _integer(value, label, minimum=0, maximum=UINT64):
+    if type(value) is not int or not minimum <= value <= maximum:
+        raise LedgerError(f'{label}: integer {minimum}..{maximum} required')
+    return value
+```
+
+#### _uuid — [ledger.py:75–83](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L75-L83)
+
+**정의(원문)**: `def _uuid(value, label):`
+
+**1. 목적**: 표준 UUID 문자열 형식 검증이다.
+
+**2. 인자·자료형·전달**: 서명에 적힌 파이썬 매개변수를 순서대로 확인한다. 위치 인자는 값으로 참조가 전달되고, `Path`는 경로 객체, `run`은 run 디렉터리, `cfg`는 정규화된 dict인 경우가 많다. 변경 가능한 list/dict는 복사 없이 전달되면 함수 안의 수정이 호출자에게도 보일 수 있다. `*` 뒤의 매개변수는 키워드 전용이다. `=...`는 명시한 기본값이다. 이 함수에서 실제로 사용하는 타입·키는 코드의 `[]` 접근과 validation을 참고한다.
+
+**3. 반환/오류**: `raise ValueError()` · `raise LedgerError(label + ': canonical UUID required') from exc` · `return value`. Python은 `raise`한 에러를 상위 호출자로 전달하며 CLI의 `main` 진입 보호 코드가 일부 오류를 잡는다.
+
+**4. 내부 처리 순서·데이터 변화**: 아래는 실제 선언 내부의 중요한 조건과 루프(원본 정의 번호):
+- [L76](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L76-L76) `try:`
+- [L77](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L77-L77) `if not isinstance(value, str) or str(uuid.UUID(value)) != value:`
+- [L79](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L79-L79) `except ValueError as exc:`
+
+메모리/파일/SQL 관련 식별자: 별도 I/O나 자원 호출이 표시되지 않는 단순 유틸리티일 수 있다. 본문 확인 필요.
+
+**5. 연결 관계**: 코드에서 직접 참조하는 호출 후보(정적 검색 결과): `_uuid`, `isinstance`, `UUID`, `ValueError`, `LedgerError`. 이는 분기별 동적 호출 확정이 아니라 코드를 따라갈 때 찾을 식별자 목록이다. 공유 자원은 전역 `DATA`, `BUILD`, `BINARY`, run의 JSON/SQLite 등이 있는지 본문에서 확인한다.
+
+**6. Python 문법**: `with`는 자원 정리, `try/except/finally`는 오류/항상 수행 경로, `yield`가 있다면 generator, `dict`/list comprehension은 자료 변환, `path / 'file'`은 pathlib 경로 결합, `with db:`는 transaction 문맥 관리다. 반드시 아래 실제 사용 문법만 해당한다고 판단한다.
+
+**7. 구체 예시(실제 실행이 아닌 가상 시나리오)**: 예시 입력에서 반환 조건, 예외 조건, 파일 경로 경계를 한 줄씩 따라가며 함수 실행 전·후 dict/파일/SQLite/프로세스 상태를 기록한다. 숫자나 임계치는 예시이지 측정·고정 값이 아니다.
+
+**8. 경계/성능/보안**: 잘못된 타입, 중복·유실된 JSON 키, 파일 심볼릭링크·권한, 크기 상한, SQLite 부분 커밋, 프로세스 생존 확인, 데이터 내구 경계를 코드 근거로 평가한다. `return` 값만으로 무손실을 단정할 수 없다.
+
+**함수 원본 전체**
+
+```python
+def _uuid(value, label):
+    try:
+        if not isinstance(value, str) or str(uuid.UUID(value)) != value:
+            raise ValueError()
+    except ValueError as exc:
+        raise LedgerError(label + ': canonical UUID required') from exc
+    return value
+```
+
+#### _digest — [ledger.py:84–91](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L84-L91)
+
+**정의(원문)**: `def _digest(path):`
+
+**1. 목적**: 파일을 여러 조각으로 읽어 SHA256을 계산한다.
+
+**2. 인자·자료형·전달**: 서명에 적힌 파이썬 매개변수를 순서대로 확인한다. 위치 인자는 값으로 참조가 전달되고, `Path`는 경로 객체, `run`은 run 디렉터리, `cfg`는 정규화된 dict인 경우가 많다. 변경 가능한 list/dict는 복사 없이 전달되면 함수 안의 수정이 호출자에게도 보일 수 있다. `*` 뒤의 매개변수는 키워드 전용이다. `=...`는 명시한 기본값이다. 이 함수에서 실제로 사용하는 타입·키는 코드의 `[]` 접근과 validation을 참고한다.
+
+**3. 반환/오류**: `return digest.hexdigest()`. Python은 `raise`한 에러를 상위 호출자로 전달하며 CLI의 `main` 진입 보호 코드가 일부 오류를 잡는다.
+
+**4. 내부 처리 순서·데이터 변화**: 아래는 실제 선언 내부의 중요한 조건과 루프(원본 정의 번호):
+- [L86](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L86-L86) `with Path(path).open('rb') as handle:`
+- [L87](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L87-L87) `for chunk in iter(lambda: handle.read(65536), b''):`
+
+메모리/파일/SQL 관련 식별자: `hashlib.sha256`, `Path`.
+
+**5. 연결 관계**: 코드에서 직접 참조하는 호출 후보(정적 검색 결과): `_digest`, `sha256`, `Path`, `open`, `iter`, `read`, `update`, `hexdigest`. 이는 분기별 동적 호출 확정이 아니라 코드를 따라갈 때 찾을 식별자 목록이다. 공유 자원은 전역 `DATA`, `BUILD`, `BINARY`, run의 JSON/SQLite 등이 있는지 본문에서 확인한다.
+
+**6. Python 문법**: `with`는 자원 정리, `try/except/finally`는 오류/항상 수행 경로, `yield`가 있다면 generator, `dict`/list comprehension은 자료 변환, `path / 'file'`은 pathlib 경로 결합, `with db:`는 transaction 문맥 관리다. 반드시 아래 실제 사용 문법만 해당한다고 판단한다.
+
+**7. 구체 예시(실제 실행이 아닌 가상 시나리오)**: 예시 입력에서 반환 조건, 예외 조건, 파일 경로 경계를 한 줄씩 따라가며 함수 실행 전·후 dict/파일/SQLite/프로세스 상태를 기록한다. 숫자나 임계치는 예시이지 측정·고정 값이 아니다.
+
+**8. 경계/성능/보안**: 잘못된 타입, 중복·유실된 JSON 키, 파일 심볼릭링크·권한, 크기 상한, SQLite 부분 커밋, 프로세스 생존 확인, 데이터 내구 경계를 코드 근거로 평가한다. `return` 값만으로 무손실을 단정할 수 없다.
+
+**함수 원본 전체**
+
+```python
+def _digest(path):
+    digest = hashlib.sha256()
+    with Path(path).open('rb') as handle:
+        for chunk in iter(lambda: handle.read(65536), b''):
+            digest.update(chunk)
+    return digest.hexdigest()
+```
+
+#### _lineage — [ledger.py:92–119](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L92-L119)
+
+**정의(원문)**: `def _lineage(run):`
+
+**1. 목적**: manifest/config/rules 등의 run identity와 해시를 대조한다.
+
+**2. 인자·자료형·전달**: 서명에 적힌 파이썬 매개변수를 순서대로 확인한다. 위치 인자는 값으로 참조가 전달되고, `Path`는 경로 객체, `run`은 run 디렉터리, `cfg`는 정규화된 dict인 경우가 많다. 변경 가능한 list/dict는 복사 없이 전달되면 함수 안의 수정이 호출자에게도 보일 수 있다. `*` 뒤의 매개변수는 키워드 전용이다. `=...`는 명시한 기본값이다. 이 함수에서 실제로 사용하는 타입·키는 코드의 `[]` 접근과 validation을 참고한다.
+
+**3. 반환/오류**: `raise LedgerError('manifest schema mismatch')` · `raise LedgerError('directory/manifest run_id mismatch')` · `raise LedgerError('config/manifest SHA256 mismatch')` · `raise LedgerError('schema 3 policy version mismatch')` · `raise LedgerError('schema 3 rules.bin/manifest policy lineage mismatch')` · `raise LedgerError('legacy rules must not claim a compiled rule file')` · `raise LedgerError('schema 3 configuration has no rules')` · `return dict(run_id=run.name, boot_id=manifest['boot_id'],`. Python은 `raise`한 에러를 상위 호출자로 전달하며 CLI의 `main` 진입 보호 코드가 일부 오류를 잡는다.
+
+**4. 내부 처리 순서·데이터 변화**: 아래는 실제 선언 내부의 중요한 조건과 루프(원본 정의 번호):
+- [L95](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L95-L95) `if type(manifest.get('schema')) is not int or manifest['schema'] != 1:`
+- [L97](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L97-L97) `if _uuid(manifest.get('run_id'), 'manifest run_id') != run.name:`
+- [L102](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L102-L102) `if config_hash != manifest.get('config_sha256'):`
+- [L104](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L104-L104) `if manifest.get('raw_schema') == 3:`
+- [L105](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L105-L105) `if manifest.get('rule_engine_schema_version') != 1 or manifest.get('policy_version') != 1:`
+- [L107](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L107-L107) `if 'event_rules' in config:`
+- [L108](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L108-L108) `if (not isinstance(manifest.get('rules_bin_sha256'), str) or`
+- [L111](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L111-L111) `elif 'critical_rules' in config:`
+- [L112](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L112-L112) `if 'rules_bin_sha256' in manifest:`
+- [L114](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L114-L114) `else:`
+
+메모리/파일/SQL 관련 식별자: `json.dumps`, `hashlib.sha256`.
+
+**5. 연결 관계**: 코드에서 직접 참조하는 호출 후보(정적 검색 결과): `_lineage`, `_object`, `type`, `get`, `LedgerError`, `_uuid`, `dumps`, `encode`, `sha256`, `hexdigest`, `isinstance`, `_digest`. 이는 분기별 동적 호출 확정이 아니라 코드를 따라갈 때 찾을 식별자 목록이다. 공유 자원은 전역 `DATA`, `BUILD`, `BINARY`, run의 JSON/SQLite 등이 있는지 본문에서 확인한다.
+
+**6. Python 문법**: `with`는 자원 정리, `try/except/finally`는 오류/항상 수행 경로, `yield`가 있다면 generator, `dict`/list comprehension은 자료 변환, `path / 'file'`은 pathlib 경로 결합, `with db:`는 transaction 문맥 관리다. 반드시 아래 실제 사용 문법만 해당한다고 판단한다.
+
+**7. 구체 예시(실제 실행이 아닌 가상 시나리오)**: 예시 입력에서 반환 조건, 예외 조건, 파일 경로 경계를 한 줄씩 따라가며 함수 실행 전·후 dict/파일/SQLite/프로세스 상태를 기록한다. 숫자나 임계치는 예시이지 측정·고정 값이 아니다.
+
+**8. 경계/성능/보안**: 잘못된 타입, 중복·유실된 JSON 키, 파일 심볼릭링크·권한, 크기 상한, SQLite 부분 커밋, 프로세스 생존 확인, 데이터 내구 경계를 코드 근거로 평가한다. `return` 값만으로 무손실을 단정할 수 없다.
+
+**함수 원본 전체**
+
+```python
+def _lineage(run):
+    manifest = _object(run / 'manifest.json')
+    config = _object(run / 'config.json')
+    if type(manifest.get('schema')) is not int or manifest['schema'] != 1:
+        raise LedgerError('manifest schema mismatch')
+    if _uuid(manifest.get('run_id'), 'manifest run_id') != run.name:
+        raise LedgerError('directory/manifest run_id mismatch')
+    _uuid(manifest.get('boot_id'), 'manifest boot_id')
+    canonical = json.dumps(config, sort_keys=True, separators=(',', ':')).encode()
+    config_hash = hashlib.sha256(canonical).hexdigest()
+    if config_hash != manifest.get('config_sha256'):
+        raise LedgerError('config/manifest SHA256 mismatch')
+    if manifest.get('raw_schema') == 3:
+        if manifest.get('rule_engine_schema_version') != 1 or manifest.get('policy_version') != 1:
+            raise LedgerError('schema 3 policy version mismatch')
+        if 'event_rules' in config:
+            if (not isinstance(manifest.get('rules_bin_sha256'), str) or
+                    _digest(run / 'rules.bin') != manifest['rules_bin_sha256']):
+                raise LedgerError('schema 3 rules.bin/manifest policy lineage mismatch')
+        elif 'critical_rules' in config:
+            if 'rules_bin_sha256' in manifest:
+                raise LedgerError('legacy rules must not claim a compiled rule file')
+        else:
+            raise LedgerError('schema 3 configuration has no rules')
+    return dict(run_id=run.name, boot_id=manifest['boot_id'],
+                config_sha256=config_hash, manifest_sha256=_digest(run / 'manifest.json'))
+```
+
+#### _bound_lineage — [ledger.py:120–125](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L120-L125)
+
+**정의(원문)**: `def _bound_lineage(value, lineage):`
+
+**1. 목적**: journal frame이 원본 run에 속했음을 식별자/해시로 확인한다.
+
+**2. 인자·자료형·전달**: 서명에 적힌 파이썬 매개변수를 순서대로 확인한다. 위치 인자는 값으로 참조가 전달되고, `Path`는 경로 객체, `run`은 run 디렉터리, `cfg`는 정규화된 dict인 경우가 많다. 변경 가능한 list/dict는 복사 없이 전달되면 함수 안의 수정이 호출자에게도 보일 수 있다. `*` 뒤의 매개변수는 키워드 전용이다. `=...`는 명시한 기본값이다. 이 함수에서 실제로 사용하는 타입·키는 코드의 `[]` 접근과 validation을 참고한다.
+
+**3. 반환/오류**: `raise LedgerError('metadata lineage mismatch: ' + key)`. Python은 `raise`한 에러를 상위 호출자로 전달하며 CLI의 `main` 진입 보호 코드가 일부 오류를 잡는다.
+
+**4. 내부 처리 순서·데이터 변화**: 아래는 실제 선언 내부의 중요한 조건과 루프(원본 정의 번호):
+- [L121](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L121-L121) `for key, expected in lineage.items():`
+- [L122](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L122-L122) `if value.get(key) != expected:`
+
+메모리/파일/SQL 관련 식별자: 별도 I/O나 자원 호출이 표시되지 않는 단순 유틸리티일 수 있다. 본문 확인 필요.
+
+**5. 연결 관계**: 코드에서 직접 참조하는 호출 후보(정적 검색 결과): `_bound_lineage`, `items`, `get`, `LedgerError`. 이는 분기별 동적 호출 확정이 아니라 코드를 따라갈 때 찾을 식별자 목록이다. 공유 자원은 전역 `DATA`, `BUILD`, `BINARY`, run의 JSON/SQLite 등이 있는지 본문에서 확인한다.
+
+**6. Python 문법**: `with`는 자원 정리, `try/except/finally`는 오류/항상 수행 경로, `yield`가 있다면 generator, `dict`/list comprehension은 자료 변환, `path / 'file'`은 pathlib 경로 결합, `with db:`는 transaction 문맥 관리다. 반드시 아래 실제 사용 문법만 해당한다고 판단한다.
+
+**7. 구체 예시(실제 실행이 아닌 가상 시나리오)**: 예시 입력에서 반환 조건, 예외 조건, 파일 경로 경계를 한 줄씩 따라가며 함수 실행 전·후 dict/파일/SQLite/프로세스 상태를 기록한다. 숫자나 임계치는 예시이지 측정·고정 값이 아니다.
+
+**8. 경계/성능/보안**: 잘못된 타입, 중복·유실된 JSON 키, 파일 심볼릭링크·권한, 크기 상한, SQLite 부분 커밋, 프로세스 생존 확인, 데이터 내구 경계를 코드 근거로 평가한다. `return` 값만으로 무손실을 단정할 수 없다.
+
+**함수 원본 전체**
+
+```python
+def _bound_lineage(value, lineage):
+    for key, expected in lineage.items():
+        if value.get(key) != expected:
+            raise LedgerError('metadata lineage mismatch: ' + key)
+```
+
+#### _lane_names — [ledger.py:126–135](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L126-L135)
+
+**정의(원문)**: `def _lane_names(offsets):`
+
+**1. 목적**: snapshot의 2-lane/3-lane 형식과 키 구성을 검증한다.
+
+**2. 인자·자료형·전달**: 서명에 적힌 파이썬 매개변수를 순서대로 확인한다. 위치 인자는 값으로 참조가 전달되고, `Path`는 경로 객체, `run`은 run 디렉터리, `cfg`는 정규화된 dict인 경우가 많다. 변경 가능한 list/dict는 복사 없이 전달되면 함수 안의 수정이 호출자에게도 보일 수 있다. `*` 뒤의 매개변수는 키워드 전용이다. `=...`는 명시한 기본값이다. 이 함수에서 실제로 사용하는 타입·키는 코드의 `[]` 접근과 validation을 참고한다.
+
+**3. 반환/오류**: `raise LedgerError('checkpoint durable lane object required')` · `return LANES` · `return ALL_LANES` · `raise LedgerError('checkpoint durable lane set mismatch')`. Python은 `raise`한 에러를 상위 호출자로 전달하며 CLI의 `main` 진입 보호 코드가 일부 오류를 잡는다.
+
+**4. 내부 처리 순서·데이터 변화**: 아래는 실제 선언 내부의 중요한 조건과 루프(원본 정의 번호):
+- [L127](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L127-L127) `if not isinstance(offsets, dict):`
+- [L129](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L129-L129) `if set(offsets) == set(LANES):`
+- [L131](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L131-L131) `if set(offsets) == set(ALL_LANES):`
+
+메모리/파일/SQL 관련 식별자: 별도 I/O나 자원 호출이 표시되지 않는 단순 유틸리티일 수 있다. 본문 확인 필요.
+
+**5. 연결 관계**: 코드에서 직접 참조하는 호출 후보(정적 검색 결과): `_lane_names`, `isinstance`, `LedgerError`. 이는 분기별 동적 호출 확정이 아니라 코드를 따라갈 때 찾을 식별자 목록이다. 공유 자원은 전역 `DATA`, `BUILD`, `BINARY`, run의 JSON/SQLite 등이 있는지 본문에서 확인한다.
+
+**6. Python 문법**: `with`는 자원 정리, `try/except/finally`는 오류/항상 수행 경로, `yield`가 있다면 generator, `dict`/list comprehension은 자료 변환, `path / 'file'`은 pathlib 경로 결합, `with db:`는 transaction 문맥 관리다. 반드시 아래 실제 사용 문법만 해당한다고 판단한다.
+
+**7. 구체 예시(실제 실행이 아닌 가상 시나리오)**: 예시 입력에서 반환 조건, 예외 조건, 파일 경로 경계를 한 줄씩 따라가며 함수 실행 전·후 dict/파일/SQLite/프로세스 상태를 기록한다. 숫자나 임계치는 예시이지 측정·고정 값이 아니다.
+
+**8. 경계/성능/보안**: 잘못된 타입, 중복·유실된 JSON 키, 파일 심볼릭링크·권한, 크기 상한, SQLite 부분 커밋, 프로세스 생존 확인, 데이터 내구 경계를 코드 근거로 평가한다. `return` 값만으로 무손실을 단정할 수 없다.
+
+**함수 원본 전체**
+
+```python
+def _lane_names(offsets):
+    if not isinstance(offsets, dict):
+        raise LedgerError('checkpoint durable lane object required')
+    if set(offsets) == set(LANES):
+        return LANES
+    if set(offsets) == set(ALL_LANES):
+        return ALL_LANES
+    raise LedgerError('checkpoint durable lane set mismatch')
+```
+
+#### _policy — [ledger.py:136–178](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L136-L178)
+
+**정의(원문)**: `def _policy(schema, quality, priority, lane):`
+
+**1. 목적**: schema·quality·priority·lane의 정책 일관성을 검증한다.
+
+**2. 인자·자료형·전달**: 서명에 적힌 파이썬 매개변수를 순서대로 확인한다. 위치 인자는 값으로 참조가 전달되고, `Path`는 경로 객체, `run`은 run 디렉터리, `cfg`는 정규화된 dict인 경우가 많다. 변경 가능한 list/dict는 복사 없이 전달되면 함수 안의 수정이 호출자에게도 보일 수 있다. `*` 뒤의 매개변수는 키워드 전용이다. `=...`는 명시한 기본값이다. 이 함수에서 실제로 사용하는 타입·키는 코드의 `[]` 접근과 validation을 참고한다.
+
+**3. 반환/오류**: `raise LedgerError('legacy quality/lane mismatch')` · `raise LedgerError('unknown raw policy/quality bits')` · `raise LedgerError('raw rule/policy requires original critical priority')` · `raise LedgerError('schema 2 critical requires rule_id')` · `raise LedgerError('schema 3 rule/policy/version mismatch')` · `raise LedgerError('raw initial/periodic policy conflict')` · `raise LedgerError('raw sample policy without quarantine')` · `raise LedgerError('raw schema mismatch')` · `raise LedgerError('raw lane/priority mismatch')` · `raise LedgerError('raw quarantine policy/lane mismatch')` · `raise LedgerError('quarantine raw requires selection policy')` · `raise LedgerError('protected rule cannot enter quarantine raw')`. Python은 `raise`한 에러를 상위 호출자로 전달하며 CLI의 `main` 진입 보호 코드가 일부 오류를 잡는다.
+
+**4. 내부 처리 순서·데이터 변화**: 아래는 실제 선언 내부의 중요한 조건과 루프(원본 정의 번호):
+- [L137](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L137-L137) `if schema == 1:`
+- [L138](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L138-L138) `if quality & ~3 or lane == 'quarantine':`
+- [L141](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L141-L141) `elif schema in (2, 3):`
+- [L142](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L142-L142) `if quality & ~(QUALITY_MASK if schema == 2 else QUALITY_MASK_V3):`
+- [L145](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L145-L145) `if schema == 2:`
+- [L146](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L146-L146) `if (flags or rule_id) and priority != 2:`
+- [L148](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L148-L148) `if priority == 2 and not rule_id:`
+- [L150](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L150-L150) `else:`
+- [L153](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L153-L153) `if (configured_policy == 3 or rule_version != 1 or policy_version != 1 or`
+- [L160](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L160-L160) `if flags & Q_INITIAL and flags & Q_PERIODIC:`
+- [L162](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L162-L162) `if flags & (Q_INITIAL | Q_PERIODIC) and not flags & Q_QUARANTINE:`
+- [L164](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L164-L164) `else:`
+- [L166](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L166-L166) `if (priority == 2) != (lane in ('critical', 'quarantine')):`
+- [L168](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L168-L168) `if bool(flags & Q_QUARANTINE) != (lane == 'quarantine'):`
+- [L170](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L170-L170) `if flags & Q_QUARANTINE and not flags & (Q_INITIAL | Q_PERIODIC):`
+- [L172](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L172-L172) `if flags & Q_PROTECTED and flags & Q_QUARANTINE:`
+
+메모리/파일/SQL 관련 식별자: 별도 I/O나 자원 호출이 표시되지 않는 단순 유틸리티일 수 있다. 본문 확인 필요.
+
+**5. 연결 관계**: 코드에서 직접 참조하는 호출 후보(정적 검색 결과): `_policy`, `LedgerError`, `in`, `or`, `and`. 이는 분기별 동적 호출 확정이 아니라 코드를 따라갈 때 찾을 식별자 목록이다. 공유 자원은 전역 `DATA`, `BUILD`, `BINARY`, run의 JSON/SQLite 등이 있는지 본문에서 확인한다.
+
+**6. Python 문법**: `with`는 자원 정리, `try/except/finally`는 오류/항상 수행 경로, `yield`가 있다면 generator, `dict`/list comprehension은 자료 변환, `path / 'file'`은 pathlib 경로 결합, `with db:`는 transaction 문맥 관리다. 반드시 아래 실제 사용 문법만 해당한다고 판단한다.
+
+**7. 구체 예시(실제 실행이 아닌 가상 시나리오)**: 예시 입력에서 반환 조건, 예외 조건, 파일 경로 경계를 한 줄씩 따라가며 함수 실행 전·후 dict/파일/SQLite/프로세스 상태를 기록한다. 숫자나 임계치는 예시이지 측정·고정 값이 아니다.
+
+**8. 경계/성능/보안**: 잘못된 타입, 중복·유실된 JSON 키, 파일 심볼릭링크·권한, 크기 상한, SQLite 부분 커밋, 프로세스 생존 확인, 데이터 내구 경계를 코드 근거로 평가한다. `return` 값만으로 무손실을 단정할 수 없다.
+
+**함수 원본 전체**
+
+```python
+def _policy(schema, quality, priority, lane):
+    if schema == 1:
+        if quality & ~3 or lane == 'quarantine':
+            raise LedgerError('legacy quality/lane mismatch')
+        flags, rule_id = 0, 0
+    elif schema in (2, 3):
+        if quality & ~(QUALITY_MASK if schema == 2 else QUALITY_MASK_V3):
+            raise LedgerError('unknown raw policy/quality bits')
+        flags, rule_id = quality & 0x1f00, (quality >> 16) & 255
+        if schema == 2:
+            if (flags or rule_id) and priority != 2:
+                raise LedgerError('raw rule/policy requires original critical priority')
+            if priority == 2 and not rule_id:
+                raise LedgerError('schema 2 critical requires rule_id')
+        else:
+            configured_policy = (quality >> 13) & 3
+            rule_version, policy_version = (quality >> 24) & 15, (quality >> 28) & 15
+            if (configured_policy == 3 or rule_version != 1 or policy_version != 1 or
+                    (priority == 2 and not rule_id) or
+                    (priority != 2 and (configured_policy != 0 or flags)) or
+                    (configured_policy == 0 and flags) or
+                    (configured_policy == 1 and flags & Q_PROTECTED) or
+                    (configured_policy == 2 and not flags & Q_PROTECTED)):
+                raise LedgerError('schema 3 rule/policy/version mismatch')
+        if flags & Q_INITIAL and flags & Q_PERIODIC:
+            raise LedgerError('raw initial/periodic policy conflict')
+        if flags & (Q_INITIAL | Q_PERIODIC) and not flags & Q_QUARANTINE:
+            raise LedgerError('raw sample policy without quarantine')
+    else:
+        raise LedgerError('raw schema mismatch')
+    if (priority == 2) != (lane in ('critical', 'quarantine')):
+        raise LedgerError('raw lane/priority mismatch')
+    if bool(flags & Q_QUARANTINE) != (lane == 'quarantine'):
+        raise LedgerError('raw quarantine policy/lane mismatch')
+    if flags & Q_QUARANTINE and not flags & (Q_INITIAL | Q_PERIODIC):
+        raise LedgerError('quarantine raw requires selection policy')
+    if flags & Q_PROTECTED and flags & Q_QUARANTINE:
+        raise LedgerError('protected rule cannot enter quarantine raw')
+    if flags & Q_UNTRACKED and not flags & (Q_QUARANTINE | Q_PROTECTED):
+        raise LedgerError('untracked policy requires quarantine or protected fallback')
+    return dict(rule_id=rule_id, flags=flags, capture_quality=quality & 3)
+```
+
+#### _snapshot — [ledger.py:179–308](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L179-L308)
+
+**정의(원문)**: `def _snapshot(value, previous=None):`
+
+**1. 목적**: 저널 checkpoint/seal의 필수 정보와 monotonic counters를 검증한다.
+
+**2. 인자·자료형·전달**: 서명에 적힌 파이썬 매개변수를 순서대로 확인한다. 위치 인자는 값으로 참조가 전달되고, `Path`는 경로 객체, `run`은 run 디렉터리, `cfg`는 정규화된 dict인 경우가 많다. 변경 가능한 list/dict는 복사 없이 전달되면 함수 안의 수정이 호출자에게도 보일 수 있다. `*` 뒤의 매개변수는 키워드 전용이다. `=...`는 명시한 기본값이다. 이 함수에서 실제로 사용하는 타입·키는 코드의 `[]` 접근과 validation을 참고한다.
+
+**3. 반환/오류**: `raise LedgerError('checkpoint durable lane set changed')` · `raise LedgerError('checkpoint offset not record aligned: ' + lane)` · `raise LedgerError('checkpoint durable offsets regressed: ' + lane)` · `raise LedgerError('checkpoint tenants must be bounded list')` · `raise LedgerError('checkpoint tenant object required')` · `raise LedgerError('duplicate tenant or regressed sequence')` · `raise LedgerError('checkpoint lost an existing tenant')` · `raise LedgerError('checkpoint faults must contain four aggregate counters')` · `raise LedgerError(key + ' regressed')` · `raise LedgerError('exact_loss_available must be boolean')` · `raise LedgerError('snapshot summary_kind must be AGGREGATE_ONLY')` · `raise LedgerError('sequence_snapshot_complete must be boolean')`. Python은 `raise`한 에러를 상위 호출자로 전달하며 CLI의 `main` 진입 보호 코드가 일부 오류를 잡는다.
+
+**4. 내부 처리 순서·데이터 변화**: 아래는 실제 선언 내부의 중요한 조건과 루프(원본 정의 번호):
+- [L182](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L182-L182) `if previous and set(previous['durable_offsets']) != set(offsets):`
+- [L184](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L184-L184) `for lane in lanes:`
+- [L186](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L186-L186) `if offset % RECORD_SIZE:`
+- [L188](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L188-L188) `if previous and offset < previous['durable_offsets'][lane]:`
+- [L191](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L191-L191) `if not isinstance(tenants, list) or len(tenants) > 1024:`
+- [L196](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L196-L196) `for tenant in tenants:`
+- [L197](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L197-L197) `if not isinstance(tenant, dict):`
+- [L201](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L201-L201) `if cgroup in ids or seq < previous_sequences.get(cgroup, 0):`
+- [L204](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L204-L204) `if previous and value.get('sequence_snapshot_complete') is True and not set(previous_sequences) <= ids:`
+- [L207](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L207-L207) `if not isinstance(faults, list) or len(faults) != 4:`
+- [L209](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L209-L209) `for item in faults:`
+- [L211](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L211-L211) `for key in ('metadata_overflow', 'metadata_dropped'):`
+- [L213](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L213-L213) `if previous and value[key] < previous[key]:`
+- [L215](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L215-L215) `if type(value.get('exact_loss_available')) is not bool:`
+- [L217](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L217-L217) `if value.get('summary_kind') != 'AGGREGATE_ONLY':`
+- [L219](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L219-L219) `if 'sequence_snapshot_complete' in value and type(value['sequence_snapshot_complete']) is not bool:`
+
+메모리/파일/SQL 관련 식별자: 별도 I/O나 자원 호출이 표시되지 않는 단순 유틸리티일 수 있다. 본문 확인 필요.
+
+**5. 연결 관계**: 코드에서 직접 참조하는 호출 후보(정적 검색 결과): `_snapshot`, `get`, `_lane_names`, `LedgerError`, `_integer`, `isinstance`, `add`, `in`, `type`, `and`, `items`, `_stream_key`, `_episode`. 이는 분기별 동적 호출 확정이 아니라 코드를 따라갈 때 찾을 식별자 목록이다. 공유 자원은 전역 `DATA`, `BUILD`, `BINARY`, run의 JSON/SQLite 등이 있는지 본문에서 확인한다.
+
+**6. Python 문법**: `with`는 자원 정리, `try/except/finally`는 오류/항상 수행 경로, `yield`가 있다면 generator, `dict`/list comprehension은 자료 변환, `path / 'file'`은 pathlib 경로 결합, `with db:`는 transaction 문맥 관리다. 반드시 아래 실제 사용 문법만 해당한다고 판단한다.
+
+**7. 구체 예시(실제 실행이 아닌 가상 시나리오)**: 예시 입력에서 반환 조건, 예외 조건, 파일 경로 경계를 한 줄씩 따라가며 함수 실행 전·후 dict/파일/SQLite/프로세스 상태를 기록한다. 숫자나 임계치는 예시이지 측정·고정 값이 아니다.
+
+**8. 경계/성능/보안**: 잘못된 타입, 중복·유실된 JSON 키, 파일 심볼릭링크·권한, 크기 상한, SQLite 부분 커밋, 프로세스 생존 확인, 데이터 내구 경계를 코드 근거로 평가한다. `return` 값만으로 무손실을 단정할 수 없다.
+
+**함수 원본 전체**
+
+```python
+def _snapshot(value, previous=None):
+    offsets = value.get('durable_offsets')
+    lanes = _lane_names(offsets)
+    if previous and set(previous['durable_offsets']) != set(offsets):
+        raise LedgerError('checkpoint durable lane set changed')
+    for lane in lanes:
+        offset = _integer(offsets[lane], 'checkpoint offset ' + lane)
+        if offset % RECORD_SIZE:
+            raise LedgerError('checkpoint offset not record aligned: ' + lane)
+        if previous and offset < previous['durable_offsets'][lane]:
+            raise LedgerError('checkpoint durable offsets regressed: ' + lane)
+    tenants = value.get('tenants')
+    if not isinstance(tenants, list) or len(tenants) > 1024:
+        raise LedgerError('checkpoint tenants must be bounded list')
+    ids = set()
+    previous_sequences = {tenant['cgroup_id']: tenant['sequence'] for tenant in
+                          previous['tenants']} if previous else {}
+    for tenant in tenants:
+        if not isinstance(tenant, dict):
+            raise LedgerError('checkpoint tenant object required')
+        cgroup = _integer(tenant.get('cgroup_id'), 'tenant cgroup_id')
+        seq = _integer(tenant.get('sequence'), 'tenant sequence')
+        if cgroup in ids or seq < previous_sequences.get(cgroup, 0):
+            raise LedgerError('duplicate tenant or regressed sequence')
+        ids.add(cgroup)
+    if previous and value.get('sequence_snapshot_complete') is True and not set(previous_sequences) <= ids:
+        raise LedgerError('checkpoint lost an existing tenant')
+    faults = value.get('faults')
+    if not isinstance(faults, list) or len(faults) != 4:
+        raise LedgerError('checkpoint faults must contain four aggregate counters')
+    for item in faults:
+        _integer(item, 'fault counter')
+    for key in ('metadata_overflow', 'metadata_dropped'):
+        _integer(value.get(key), key)
+        if previous and value[key] < previous[key]:
+            raise LedgerError(key + ' regressed')
+    if type(value.get('exact_loss_available')) is not bool:
+        raise LedgerError('exact_loss_available must be boolean')
+    if value.get('summary_kind') != 'AGGREGATE_ONLY':
+        raise LedgerError('snapshot summary_kind must be AGGREGATE_ONLY')
+    if 'sequence_snapshot_complete' in value and type(value['sequence_snapshot_complete']) is not bool:
+        raise LedgerError('sequence_snapshot_complete must be boolean')
+    if value['exact_loss_available'] and (value['metadata_overflow'] or value['metadata_dropped']):
+        raise LedgerError('exact loss coverage contradicts metadata overflow')
+    if value['record_type'] == 'seal' and value.get('state') not in ('STOPPED', 'FAILED'):
+        raise LedgerError('seal state must be STOPPED or FAILED')
+    for key in QUARANTINE_METRIC_ALIASES:
+        if key in value:
+            _integer(value[key], key, maximum=1024 if key == 'active_quarantined_streams' else UINT64)
+    if 'peak_critical_rate' in value and value.get('peak_critical_rate_scope') != 'MAX_TRACKED_STREAM_ONE_SECOND_EPS':
+        raise LedgerError('peak critical rate scope mismatch')
+    if 'quarantine_by_reason' in value:
+        reasons = value['quarantine_by_reason']
+        if (not isinstance(reasons, dict) or set(reasons) != {'CRITICAL_RATE_EXCEEDED', 'CRITICAL_RATE_RECOVERED'} or
+            value.get('quarantine_by_reason_scope') != 'TRANSITIONS'):
+            raise LedgerError('quarantine reason counts require exact transition scope')
+        for key, item in reasons.items():
+            _integer(item, 'quarantine transition reason count ' + key)
+    if 'streams' in value:
+        streams = value['streams']
+        if not isinstance(streams, list) or len(streams) > 1024:
+            raise LedgerError('quarantine streams must be bounded list')
+        seen_streams = set()
+        for stream in streams:
+            key = _stream_key(stream)
+            if key in seen_streams:
+                raise LedgerError('duplicate quarantine stream')
+            seen_streams.add(key)
+            if not isinstance(stream.get('engine'), dict) or not isinstance(stream.get('collector'), dict):
+                raise LedgerError('quarantine engine/collector objects required')
+            for section in (stream, stream['collector']):
+                for key, item in section.items():
+                    if key not in ('engine', 'collector'):
+                        _integer(item, 'stream counter ' + key)
+            for key, item in stream['engine'].items():
+                if key in ('current', 'last'):
+                    _episode(item)
+                else:
+                    _integer(item, 'engine counter ' + key)
+        for key in ('stream_snapshot_complete', 'stream_storage_complete'):
+            if type(value.get(key)) is not bool:
+                raise LedgerError(key + ' must be boolean')
+        if 'quarantine_tracking_complete' in value and type(value['quarantine_tracking_complete']) is not bool:
+            raise LedgerError('quarantine_tracking_complete must be boolean')
+        global_ = value.get('quarantine_global', {})
+        if not isinstance(global_, dict):
+            raise LedgerError('quarantine_global object required')
+        for key, item in global_.items():
+            _integer(item, 'global quarantine counter ' + key)
+    if 'rule_stats' in value:
+        rows = value['rule_stats']
+        if (not isinstance(rows, list) or not 1 <= len(rows) <= 8 or
+                type(value.get('rule_stats_snapshot_complete')) is not bool or
+                not isinstance(value.get('rule_stats_scope'), str) or not value['rule_stats_scope']):
+            raise LedgerError('rule_stats snapshot/scope mismatch')
+        seen = set()
+        scalar_counters = ('evaluated', 'matched', 'unknown', 'selected', 'ring_submitted',
+                           'quarantine_summarized', 'ring_failed', 'bulk_budget_suppressed',
+                           'bulk_budget_contention')
+        lane_counters = ('collector_observed', 'collector_appended', 'collector_durable',
+                         'collector_queue_rejected', 'collector_quota_rejected')
+        for row in rows:
+            if not isinstance(row, dict):
+                raise LedgerError('rule_stats row must be object')
+            rid = _integer(row.get('rule_id'), 'rule_stats rule_id', 1, 255)
+            if rid in seen:
+                raise LedgerError('duplicate rule_stats rule_id')
+            seen.add(rid)
+            _integer(row.get('priority'), 'rule_stats priority', 0, 2)
+            _integer(row.get('configured_policy'), 'rule_stats configured_policy', 0, 2)
+            _integer(row.get('precedence'), 'rule_stats precedence', 0, 1000)
+            available = row.get('stats_available', True)
+            if type(available) is not bool:
+                raise LedgerError('rule_stats stats_available must be boolean')
+            if not available and value['rule_stats_snapshot_complete']:
+                raise LedgerError('unavailable rule_stats contradicts complete snapshot')
+            for key in scalar_counters:
+                if available:
+                    _integer(row.get(key), 'rule_stats ' + key)
+                elif key not in row or row[key] is not None:
+                    raise LedgerError('unavailable rule_stats ' + key + ' must be null')
+            for key in lane_counters:
+                counts = row.get(key)
+                if not isinstance(counts, list) or len(counts) != 3:
+                    raise LedgerError('rule_stats ' + key + ' requires three lane counters')
+                for count in counts:
+                    _integer(count, 'rule_stats ' + key)
+    return value
+```
+
+#### _stream_key — [ledger.py:309–316](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L309-L316)
+
+**정의(원문)**: `def _stream_key(value):`
+
+**1. 목적**: quarantine stream의 식별자를 검증한다.
+
+**2. 인자·자료형·전달**: 서명에 적힌 파이썬 매개변수를 순서대로 확인한다. 위치 인자는 값으로 참조가 전달되고, `Path`는 경로 객체, `run`은 run 디렉터리, `cfg`는 정규화된 dict인 경우가 많다. 변경 가능한 list/dict는 복사 없이 전달되면 함수 안의 수정이 호출자에게도 보일 수 있다. `*` 뒤의 매개변수는 키워드 전용이다. `=...`는 명시한 기본값이다. 이 함수에서 실제로 사용하는 타입·키는 코드의 `[]` 접근과 validation을 참고한다.
+
+**3. 반환/오류**: `raise LedgerError('quarantine stream object required')` · `return (str(_integer(value.get('cgroup_id'), 'stream cgroup_id')),`. Python은 `raise`한 에러를 상위 호출자로 전달하며 CLI의 `main` 진입 보호 코드가 일부 오류를 잡는다.
+
+**4. 내부 처리 순서·데이터 변화**: 아래는 실제 선언 내부의 중요한 조건과 루프(원본 정의 번호):
+- [L310](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L310-L310) `if not isinstance(value, dict):`
+
+메모리/파일/SQL 관련 식별자: 별도 I/O나 자원 호출이 표시되지 않는 단순 유틸리티일 수 있다. 본문 확인 필요.
+
+**5. 연결 관계**: 코드에서 직접 참조하는 호출 후보(정적 검색 결과): `_stream_key`, `isinstance`, `LedgerError`, `_integer`, `get`. 이는 분기별 동적 호출 확정이 아니라 코드를 따라갈 때 찾을 식별자 목록이다. 공유 자원은 전역 `DATA`, `BUILD`, `BINARY`, run의 JSON/SQLite 등이 있는지 본문에서 확인한다.
+
+**6. Python 문법**: `with`는 자원 정리, `try/except/finally`는 오류/항상 수행 경로, `yield`가 있다면 generator, `dict`/list comprehension은 자료 변환, `path / 'file'`은 pathlib 경로 결합, `with db:`는 transaction 문맥 관리다. 반드시 아래 실제 사용 문법만 해당한다고 판단한다.
+
+**7. 구체 예시(실제 실행이 아닌 가상 시나리오)**: 예시 입력에서 반환 조건, 예외 조건, 파일 경로 경계를 한 줄씩 따라가며 함수 실행 전·후 dict/파일/SQLite/프로세스 상태를 기록한다. 숫자나 임계치는 예시이지 측정·고정 값이 아니다.
+
+**8. 경계/성능/보안**: 잘못된 타입, 중복·유실된 JSON 키, 파일 심볼릭링크·권한, 크기 상한, SQLite 부분 커밋, 프로세스 생존 확인, 데이터 내구 경계를 코드 근거로 평가한다. `return` 값만으로 무손실을 단정할 수 없다.
+
+**함수 원본 전체**
+
+```python
+def _stream_key(value):
+    if not isinstance(value, dict):
+        raise LedgerError('quarantine stream object required')
+    return (str(_integer(value.get('cgroup_id'), 'stream cgroup_id')),
+            _integer(value.get('rule_id'), 'stream rule_id', 1, 255),
+            _integer(value.get('kind'), 'stream kind', 1, 2))
+```
+
+#### _episode — [ledger.py:317–338](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L317-L338)
+
+**정의(원문)**: `def _episode(value):`
+
+**1. 목적**: 격리 episode 구조체의 시간·숫자·일관성을 검증한다.
+
+**2. 인자·자료형·전달**: 서명에 적힌 파이썬 매개변수를 순서대로 확인한다. 위치 인자는 값으로 참조가 전달되고, `Path`는 경로 객체, `run`은 run 디렉터리, `cfg`는 정규화된 dict인 경우가 많다. 변경 가능한 list/dict는 복사 없이 전달되면 함수 안의 수정이 호출자에게도 보일 수 있다. `*` 뒤의 매개변수는 키워드 전용이다. `=...`는 명시한 기본값이다. 이 함수에서 실제로 사용하는 타입·키는 코드의 `[]` 접근과 validation을 참고한다.
+
+**3. 반환/오류**: `raise LedgerError('quarantine episode object required')` · `raise LedgerError('episode tracking_complete must be boolean or 0/1')` · `raise LedgerError('episode identity/first sequence mismatch')` · `raise LedgerError('episode time bounds regressed')` · `return value`. Python은 `raise`한 에러를 상위 호출자로 전달하며 CLI의 `main` 진입 보호 코드가 일부 오류를 잡는다.
+
+**4. 내부 처리 순서·데이터 변화**: 아래는 실제 선언 내부의 중요한 조건과 루프(원본 정의 번호):
+- [L318](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L318-L318) `if not isinstance(value, dict):`
+- [L323](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L323-L323) `for key in required:`
+- [L325](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L325-L325) `for key, item in value.items():`
+- [L326](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L326-L326) `if key == 'tracking_complete':`
+- [L327](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L327-L327) `if type(item) is not bool and (type(item) is not int or item not in (0, 1)):`
+- [L329](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L329-L329) `else:`
+- [L331](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L331-L331) `if value['episode_id']:`
+- [L332](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L332-L332) `if value['episode_id'] != value['first_sequence']:`
+- [L334](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L334-L334) `if value['end_ns'] and value['end_ns'] < value['start_ns']:`
+
+메모리/파일/SQL 관련 식별자: 별도 I/O나 자원 호출이 표시되지 않는 단순 유틸리티일 수 있다. 본문 확인 필요.
+
+**5. 연결 관계**: 코드에서 직접 참조하는 호출 후보(정적 검색 결과): `_episode`, `isinstance`, `LedgerError`, `_integer`, `get`, `items`, `type`, `and`, `in`. 이는 분기별 동적 호출 확정이 아니라 코드를 따라갈 때 찾을 식별자 목록이다. 공유 자원은 전역 `DATA`, `BUILD`, `BINARY`, run의 JSON/SQLite 등이 있는지 본문에서 확인한다.
+
+**6. Python 문법**: `with`는 자원 정리, `try/except/finally`는 오류/항상 수행 경로, `yield`가 있다면 generator, `dict`/list comprehension은 자료 변환, `path / 'file'`은 pathlib 경로 결합, `with db:`는 transaction 문맥 관리다. 반드시 아래 실제 사용 문법만 해당한다고 판단한다.
+
+**7. 구체 예시(실제 실행이 아닌 가상 시나리오)**: 예시 입력에서 반환 조건, 예외 조건, 파일 경로 경계를 한 줄씩 따라가며 함수 실행 전·후 dict/파일/SQLite/프로세스 상태를 기록한다. 숫자나 임계치는 예시이지 측정·고정 값이 아니다.
+
+**8. 경계/성능/보안**: 잘못된 타입, 중복·유실된 JSON 키, 파일 심볼릭링크·권한, 크기 상한, SQLite 부분 커밋, 프로세스 생존 확인, 데이터 내구 경계를 코드 근거로 평가한다. `return` 값만으로 무손실을 단정할 수 없다.
+
+**함수 원본 전체**
+
+```python
+def _episode(value):
+    if not isinstance(value, dict):
+        raise LedgerError('quarantine episode object required')
+    required = ('episode_id', 'start_ns', 'end_ns', 'first_sequence', 'last_sequence',
+                'seen', 'full_selected', 'sample_selected', 'summarized',
+                'full_submitted', 'sample_submitted', 'ring_failed')
+    for key in required:
+        _integer(value.get(key), 'episode ' + key)
+    for key, item in value.items():
+        if key == 'tracking_complete':
+            if type(item) is not bool and (type(item) is not int or item not in (0, 1)):
+                raise LedgerError('episode tracking_complete must be boolean or 0/1')
+        else:
+            _integer(item, 'episode ' + key)
+    if value['episode_id']:
+        if value['episode_id'] != value['first_sequence']:
+            raise LedgerError('episode identity/first sequence mismatch')
+        if value['end_ns'] and value['end_ns'] < value['start_ns']:
+            raise LedgerError('episode time bounds regressed')
+    return value
+```
+
+#### _control — [ledger.py:339–373](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L339-L373)
+
+**정의(원문)**: `def _control(db, value, report):`
+
+**1. 목적**: quarantine control enter/exit record를 검증하고 SQLite에 쌓는다.
+
+**2. 인자·자료형·전달**: 서명에 적힌 파이썬 매개변수를 순서대로 확인한다. 위치 인자는 값으로 참조가 전달되고, `Path`는 경로 객체, `run`은 run 디렉터리, `cfg`는 정규화된 dict인 경우가 많다. 변경 가능한 list/dict는 복사 없이 전달되면 함수 안의 수정이 호출자에게도 보일 수 있다. `*` 뒤의 매개변수는 키워드 전용이다. `=...`는 명시한 기본값이다. 이 함수에서 실제로 사용하는 타입·키는 코드의 `[]` 접근과 validation을 참고한다.
+
+**3. 반환/오류**: `raise LedgerError('control/episode identity mismatch')` · `raise LedgerError('control/episode sequence bounds mismatch')` · `raise LedgerError('quarantine transition reason mismatch')` · `raise LedgerError('quarantine transition policy mismatch: ' + key)` · `raise LedgerError('quarantine enter policy time mismatch')` · `raise LedgerError('quarantine exit policy time mismatch')` · `raise LedgerError('conflicting quarantine transition')`. Python은 `raise`한 에러를 상위 호출자로 전달하며 CLI의 `main` 진입 보호 코드가 일부 오류를 잡는다.
+
+**4. 내부 처리 순서·데이터 변화**: 아래는 실제 선언 내부의 중요한 조건과 루프(원본 정의 번호):
+- [L343](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L343-L343) `if eid != episode['episode_id']:`
+- [L345](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L345-L345) `for key in ('first_seq', 'last_seq', 'seq', 'monotonic_ns', 'threshold_eps', 'observed_eps', 'duration_ms'):`
+- [L347](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L347-L347) `if value['first_seq'] != episode['first_sequence'] or value['last_seq'] != episode['last_sequence']:`
+- [L350](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L350-L350) `if value.get('reason') != ('HIGH_RATE' if transition == 'quarantine_enter' else 'LOW_RATE'):`
+- [L355](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L355-L355) `for key, expected in expected_policy.items():`
+- [L356](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L356-L356) `if key in value and value[key] != expected:`
+- [L358](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L358-L358) `if episode['start_ns'] != value['monotonic_ns'] and transition == 'quarantine_enter':`
+- [L360](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L360-L360) `if episode['end_ns'] != value['monotonic_ns'] and transition == 'quarantine_exit':`
+- [L366](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L366-L366) `if old:`
+- [L367](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L367-L367) `if old[0] != signature:`
+- [L370](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L370-L370) `else:`
+
+메모리/파일/SQL 관련 식별자: `json.dumps`, `db.execute`.
+
+**5. 연결 관계**: 코드에서 직접 참조하는 호출 후보(정적 검색 결과): `_control`, `_stream_key`, `_episode`, `get`, `_integer`, `LedgerError`, `in`, `items`, `dumps`, `_seq_key`, `execute`, `fetchone`, `VALUES`. 이는 분기별 동적 호출 확정이 아니라 코드를 따라갈 때 찾을 식별자 목록이다. 공유 자원은 전역 `DATA`, `BUILD`, `BINARY`, run의 JSON/SQLite 등이 있는지 본문에서 확인한다.
+
+**6. Python 문법**: `with`는 자원 정리, `try/except/finally`는 오류/항상 수행 경로, `yield`가 있다면 generator, `dict`/list comprehension은 자료 변환, `path / 'file'`은 pathlib 경로 결합, `with db:`는 transaction 문맥 관리다. 반드시 아래 실제 사용 문법만 해당한다고 판단한다.
+
+**7. 구체 예시(실제 실행이 아닌 가상 시나리오)**: 예시 입력에서 반환 조건, 예외 조건, 파일 경로 경계를 한 줄씩 따라가며 함수 실행 전·후 dict/파일/SQLite/프로세스 상태를 기록한다. 숫자나 임계치는 예시이지 측정·고정 값이 아니다.
+
+**8. 경계/성능/보안**: 잘못된 타입, 중복·유실된 JSON 키, 파일 심볼릭링크·권한, 크기 상한, SQLite 부분 커밋, 프로세스 생존 확인, 데이터 내구 경계를 코드 근거로 평가한다. `return` 값만으로 무손실을 단정할 수 없다.
+
+**함수 원본 전체**
+
+```python
+def _control(db, value, report):
+    cgroup, rule, kind = _stream_key(value)
+    episode = _episode(value.get('episode'))
+    eid = _integer(value.get('episode_id'), 'control episode_id', 1)
+    if eid != episode['episode_id']:
+        raise LedgerError('control/episode identity mismatch')
+    for key in ('first_seq', 'last_seq', 'seq', 'monotonic_ns', 'threshold_eps', 'observed_eps', 'duration_ms'):
+        _integer(value.get(key), 'control ' + key)
+    if value['first_seq'] != episode['first_sequence'] or value['last_seq'] != episode['last_sequence']:
+        raise LedgerError('control/episode sequence bounds mismatch')
+    transition = value['record_type']
+    if value.get('reason') != ('HIGH_RATE' if transition == 'quarantine_enter' else 'LOW_RATE'):
+        raise LedgerError('quarantine transition reason mismatch')
+    expected_policy = dict(original_priority='CRITICAL',
+        effective_policy='QUARANTINE' if transition == 'quarantine_enter' else 'CRITICAL',
+        trigger_reason='CRITICAL_RATE_EXCEEDED' if transition == 'quarantine_enter' else 'CRITICAL_RATE_RECOVERED')
+    for key, expected in expected_policy.items():
+        if key in value and value[key] != expected:
+            raise LedgerError('quarantine transition policy mismatch: ' + key)
+    if episode['start_ns'] != value['monotonic_ns'] and transition == 'quarantine_enter':
+        raise LedgerError('quarantine enter policy time mismatch')
+    if episode['end_ns'] != value['monotonic_ns'] and transition == 'quarantine_exit':
+        raise LedgerError('quarantine exit policy time mismatch')
+    signature = json.dumps({key:item for key,item in value.items() if key != 'journal_seq'},
+                           sort_keys=True, separators=(',', ':'))
+    key = (cgroup, rule, kind, _seq_key(eid), transition)
+    old = db.execute('SELECT payload FROM controls WHERE cgroup=? AND rule_id=? AND kind=? AND episode_id=? AND transition=?', key).fetchone()
+    if old:
+        if old[0] != signature:
+            raise LedgerError('conflicting quarantine transition')
+        report['duplicate_quarantine_controls'] += 1
+    else:
+        db.execute('INSERT INTO controls VALUES (?,?,?,?,?,?)', (*key, signature))
+```
+
+#### _seq_key — [ledger.py:374–378](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L374-L378)
+
+**정의(원문)**: `def _seq_key(seq):`
+
+**1. 목적**: 64비트 시퀀스의 SQLite 비교/정렬용 키를 만든다.
+
+**2. 인자·자료형·전달**: 서명에 적힌 파이썬 매개변수를 순서대로 확인한다. 위치 인자는 값으로 참조가 전달되고, `Path`는 경로 객체, `run`은 run 디렉터리, `cfg`는 정규화된 dict인 경우가 많다. 변경 가능한 list/dict는 복사 없이 전달되면 함수 안의 수정이 호출자에게도 보일 수 있다. `*` 뒤의 매개변수는 키워드 전용이다. `=...`는 명시한 기본값이다. 이 함수에서 실제로 사용하는 타입·키는 코드의 `[]` 접근과 validation을 참고한다.
+
+**3. 반환/오류**: `return f'{seq:020d}'`. Python은 `raise`한 에러를 상위 호출자로 전달하며 CLI의 `main` 진입 보호 코드가 일부 오류를 잡는다.
+
+**4. 내부 처리 순서·데이터 변화**: 아래는 실제 선언 내부의 중요한 조건과 루프(원본 정의 번호):
+- 명시 분기 없이 순차 계산/반환한다.
+
+메모리/파일/SQL 관련 식별자: 별도 I/O나 자원 호출이 표시되지 않는 단순 유틸리티일 수 있다. 본문 확인 필요.
+
+**5. 연결 관계**: 코드에서 직접 참조하는 호출 후보(정적 검색 결과): `_seq_key`. 이는 분기별 동적 호출 확정이 아니라 코드를 따라갈 때 찾을 식별자 목록이다. 공유 자원은 전역 `DATA`, `BUILD`, `BINARY`, run의 JSON/SQLite 등이 있는지 본문에서 확인한다.
+
+**6. Python 문법**: `with`는 자원 정리, `try/except/finally`는 오류/항상 수행 경로, `yield`가 있다면 generator, `dict`/list comprehension은 자료 변환, `path / 'file'`은 pathlib 경로 결합, `with db:`는 transaction 문맥 관리다. 반드시 아래 실제 사용 문법만 해당한다고 판단한다.
+
+**7. 구체 예시(실제 실행이 아닌 가상 시나리오)**: 예시 입력에서 반환 조건, 예외 조건, 파일 경로 경계를 한 줄씩 따라가며 함수 실행 전·후 dict/파일/SQLite/프로세스 상태를 기록한다. 숫자나 임계치는 예시이지 측정·고정 값이 아니다.
+
+**8. 경계/성능/보안**: 잘못된 타입, 중복·유실된 JSON 키, 파일 심볼릭링크·권한, 크기 상한, SQLite 부분 커밋, 프로세스 생존 확인, 데이터 내구 경계를 코드 근거로 평가한다. `return` 값만으로 무손실을 단정할 수 없다.
+
+**함수 원본 전체**
+
+```python
+def _seq_key(seq):
+    # Text preserves the whole unsigned 64-bit ABI and lexicographic order.
+    return f'{seq:020d}'
+```
+
+#### _loss_witness — [ledger.py:379–410](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L379-L410)
+
+**정의(원문)**: `def _loss_witness(value, lane):`
+
+**1. 목적**: 개별 userspace 손실 원장 레코드의 witness 내용을 검증한다.
+
+**2. 인자·자료형·전달**: 서명에 적힌 파이썬 매개변수를 순서대로 확인한다. 위치 인자는 값으로 참조가 전달되고, `Path`는 경로 객체, `run`은 run 디렉터리, `cfg`는 정규화된 dict인 경우가 많다. 변경 가능한 list/dict는 복사 없이 전달되면 함수 안의 수정이 호출자에게도 보일 수 있다. `*` 뒤의 매개변수는 키워드 전용이다. `=...`는 명시한 기본값이다. 이 함수에서 실제로 사용하는 타입·키는 코드의 `[]` 접근과 validation을 참고한다.
+
+**3. 반환/오류**: `return None` · `raise LedgerError('loss witness field set mismatch')` · `raise LedgerError('unsupported loss witness version/source')` · `raise LedgerError('loss witness rule_id/quality mismatch')` · `raise LedgerError('loss result must be signed 64-bit integer')` · `raise LedgerError('loss witness path_hex/captured_len mismatch')` · `return json.dumps(witness, sort_keys=True, separators=(',', ':'))`. Python은 `raise`한 에러를 상위 호출자로 전달하며 CLI의 `main` 진입 보호 코드가 일부 오류를 잡는다.
+
+**4. 내부 처리 순서·데이터 변화**: 아래는 실제 선언 내부의 중요한 조건과 루프(원본 정의 번호):
+- [L382](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L382-L382) `if witness is None:`
+- [L387](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L387-L387) `if not isinstance(witness, dict) or set(witness) != required:`
+- [L389](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L389-L389) `if type(witness['version']) is not int or witness['version'] != 1 or witness['source'] != 'USERSPACE_RING_CALLBACK':`
+- [L396](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L396-L396) `if _integer(witness['rule_id'], 'loss rule_id', 0, 255) != policy['rule_id']:`
+- [L398](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L398-L398) `for key in ('pid', 'tid', 'uid', 'op_flags'):`
+- [L401](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L401-L401) `if type(witness['result']) is not int or not -(2**63) <= witness['result'] < 2**63:`
+- [L405](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L405-L405) `if (not isinstance(path_hex, str) or len(path_hex) != length * 2 or`
+
+메모리/파일/SQL 관련 식별자: `json.dumps`.
+
+**5. 연결 관계**: 코드에서 직접 참조하는 호출 후보(정적 검색 결과): `_loss_witness`, `get`, `isinstance`, `LedgerError`, `type`, `_integer`, `_policy`, `in`, `any`, `dumps`. 이는 분기별 동적 호출 확정이 아니라 코드를 따라갈 때 찾을 식별자 목록이다. 공유 자원은 전역 `DATA`, `BUILD`, `BINARY`, run의 JSON/SQLite 등이 있는지 본문에서 확인한다.
+
+**6. Python 문법**: `with`는 자원 정리, `try/except/finally`는 오류/항상 수행 경로, `yield`가 있다면 generator, `dict`/list comprehension은 자료 변환, `path / 'file'`은 pathlib 경로 결합, `with db:`는 transaction 문맥 관리다. 반드시 아래 실제 사용 문법만 해당한다고 판단한다.
+
+**7. 구체 예시(실제 실행이 아닌 가상 시나리오)**: 예시 입력에서 반환 조건, 예외 조건, 파일 경로 경계를 한 줄씩 따라가며 함수 실행 전·후 dict/파일/SQLite/프로세스 상태를 기록한다. 숫자나 임계치는 예시이지 측정·고정 값이 아니다.
+
+**8. 경계/성능/보안**: 잘못된 타입, 중복·유실된 JSON 키, 파일 심볼릭링크·권한, 크기 상한, SQLite 부분 커밋, 프로세스 생존 확인, 데이터 내구 경계를 코드 근거로 평가한다. `return` 값만으로 무손실을 단정할 수 없다.
+
+**함수 원본 전체**
+
+```python
+def _loss_witness(value, lane):
+    """Validate optional v1 per-ID context; old five-field tombstones stay valid."""
+    witness = value.get('witness')
+    if witness is None:
+        return None
+    required = {'version', 'source', 'event_schema', 'kind', 'priority', 'quality',
+                'rule_id', 'pid', 'tid', 'uid', 'process_start_ns', 'result',
+                'op_flags', 'captured_len', 'path_hex'}
+    if not isinstance(witness, dict) or set(witness) != required:
+        raise LedgerError('loss witness field set mismatch')
+    if type(witness['version']) is not int or witness['version'] != 1 or witness['source'] != 'USERSPACE_RING_CALLBACK':
+        raise LedgerError('unsupported loss witness version/source')
+    schema = _integer(witness['event_schema'], 'loss event_schema', 2, 3)
+    _integer(witness['kind'], 'loss kind', 1, 2)
+    priority = _integer(witness['priority'], 'loss priority', 0, 2)
+    quality = _integer(witness['quality'], 'loss quality', 0, 0xffffffff)
+    policy = _policy(schema, quality, priority, lane)
+    if _integer(witness['rule_id'], 'loss rule_id', 0, 255) != policy['rule_id']:
+        raise LedgerError('loss witness rule_id/quality mismatch')
+    for key in ('pid', 'tid', 'uid', 'op_flags'):
+        _integer(witness[key], 'loss ' + key, 0, 0xffffffff)
+    _integer(witness['process_start_ns'], 'loss process_start_ns')
+    if type(witness['result']) is not int or not -(2**63) <= witness['result'] < 2**63:
+        raise LedgerError('loss result must be signed 64-bit integer')
+    length = _integer(witness['captured_len'], 'loss captured_len', 0, 127)
+    path_hex = witness['path_hex']
+    if (not isinstance(path_hex, str) or len(path_hex) != length * 2 or
+        any(char not in '0123456789abcdef' for char in path_hex)):
+        raise LedgerError('loss witness path_hex/captured_len mismatch')
+    return json.dumps(witness, sort_keys=True, separators=(',', ':'))
+```
+
+#### _loss — [ledger.py:411–429](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L411-L429)
+
+**정의(원문)**: `def _loss(db, value, report):`
+
+**1. 목적**: 손실 tombstone을 ID·reason·중복 충돌 검사 후 SQLite에 기록한다.
+
+**2. 인자·자료형·전달**: 서명에 적힌 파이썬 매개변수를 순서대로 확인한다. 위치 인자는 값으로 참조가 전달되고, `Path`는 경로 객체, `run`은 run 디렉터리, `cfg`는 정규화된 dict인 경우가 많다. 변경 가능한 list/dict는 복사 없이 전달되면 함수 안의 수정이 호출자에게도 보일 수 있다. `*` 뒤의 매개변수는 키워드 전용이다. `=...`는 명시한 기본값이다. 이 함수에서 실제로 사용하는 타입·키는 코드의 `[]` 접근과 validation을 참고한다.
+
+**3. 반환/오류**: `raise LedgerError('invalid loss lane/reason')` · `raise LedgerError('conflicting loss tombstones for ' + cgroup + ':' + str(int(seq)))`. Python은 `raise`한 에러를 상위 호출자로 전달하며 CLI의 `main` 진입 보호 코드가 일부 오류를 잡는다.
+
+**4. 내부 처리 순서·데이터 변화**: 아래는 실제 선언 내부의 중요한 조건과 루프(원본 정의 번호):
+- [L416](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L416-L416) `if lane not in ALL_LANES or not isinstance(reason, str) or not reason or len(reason) > 128 or '\0' in reason:`
+- [L422](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L422-L422) `if old:`
+- [L423](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L423-L423) `if old != signature:`
+- [L426](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L426-L426) `else:`
+
+메모리/파일/SQL 관련 식별자: `db.execute`.
+
+**5. 연결 관계**: 코드에서 직접 참조하는 호출 후보(정적 검색 결과): `_loss`, `_integer`, `get`, `_seq_key`, `isinstance`, `LedgerError`, `_loss_witness`, `execute`, `fetchone`, `VALUES`. 이는 분기별 동적 호출 확정이 아니라 코드를 따라갈 때 찾을 식별자 목록이다. 공유 자원은 전역 `DATA`, `BUILD`, `BINARY`, run의 JSON/SQLite 등이 있는지 본문에서 확인한다.
+
+**6. Python 문법**: `with`는 자원 정리, `try/except/finally`는 오류/항상 수행 경로, `yield`가 있다면 generator, `dict`/list comprehension은 자료 변환, `path / 'file'`은 pathlib 경로 결합, `with db:`는 transaction 문맥 관리다. 반드시 아래 실제 사용 문법만 해당한다고 판단한다.
+
+**7. 구체 예시(실제 실행이 아닌 가상 시나리오)**: 예시 입력에서 반환 조건, 예외 조건, 파일 경로 경계를 한 줄씩 따라가며 함수 실행 전·후 dict/파일/SQLite/프로세스 상태를 기록한다. 숫자나 임계치는 예시이지 측정·고정 값이 아니다.
+
+**8. 경계/성능/보안**: 잘못된 타입, 중복·유실된 JSON 키, 파일 심볼릭링크·권한, 크기 상한, SQLite 부분 커밋, 프로세스 생존 확인, 데이터 내구 경계를 코드 근거로 평가한다. `return` 값만으로 무손실을 단정할 수 없다.
+
+**함수 원본 전체**
+
+```python
+def _loss(db, value, report):
+    cgroup = str(_integer(value.get('cgroup_id'), 'loss cgroup_id'))
+    seq = _seq_key(_integer(value.get('seq'), 'loss seq', 1))
+    lane, reason = value.get('lane'), value.get('reason')
+    timestamp = _integer(value.get('monotonic_ns'), 'loss monotonic_ns')
+    if lane not in ALL_LANES or not isinstance(reason, str) or not reason or len(reason) > 128 or '\0' in reason:
+        raise LedgerError('invalid loss lane/reason')
+    witness = _loss_witness(value, lane)
+    old = db.execute('SELECT lane,reason,monotonic_ns,witness FROM losses WHERE cgroup=? AND seq=?',
+                     (cgroup, seq)).fetchone()
+    signature = (lane, reason, str(timestamp), witness)
+    if old:
+        if old != signature:
+            raise LedgerError('conflicting loss tombstones for ' + cgroup + ':' + str(int(seq)))
+        report['duplicate_loss_records'] += 1
+    else:
+        db.execute('INSERT INTO losses VALUES (?,?,?,?,?,?)', (cgroup, seq, *signature))
+```
+
+#### _read_journal — [ledger.py:430–481](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L430-L481)
+
+**정의(원문)**: `def _read_journal(run, fence, lineage, db, report):`
+
+**1. 목적**: commit fence가 보증한 바이트까지만 CRC journal frame을 파싱한다.
+
+**2. 인자·자료형·전달**: 서명에 적힌 파이썬 매개변수를 순서대로 확인한다. 위치 인자는 값으로 참조가 전달되고, `Path`는 경로 객체, `run`은 run 디렉터리, `cfg`는 정규화된 dict인 경우가 많다. 변경 가능한 list/dict는 복사 없이 전달되면 함수 안의 수정이 호출자에게도 보일 수 있다. `*` 뒤의 매개변수는 키워드 전용이다. `=...`는 명시한 기본값이다. 이 함수에서 실제로 사용하는 타입·키는 코드의 `[]` 접근과 validation을 참고한다.
+
+**3. 반환/오류**: `raise LedgerError('journal shorter than committed fence')` · `raise LedgerError('torn frame header inside committed journal')` · `raise LedgerError('invalid or torn committed frame length')` · `raise LedgerError('metadata CRC32 mismatch at byte ' + str(offset))` · `raise LedgerError('metadata frame schema mismatch')` · `raise LedgerError('metadata journal_seq is not contiguous')` · `raise LedgerError('records after terminal seal')` · `raise LedgerError('unsupported metadata record_type')` · `raise LedgerError('commit fence boundary/journal_seq mismatch')` · `return last`. Python은 `raise`한 에러를 상위 호출자로 전달하며 CLI의 `main` 진입 보호 코드가 일부 오류를 잡는다.
+
+**4. 내부 처리 순서·데이터 변화**: 아래는 실제 선언 내부의 중요한 조건과 루프(원본 정의 번호):
+- [L434](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L434-L434) `if boundary > size:`
+- [L441](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L441-L441) `with (run / 'evidence.meta').open('rb') as handle:`
+- [L442](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L442-L442) `while offset < boundary:`
+- [L443](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L443-L443) `if boundary-offset < FRAME.size:`
+- [L446](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L446-L446) `if not 1 <= length <= MAX_FRAME or FRAME.size+length > boundary-offset:`
+- [L449](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L449-L449) `if zlib.crc32(raw) != checksum:`
+- [L452](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L452-L452) `if not isinstance(value, dict) or type(value.get('schema')) is not int or value['schema'] != 1:`
+- [L455](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L455-L455) `if _integer(value.get('journal_seq'), 'frame journal_seq', 1) != seq:`
+- [L458](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L458-L458) `if sealed:`
+- [L461](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L461-L461) `if kind == 'loss':`
+- [L463](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L463-L463) `elif kind in ('quarantine_enter', 'quarantine_exit'):`
+- [L465](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L465-L465) `elif kind in ('checkpoint', 'seal'):`
+- [L469](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L469-L469) `else:`
+- [L474](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L474-L474) `if seq % 4096 == 0:`
+- [L476](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L476-L476) `if offset != boundary or seq != last_seq:`
+
+메모리/파일/SQL 관련 식별자: `zlib.crc32`, `_read_journal`.
+
+**5. 연결 관계**: 코드에서 직접 참조하는 호출 후보(정적 검색 결과): `_read_journal`, `_integer`, `get`, `stat`, `LedgerError`, `update`, `with`, `open`, `unpack`, `read`, `crc32`, `_json`, `isinstance`, `type`, `_bound_lineage`, `_loss`, `in`, `_control`, `_snapshot`, `commit`. 이는 분기별 동적 호출 확정이 아니라 코드를 따라갈 때 찾을 식별자 목록이다. 공유 자원은 전역 `DATA`, `BUILD`, `BINARY`, run의 JSON/SQLite 등이 있는지 본문에서 확인한다.
+
+**6. Python 문법**: `with`는 자원 정리, `try/except/finally`는 오류/항상 수행 경로, `yield`가 있다면 generator, `dict`/list comprehension은 자료 변환, `path / 'file'`은 pathlib 경로 결합, `with db:`는 transaction 문맥 관리다. 반드시 아래 실제 사용 문법만 해당한다고 판단한다.
+
+**7. 구체 예시(실제 실행이 아닌 가상 시나리오)**: 예시 입력에서 반환 조건, 예외 조건, 파일 경로 경계를 한 줄씩 따라가며 함수 실행 전·후 dict/파일/SQLite/프로세스 상태를 기록한다. 숫자나 임계치는 예시이지 측정·고정 값이 아니다.
+
+**8. 경계/성능/보안**: 잘못된 타입, 중복·유실된 JSON 키, 파일 심볼릭링크·권한, 크기 상한, SQLite 부분 커밋, 프로세스 생존 확인, 데이터 내구 경계를 코드 근거로 평가한다. `return` 값만으로 무손실을 단정할 수 없다.
+
+**함수 원본 전체**
+
+```python
+def _read_journal(run, fence, lineage, db, report):
+    boundary = _integer(fence.get('offset'), 'commit offset', 0, MAX_JOURNAL)
+    last_seq = _integer(fence.get('journal_seq'), 'commit journal_seq')
+    size = (run / 'evidence.meta').stat().st_size
+    if boundary > size:
+        raise LedgerError('journal shorter than committed fence')
+    report['journal'].update(committed_bytes=boundary, uncommitted_bytes=size-boundary,
+                             committed_journal_seq=last_seq)
+    progress = report['verification_progress']
+    progress['journal_committed_boundary_bytes'] = boundary
+    seq, offset, last, sealed = 0, 0, None, False
+    with (run / 'evidence.meta').open('rb') as handle:
+        while offset < boundary:
+            if boundary-offset < FRAME.size:
+                raise LedgerError('torn frame header inside committed journal')
+            length, checksum = FRAME.unpack(handle.read(FRAME.size))
+            if not 1 <= length <= MAX_FRAME or FRAME.size+length > boundary-offset:
+                raise LedgerError('invalid or torn committed frame length')
+            raw = handle.read(length)
+            if zlib.crc32(raw) != checksum:
+                raise LedgerError('metadata CRC32 mismatch at byte ' + str(offset))
+            value = _json(raw)
+            if not isinstance(value, dict) or type(value.get('schema')) is not int or value['schema'] != 1:
+                raise LedgerError('metadata frame schema mismatch')
+            seq += 1
+            if _integer(value.get('journal_seq'), 'frame journal_seq', 1) != seq:
+                raise LedgerError('metadata journal_seq is not contiguous')
+            _bound_lineage(value, lineage)
+            if sealed:
+                raise LedgerError('records after terminal seal')
+            kind = value.get('record_type')
+            if kind == 'loss':
+                _loss(db, value, report)
+            elif kind in ('quarantine_enter', 'quarantine_exit'):
+                _control(db, value, report)
+            elif kind in ('checkpoint', 'seal'):
+                _bound_lineage(value, lineage)
+                last = _snapshot(value, last)
+                sealed = kind == 'seal'
+            else:
+                raise LedgerError('unsupported metadata record_type')
+            offset += FRAME.size + length
+            progress['journal_verified_prefix_bytes'] = offset
+            progress['journal_verified_frames'] = seq
+            if seq % 4096 == 0:
+                db.commit()
+    if offset != boundary or seq != last_seq:
+        raise LedgerError('commit fence boundary/journal_seq mismatch')
+    db.commit()
+    return last
+```
+
+#### _read_raw — [ledger.py:482–534](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L482-L534)
+
+**정의(원문)**: `def _read_raw(run, snapshot, db, report):`
+
+**1. 목적**: snapshot의 durable raw 오프셋까지만 CRC 및 중복·lane을 검사한다.
+
+**2. 인자·자료형·전달**: 서명에 적힌 파이썬 매개변수를 순서대로 확인한다. 위치 인자는 값으로 참조가 전달되고, `Path`는 경로 객체, `run`은 run 디렉터리, `cfg`는 정규화된 dict인 경우가 많다. 변경 가능한 list/dict는 복사 없이 전달되면 함수 안의 수정이 호출자에게도 보일 수 있다. `*` 뒤의 매개변수는 키워드 전용이다. `=...`는 명시한 기본값이다. 이 함수에서 실제로 사용하는 타입·키는 코드의 `[]` 접근과 validation을 참고한다.
+
+**3. 반환/오류**: `raise LedgerError('raw shorter than committed checkpoint: ' + lane)` · `raise LedgerError(f'{lane}.raw:{offset}: CRC32/reserved mismatch')` · `raise LedgerError('raw magic/schema/kind/priority mismatch')` · `raise LedgerError('raw capture length mismatch')` · `raise LedgerError('raw string has no NUL')` · `raise LedgerError('raw path/capture length mismatch')` · `raise LedgerError('raw sequence must be positive')` · `raise LedgerError('conflicting durable payload for ' + cgroup + ':' + str(event[2]))` · `raise LedgerError('durable record contradicts loss tombstone: ' + conflict[0] + ':' + str(int(conflict[1])))`. Python은 `raise`한 에러를 상위 호출자로 전달하며 CLI의 `main` 진입 보호 코드가 일부 오류를 잡는다.
+
+**4. 내부 처리 순서·데이터 변화**: 아래는 실제 선언 내부의 중요한 조건과 루프(원본 정의 번호):
+- [L485](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L485-L485) `for lane in _lane_names(offsets):`
+- [L489](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L489-L489) `if limit > size:`
+- [L495](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L495-L495) `if not limit:`
+- [L497](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L497-L497) `with path.open('rb') as handle:`
+- [L498](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L498-L498) `for offset in range(0, limit, RECORD_SIZE):`
+- [L501](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L501-L501) `if reserved or zlib.crc32(raw[:-8]) != checksum:`
+- [L504](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L504-L504) `if event[5] != 0x31514F45 or event[6] not in (1, 2, 3) or event[7] not in (1, 2) or event[8] not in (0, 1, 2):`
+- [L507](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L507-L507) `if event[15] > 127:`
+- [L509](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L509-L509) `if b'\0' not in event[17] or b'\0' not in event[18]:`
+- [L512](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L512-L512) `if policy['capture_quality'] == 0 and len(path_bytes) != event[15]:`
+- [L514](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L514-L514) `if not event[2]:`
+- [L520](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L520-L520) `if previous and previous[0] != digest:`
+- [L526](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L526-L526) `if offset % (4096 * RECORD_SIZE) == 0:`
+- [L530](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L530-L530) `if conflict:`
+
+메모리/파일/SQL 관련 식별자: `struct.unpack`, `zlib.crc32`, `hashlib.sha256`, `db.execute`, `_read_raw`.
+
+**5. 연결 관계**: 코드에서 직접 참조하는 호출 후보(정적 검색 결과): `_read_raw`, `in`, `exists`, `_lane_names`, `stat`, `LedgerError`, `open`, `read`, `unpack`, `crc32`, `_policy`, `split`, `_seq_key`, `sha256`, `hexdigest`, `execute`, `fetchone`, `VALUES`, `commit`, `USING`. 이는 분기별 동적 호출 확정이 아니라 코드를 따라갈 때 찾을 식별자 목록이다. 공유 자원은 전역 `DATA`, `BUILD`, `BINARY`, run의 JSON/SQLite 등이 있는지 본문에서 확인한다.
+
+**6. Python 문법**: `with`는 자원 정리, `try/except/finally`는 오류/항상 수행 경로, `yield`가 있다면 generator, `dict`/list comprehension은 자료 변환, `path / 'file'`은 pathlib 경로 결합, `with db:`는 transaction 문맥 관리다. 반드시 아래 실제 사용 문법만 해당한다고 판단한다.
+
+**7. 구체 예시(실제 실행이 아닌 가상 시나리오)**: 예시 입력에서 반환 조건, 예외 조건, 파일 경로 경계를 한 줄씩 따라가며 함수 실행 전·후 dict/파일/SQLite/프로세스 상태를 기록한다. 숫자나 임계치는 예시이지 측정·고정 값이 아니다.
+
+**8. 경계/성능/보안**: 잘못된 타입, 중복·유실된 JSON 키, 파일 심볼릭링크·권한, 크기 상한, SQLite 부분 커밋, 프로세스 생존 확인, 데이터 내구 경계를 코드 근거로 평가한다. `return` 값만으로 무손실을 단정할 수 없다.
+
+**함수 원본 전체**
+
+```python
+def _read_raw(run, snapshot, db, report):
+    offsets = snapshot['durable_offsets'] if snapshot else {lane: 0 for lane in
+        (ALL_LANES if (run / 'quarantine.raw').exists() else LANES)}
+    for lane in _lane_names(offsets):
+        path = run / (lane + '.raw')
+        size = path.stat().st_size if path.exists() else 0
+        limit = offsets[lane]
+        if limit > size:
+            raise LedgerError('raw shorter than committed checkpoint: ' + lane)
+        report['raw'][lane] = dict(file_bytes=size, durable_bytes=limit,
+                                   uncommitted_bytes=size-limit,
+                                   partial_tail_bytes=(size-limit) % RECORD_SIZE)
+        report['verification_progress']['raw_verified_prefix_bytes'][lane] = 0
+        if not limit:
+            continue
+        with path.open('rb') as handle:
+            for offset in range(0, limit, RECORD_SIZE):
+                raw = handle.read(RECORD_SIZE)
+                checksum, reserved = struct.unpack('<II', raw[-8:])
+                if reserved or zlib.crc32(raw[:-8]) != checksum:
+                    raise LedgerError(f'{lane}.raw:{offset}: CRC32/reserved mismatch')
+                event = EVENT.unpack(raw[:-8])
+                if event[5] != 0x31514F45 or event[6] not in (1, 2, 3) or event[7] not in (1, 2) or event[8] not in (0, 1, 2):
+                    raise LedgerError('raw magic/schema/kind/priority mismatch')
+                policy = _policy(event[6], event[16], event[8], lane)
+                if event[15] > 127:
+                    raise LedgerError('raw capture length mismatch')
+                if b'\0' not in event[17] or b'\0' not in event[18]:
+                    raise LedgerError('raw string has no NUL')
+                path_bytes = event[18].split(b'\0', 1)[0]
+                if policy['capture_quality'] == 0 and len(path_bytes) != event[15]:
+                    raise LedgerError('raw path/capture length mismatch')
+                if not event[2]:
+                    raise LedgerError('raw sequence must be positive')
+                cgroup, seq = str(event[1]), _seq_key(event[2])
+                digest = hashlib.sha256(raw).hexdigest()
+                previous = db.execute('SELECT digest FROM durable WHERE cgroup=? AND seq=?',
+                                      (cgroup, seq)).fetchone()
+                if previous and previous[0] != digest:
+                    raise LedgerError('conflicting durable payload for ' + cgroup + ':' + str(event[2]))
+                db.execute('INSERT OR IGNORE INTO durable VALUES (?,?,?,?,?,?,?,?)',
+                           (cgroup, seq, digest, lane, policy['rule_id'], event[7], policy['flags'], _seq_key(event[0])))
+                report['durable_records'] += 1
+                report['verification_progress']['raw_verified_prefix_bytes'][lane] = offset + RECORD_SIZE
+                if offset % (4096 * RECORD_SIZE) == 0:
+                    db.commit()
+    db.commit()
+    conflict = db.execute('SELECT cgroup,seq FROM durable JOIN losses USING(cgroup,seq) LIMIT 1').fetchone()
+    if conflict:
+        raise LedgerError('durable record contradicts loss tombstone: ' + conflict[0] + ':' + str(int(conflict[1])))
+    report['durable_unique_events'] = db.execute('SELECT count(*) FROM durable').fetchone()[0]
+```
+
+#### _ranges — [ledger.py:535–556](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L535-L556)
+
+**정의(원문)**: `def _ranges(values, label):`
+
+**1. 목적**: 연속 시퀀스의 범위/경계를 계산한다.
+
+**2. 인자·자료형·전달**: 서명에 적힌 파이썬 매개변수를 순서대로 확인한다. 위치 인자는 값으로 참조가 전달되고, `Path`는 경로 객체, `run`은 run 디렉터리, `cfg`는 정규화된 dict인 경우가 많다. 변경 가능한 list/dict는 복사 없이 전달되면 함수 안의 수정이 호출자에게도 보일 수 있다. `*` 뒤의 매개변수는 키워드 전용이다. `=...`는 명시한 기본값이다. 이 함수에서 실제로 사용하는 타입·키는 코드의 `[]` 접근과 validation을 참고한다.
+
+**3. 반환/오류**: `return dict(count=count, ranges=output, range_count=total_ranges,`. Python은 `raise`한 에러를 상위 호출자로 전달하며 CLI의 `main` 진입 보호 코드가 일부 오류를 잡는다.
+
+**4. 내부 처리 순서·데이터 변화**: 아래는 실제 선언 내부의 중요한 조건과 루프(원본 정의 번호):
+- [L538](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L538-L538) `for value in values:`
+- [L541](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L541-L541) `if last is not None and value == last + 1:`
+- [L544](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L544-L544) `if last is not None:`
+- [L546](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L546-L546) `if len(output) < MAX_RANGES:`
+- [L549](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L549-L549) `if last is not None:`
+- [L551](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L551-L551) `if len(output) < MAX_RANGES:`
+
+메모리/파일/SQL 관련 식별자: 별도 I/O나 자원 호출이 표시되지 않는 단순 유틸리티일 수 있다. 본문 확인 필요.
+
+**5. 연결 관계**: 코드에서 직접 참조하는 호출 후보(정적 검색 결과): `_ranges`, `append`. 이는 분기별 동적 호출 확정이 아니라 코드를 따라갈 때 찾을 식별자 목록이다. 공유 자원은 전역 `DATA`, `BUILD`, `BINARY`, run의 JSON/SQLite 등이 있는지 본문에서 확인한다.
+
+**6. Python 문법**: `with`는 자원 정리, `try/except/finally`는 오류/항상 수행 경로, `yield`가 있다면 generator, `dict`/list comprehension은 자료 변환, `path / 'file'`은 pathlib 경로 결합, `with db:`는 transaction 문맥 관리다. 반드시 아래 실제 사용 문법만 해당한다고 판단한다.
+
+**7. 구체 예시(실제 실행이 아닌 가상 시나리오)**: 예시 입력에서 반환 조건, 예외 조건, 파일 경로 경계를 한 줄씩 따라가며 함수 실행 전·후 dict/파일/SQLite/프로세스 상태를 기록한다. 숫자나 임계치는 예시이지 측정·고정 값이 아니다.
+
+**8. 경계/성능/보안**: 잘못된 타입, 중복·유실된 JSON 키, 파일 심볼릭링크·권한, 크기 상한, SQLite 부분 커밋, 프로세스 생존 확인, 데이터 내구 경계를 코드 근거로 평가한다. `return` 값만으로 무손실을 단정할 수 없다.
+
+**함수 원본 전체**
+
+```python
+def _ranges(values, label):
+    """Compress a sorted iterator while retaining exact counts with capped output."""
+    output, start, last, count, total_ranges = [], None, None, 0, 0
+    for value in values:
+        value = int(value)
+        count += 1
+        if last is not None and value == last + 1:
+            last = value
+            continue
+        if last is not None:
+            total_ranges += 1
+            if len(output) < MAX_RANGES:
+                output.append(dict(start=start, end=last, status=label))
+        start = last = value
+    if last is not None:
+        total_ranges += 1
+        if len(output) < MAX_RANGES:
+            output.append(dict(start=start, end=last, status=label))
+    return dict(count=count, ranges=output, range_count=total_ranges,
+                ranges_truncated=total_ranges > len(output))
+```
+
+#### _gaps — [ledger.py:557–593](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L557-L593)
+
+**정의(원문)**: `def _gaps(db, cgroup, upper):`
+
+**1. 목적**: 관측된 ID와 known-loss ID 사이 빈 번호 구간을 계산한다.
+
+**2. 인자·자료형·전달**: 서명에 적힌 파이썬 매개변수를 순서대로 확인한다. 위치 인자는 값으로 참조가 전달되고, `Path`는 경로 객체, `run`은 run 디렉터리, `cfg`는 정규화된 dict인 경우가 많다. 변경 가능한 list/dict는 복사 없이 전달되면 함수 안의 수정이 호출자에게도 보일 수 있다. `*` 뒤의 매개변수는 키워드 전용이다. `=...`는 명시한 기본값이다. 이 함수에서 실제로 사용하는 타입·키는 코드의 `[]` 접근과 validation을 참고한다.
+
+**3. 반환/오류**: `return` · `return dict(count=count, ranges=ranges, range_count=total_ranges,`. Python은 `raise`한 에러를 상위 호출자로 전달하며 CLI의 `main` 진입 보호 코드가 일부 오류를 잡는다.
+
+**4. 내부 처리 순서·데이터 변화**: 아래는 실제 선언 내부의 중요한 조건과 루프(원본 정의 번호):
+- [L564](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L564-L564) `if pending and pending['end']+1 == start and pending['reason'] == reason and pending.get('lane') == lane:`
+- [L567](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L567-L567) `if pending and len(ranges) < MAX_RANGES:`
+- [L572](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L572-L572) `if lane is not None:`
+- [L579](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L579-L579) `for text, kind, reason, lane in records:`
+- [L581](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L581-L581) `if seq > cursor:`
+- [L583](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L583-L583) `if kind == 'LOSS':`
+- [L586](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L586-L586) `if cursor <= upper:`
+- [L588](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L588-L588) `if pending and len(ranges) < MAX_RANGES:`
+
+메모리/파일/SQL 관련 식별자: `db.execute`.
+
+**5. 연결 관계**: 코드에서 직접 참조하는 호출 후보(정적 검색 결과): `_gaps`, `upper`, `append`, `get`, `execute`, `FROM`, `_seq_key`. 이는 분기별 동적 호출 확정이 아니라 코드를 따라갈 때 찾을 식별자 목록이다. 공유 자원은 전역 `DATA`, `BUILD`, `BINARY`, run의 JSON/SQLite 등이 있는지 본문에서 확인한다.
+
+**6. Python 문법**: `with`는 자원 정리, `try/except/finally`는 오류/항상 수행 경로, `yield`가 있다면 generator, `dict`/list comprehension은 자료 변환, `path / 'file'`은 pathlib 경로 결합, `with db:`는 transaction 문맥 관리다. 반드시 아래 실제 사용 문법만 해당한다고 판단한다.
+
+**7. 구체 예시(실제 실행이 아닌 가상 시나리오)**: 예시 입력에서 반환 조건, 예외 조건, 파일 경로 경계를 한 줄씩 따라가며 함수 실행 전·후 dict/파일/SQLite/프로세스 상태를 기록한다. 숫자나 임계치는 예시이지 측정·고정 값이 아니다.
+
+**8. 경계/성능/보안**: 잘못된 타입, 중복·유실된 JSON 키, 파일 심볼릭링크·권한, 크기 상한, SQLite 부분 커밋, 프로세스 생존 확인, 데이터 내구 경계를 코드 근거로 평가한다. `return` 값만으로 무손실을 단정할 수 없다.
+
+**함수 원본 전체**
+
+```python
+def _gaps(db, cgroup, upper):
+    """Return intervals, never enumerate 1..upper (which may be 2**64-1)."""
+    cursor, count, ranges, total_ranges, pending = 1, 0, [], 0, None
+
+    def append(start, end, reason='UNKNOWN', lane=None):
+        nonlocal count, total_ranges, pending
+        count += end-start+1
+        if pending and pending['end']+1 == start and pending['reason'] == reason and pending.get('lane') == lane:
+            pending['end'] = end
+            return
+        if pending and len(ranges) < MAX_RANGES:
+            ranges.append(pending)
+        total_ranges += 1
+        pending = dict(start=start, end=end, status='ABSENT_FROM_DURABLE_RAW', reason=reason,
+                       reason_source='UNKNOWN' if lane is None else 'EXACT_USERSPACE_TOMBSTONE')
+        if lane is not None:
+            pending['lane'] = lane
+
+    records = db.execute('SELECT seq,kind,reason,lane FROM ('
+        'SELECT seq,\'DURABLE\' AS kind,\'\' AS reason,\'\' AS lane FROM durable WHERE cgroup=? AND seq<=? '
+        'UNION ALL SELECT seq,\'LOSS\',reason,lane FROM losses WHERE cgroup=? AND seq<=?) ORDER BY seq',
+        (str(cgroup), _seq_key(upper), str(cgroup), _seq_key(upper)))
+    for text, kind, reason, lane in records:
+        seq = int(text)
+        if seq > cursor:
+            append(cursor, seq-1)
+        if kind == 'LOSS':
+            append(seq, seq, reason, lane)
+        cursor = seq+1
+    if cursor <= upper:
+        append(cursor, upper)
+    if pending and len(ranges) < MAX_RANGES:
+        ranges.append(pending)
+    return dict(count=count, ranges=ranges, range_count=total_ranges,
+                ranges_truncated=total_ranges > len(ranges))
+```
+
+#### append — [ledger.py:561–574](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L561-L574)
+
+**정의(원문)**: `def append(start, end, reason='UNKNOWN', lane=None):`
+
+**1. 목적**: 원본의 입력·상태를 검증하거나 결과 구조를 생성한다.
+
+**2. 인자·자료형·전달**: 서명에 적힌 파이썬 매개변수를 순서대로 확인한다. 위치 인자는 값으로 참조가 전달되고, `Path`는 경로 객체, `run`은 run 디렉터리, `cfg`는 정규화된 dict인 경우가 많다. 변경 가능한 list/dict는 복사 없이 전달되면 함수 안의 수정이 호출자에게도 보일 수 있다. `*` 뒤의 매개변수는 키워드 전용이다. `=...`는 명시한 기본값이다. 이 함수에서 실제로 사용하는 타입·키는 코드의 `[]` 접근과 validation을 참고한다.
+
+**3. 반환/오류**: `return`. Python은 `raise`한 에러를 상위 호출자로 전달하며 CLI의 `main` 진입 보호 코드가 일부 오류를 잡는다.
+
+**4. 내부 처리 순서·데이터 변화**: 아래는 실제 선언 내부의 중요한 조건과 루프(원본 정의 번호):
+- [L564](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L564-L564) `if pending and pending['end']+1 == start and pending['reason'] == reason and pending.get('lane') == lane:`
+- [L567](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L567-L567) `if pending and len(ranges) < MAX_RANGES:`
+- [L572](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L572-L572) `if lane is not None:`
+
+메모리/파일/SQL 관련 식별자: 별도 I/O나 자원 호출이 표시되지 않는 단순 유틸리티일 수 있다. 본문 확인 필요.
+
+**5. 연결 관계**: 코드에서 직접 참조하는 호출 후보(정적 검색 결과): `append`, `get`. 이는 분기별 동적 호출 확정이 아니라 코드를 따라갈 때 찾을 식별자 목록이다. 공유 자원은 전역 `DATA`, `BUILD`, `BINARY`, run의 JSON/SQLite 등이 있는지 본문에서 확인한다.
+
+**6. Python 문법**: `with`는 자원 정리, `try/except/finally`는 오류/항상 수행 경로, `yield`가 있다면 generator, `dict`/list comprehension은 자료 변환, `path / 'file'`은 pathlib 경로 결합, `with db:`는 transaction 문맥 관리다. 반드시 아래 실제 사용 문법만 해당한다고 판단한다.
+
+**7. 구체 예시(실제 실행이 아닌 가상 시나리오)**: 예시 입력에서 반환 조건, 예외 조건, 파일 경로 경계를 한 줄씩 따라가며 함수 실행 전·후 dict/파일/SQLite/프로세스 상태를 기록한다. 숫자나 임계치는 예시이지 측정·고정 값이 아니다.
+
+**8. 경계/성능/보안**: 잘못된 타입, 중복·유실된 JSON 키, 파일 심볼릭링크·권한, 크기 상한, SQLite 부분 커밋, 프로세스 생존 확인, 데이터 내구 경계를 코드 근거로 평가한다. `return` 값만으로 무손실을 단정할 수 없다.
+
+**함수 원본 전체**
+
+```python
+    def append(start, end, reason='UNKNOWN', lane=None):
+        nonlocal count, total_ranges, pending
+        count += end-start+1
+        if pending and pending['end']+1 == start and pending['reason'] == reason and pending.get('lane') == lane:
+            pending['end'] = end
+            return
+        if pending and len(ranges) < MAX_RANGES:
+            ranges.append(pending)
+        total_ranges += 1
+        pending = dict(start=start, end=end, status='ABSENT_FROM_DURABLE_RAW', reason=reason,
+                       reason_source='UNKNOWN' if lane is None else 'EXACT_USERSPACE_TOMBSTONE')
+        if lane is not None:
+            pending['lane'] = lane
+```
+
+#### _contiguous_frontier — [ledger.py:594–610](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L594-L610)
+
+**정의(원문)**: `def _contiguous_frontier(db, cgroup, include_losses):`
+
+**1. 목적**: 관측/손실로 설명되는 연속 cgroup 시퀀스 상한을 구한다.
+
+**2. 인자·자료형·전달**: 서명에 적힌 파이썬 매개변수를 순서대로 확인한다. 위치 인자는 값으로 참조가 전달되고, `Path`는 경로 객체, `run`은 run 디렉터리, `cfg`는 정규화된 dict인 경우가 많다. 변경 가능한 list/dict는 복사 없이 전달되면 함수 안의 수정이 호출자에게도 보일 수 있다. `*` 뒤의 매개변수는 키워드 전용이다. `=...`는 명시한 기본값이다. 이 함수에서 실제로 사용하는 타입·키는 코드의 `[]` 접근과 validation을 참고한다.
+
+**3. 반환/오류**: `return next_seq - 1`. Python은 `raise`한 에러를 상위 호출자로 전달하며 CLI의 `main` 진입 보호 코드가 일부 오류를 잡는다.
+
+**4. 내부 처리 순서·데이터 변화**: 아래는 실제 선언 내부의 중요한 조건과 루프(원본 정의 번호):
+- [L596](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L596-L596) `if include_losses:`
+- [L600](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L600-L600) `else:`
+- [L604](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L604-L604) `for (value,) in db.execute(query, args):`
+- [L605](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L605-L605) `if int(value) != next_seq:`
+
+메모리/파일/SQL 관련 식별자: `db.execute`.
+
+**5. 연결 관계**: 코드에서 직접 참조하는 호출 후보(정적 검색 결과): `_contiguous_frontier`, `execute`. 이는 분기별 동적 호출 확정이 아니라 코드를 따라갈 때 찾을 식별자 목록이다. 공유 자원은 전역 `DATA`, `BUILD`, `BINARY`, run의 JSON/SQLite 등이 있는지 본문에서 확인한다.
+
+**6. Python 문법**: `with`는 자원 정리, `try/except/finally`는 오류/항상 수행 경로, `yield`가 있다면 generator, `dict`/list comprehension은 자료 변환, `path / 'file'`은 pathlib 경로 결합, `with db:`는 transaction 문맥 관리다. 반드시 아래 실제 사용 문법만 해당한다고 판단한다.
+
+**7. 구체 예시(실제 실행이 아닌 가상 시나리오)**: 예시 입력에서 반환 조건, 예외 조건, 파일 경로 경계를 한 줄씩 따라가며 함수 실행 전·후 dict/파일/SQLite/프로세스 상태를 기록한다. 숫자나 임계치는 예시이지 측정·고정 값이 아니다.
+
+**8. 경계/성능/보안**: 잘못된 타입, 중복·유실된 JSON 키, 파일 심볼릭링크·권한, 크기 상한, SQLite 부분 커밋, 프로세스 생존 확인, 데이터 내구 경계를 코드 근거로 평가한다. `return` 값만으로 무손실을 단정할 수 없다.
+
+**함수 원본 전체**
+
+```python
+def _contiguous_frontier(db, cgroup, include_losses):
+    """A prefix proven by individual IDs, never by aggregate counters."""
+    if include_losses:
+        query = ('SELECT seq FROM durable WHERE cgroup=? UNION '
+                 'SELECT seq FROM losses WHERE cgroup=? ORDER BY seq')
+        args = (str(cgroup), str(cgroup))
+    else:
+        query = 'SELECT seq FROM durable WHERE cgroup=? ORDER BY seq'
+        args = (str(cgroup),)
+    next_seq = 1
+    for (value,) in db.execute(query, args):
+        if int(value) != next_seq:
+            break
+        next_seq += 1
+    return next_seq - 1
+```
+
+#### match_truth_candidates — [ledger.py:611–648](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L611-L648)
+
+**정의(원문)**: `def match_truth_candidates(loss, candidates, tolerance_ns, *, candidate_set_complete=False):`
+
+**1. 목적**: 사용자 제공 truth 후보와 손실 증거를 시간오차 내에 연결하되 근거 한계를 보존한다.
+
+**2. 인자·자료형·전달**: 서명에 적힌 파이썬 매개변수를 순서대로 확인한다. 위치 인자는 값으로 참조가 전달되고, `Path`는 경로 객체, `run`은 run 디렉터리, `cfg`는 정규화된 dict인 경우가 많다. 변경 가능한 list/dict는 복사 없이 전달되면 함수 안의 수정이 호출자에게도 보일 수 있다. `*` 뒤의 매개변수는 키워드 전용이다. `=...`는 명시한 기본값이다. 이 함수에서 실제로 사용하는 타입·키는 코드의 `[]` 접근과 validation을 참고한다.
+
+**3. 반환/오류**: `return dict(status='UNKNOWN', truth_seq=None, candidate_count=None)` · `return dict(status='UNKNOWN', truth_seq=None, candidate_count=0)` · `return dict(status='UNKNOWN', truth_seq=None, candidate_count=0)` · `return dict(status='UNIQUE_CANDIDATE', truth_seq=next(iter(matches)), candidate_count=1)` · `return dict(status='AMBIGUOUS' if matches else 'UNKNOWN', truth_seq=None,`. Python은 `raise`한 에러를 상위 호출자로 전달하며 CLI의 `main` 진입 보호 코드가 일부 오류를 잡는다.
+
+**4. 내부 처리 순서·데이터 변화**: 아래는 실제 선언 내부의 중요한 조건과 루프(원본 정의 번호):
+- [L618](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L618-L618) `if candidate_set_complete is not True:`
+- [L621](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L621-L621) `if (not isinstance(witness, dict) or type(witness.get('quality')) is not int or`
+- [L625](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L625-L625) `if any(key not in loss for key in needed) or not witness.get('path_hex') or not witness.get('tid'):`
+- [L628](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L628-L628) `for candidate in candidates:`
+- [L629](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L629-L629) `if (candidate.get('run_id') != loss['run_id'] or`
+- [L641](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L641-L641) `if type(truth_seq) is int and truth_seq >= 0:`
+- [L643](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L643-L643) `if len(matches) == 1:`
+
+메모리/파일/SQL 관련 식별자: 별도 I/O나 자원 호출이 표시되지 않는 단순 유틸리티일 수 있다. 본문 확인 필요.
+
+**5. 연결 관계**: 코드에서 직접 참조하는 호출 후보(정적 검색 결과): `match_truth_candidates`, `_integer`, `get`, `isinstance`, `type`, `any`, `abs`, `add`, `next`, `iter`. 이는 분기별 동적 호출 확정이 아니라 코드를 따라갈 때 찾을 식별자 목록이다. 공유 자원은 전역 `DATA`, `BUILD`, `BINARY`, run의 JSON/SQLite 등이 있는지 본문에서 확인한다.
+
+**6. Python 문법**: `with`는 자원 정리, `try/except/finally`는 오류/항상 수행 경로, `yield`가 있다면 generator, `dict`/list comprehension은 자료 변환, `path / 'file'`은 pathlib 경로 결합, `with db:`는 transaction 문맥 관리다. 반드시 아래 실제 사용 문법만 해당한다고 판단한다.
+
+**7. 구체 예시(실제 실행이 아닌 가상 시나리오)**: 예시 입력에서 반환 조건, 예외 조건, 파일 경로 경계를 한 줄씩 따라가며 함수 실행 전·후 dict/파일/SQLite/프로세스 상태를 기록한다. 숫자나 임계치는 예시이지 측정·고정 값이 아니다.
+
+**8. 경계/성능/보안**: 잘못된 타입, 중복·유실된 JSON 키, 파일 심볼릭링크·권한, 크기 상한, SQLite 부분 커밋, 프로세스 생존 확인, 데이터 내구 경계를 코드 근거로 평가한다. `return` 값만으로 무손실을 단정할 수 없다.
+
+**함수 원본 전체**
+
+```python
+def match_truth_candidates(loss, candidates, tolerance_ns, *, candidate_set_complete=False):
+    """Return a truth ID only for one full-context candidate in one run/clock.
+
+    The caller must assert a complete candidate set from the same run and
+    notebook monotonic clock. A nearest timestamp alone never establishes ID.
+    """
+    _integer(tolerance_ns, 'truth matching tolerance_ns')
+    if candidate_set_complete is not True:
+        return dict(status='UNKNOWN', truth_seq=None, candidate_count=None)
+    witness = loss.get('witness')
+    if (not isinstance(witness, dict) or type(witness.get('quality')) is not int or
+        witness['quality'] & 3):
+        return dict(status='UNKNOWN', truth_seq=None, candidate_count=0)
+    needed = ('run_id', 'boot_id', 'cgroup_id', 'monotonic_ns')
+    if any(key not in loss for key in needed) or not witness.get('path_hex') or not witness.get('tid'):
+        return dict(status='UNKNOWN', truth_seq=None, candidate_count=0)
+    matches = set()
+    for candidate in candidates:
+        if (candidate.get('run_id') != loss['run_id'] or
+            candidate.get('boot_id') != loss['boot_id'] or
+            candidate.get('clock_domain') != 'NOTEBOOK_MONOTONIC' or
+            candidate.get('cgroup_id') != loss['cgroup_id'] or
+            candidate.get('tid') != witness['tid'] or
+            candidate.get('kind') != witness['kind'] or
+            candidate.get('path_hex') != witness['path_hex'] or
+            candidate.get('result') != witness['result'] or
+            type(candidate.get('monotonic_ns')) is not int or
+            abs(candidate['monotonic_ns'] - loss['monotonic_ns']) > tolerance_ns):
+            continue
+        truth_seq = candidate.get('truth_seq')
+        if type(truth_seq) is int and truth_seq >= 0:
+            matches.add(truth_seq)
+    if len(matches) == 1:
+        return dict(status='UNIQUE_CANDIDATE', truth_seq=next(iter(matches)), candidate_count=1)
+    return dict(status='AMBIGUOUS' if matches else 'UNKNOWN', truth_seq=None,
+                candidate_count=len(matches))
+```
+
+#### _raw_counts — [ledger.py:649–673](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L649-L673)
+
+**정의(원문)**: `def _raw_counts(db, cgroup=None, rule_id=None, kind=None, start_ns=None, end_ns=None, end_inclusive=False, include_untracked=True):`
+
+**1. 목적**: 검증된 raw를 조건별로 집계한다.
+
+**2. 인자·자료형·전달**: 서명에 적힌 파이썬 매개변수를 순서대로 확인한다. 위치 인자는 값으로 참조가 전달되고, `Path`는 경로 객체, `run`은 run 디렉터리, `cfg`는 정규화된 dict인 경우가 많다. 변경 가능한 list/dict는 복사 없이 전달되면 함수 안의 수정이 호출자에게도 보일 수 있다. `*` 뒤의 매개변수는 키워드 전용이다. `=...`는 명시한 기본값이다. 이 함수에서 실제로 사용하는 타입·키는 코드의 `[]` 접근과 validation을 참고한다.
+
+**3. 반환/오류**: `return dict(owned_initial_full=row[0], owned_periodic_sample=row[1],`. Python은 `raise`한 에러를 상위 호출자로 전달하며 CLI의 `main` 진입 보호 코드가 일부 오류를 잡는다.
+
+**4. 내부 처리 순서·데이터 변화**: 아래는 실제 선언 내부의 중요한 조건과 루프(원본 정의 번호):
+- [L652](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L652-L652) `for key, value in (('cgroup', cgroup), ('rule_id', rule_id), ('kind', kind)):`
+- [L653](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L653-L653) `if value is not None:`
+- [L656](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L656-L656) `for operator, value in (('>=', start_ns), ('<=' if end_inclusive else '<', end_ns)):`
+- [L657](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L657-L657) `if value is not None:`
+- [L660](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L660-L660) `if not include_untracked:`
+
+메모리/파일/SQL 관련 식별자: `db.execute`.
+
+**5. 연결 관계**: 코드에서 직접 참조하는 호출 후보(정적 검색 결과): `_raw_counts`, `in`, `append`, `_seq_key`, `execute`, `coalesce`, `sum`, `AND`, `join`, `fetchone`. 이는 분기별 동적 호출 확정이 아니라 코드를 따라갈 때 찾을 식별자 목록이다. 공유 자원은 전역 `DATA`, `BUILD`, `BINARY`, run의 JSON/SQLite 등이 있는지 본문에서 확인한다.
+
+**6. Python 문법**: `with`는 자원 정리, `try/except/finally`는 오류/항상 수행 경로, `yield`가 있다면 generator, `dict`/list comprehension은 자료 변환, `path / 'file'`은 pathlib 경로 결합, `with db:`는 transaction 문맥 관리다. 반드시 아래 실제 사용 문법만 해당한다고 판단한다.
+
+**7. 구체 예시(실제 실행이 아닌 가상 시나리오)**: 예시 입력에서 반환 조건, 예외 조건, 파일 경로 경계를 한 줄씩 따라가며 함수 실행 전·후 dict/파일/SQLite/프로세스 상태를 기록한다. 숫자나 임계치는 예시이지 측정·고정 값이 아니다.
+
+**8. 경계/성능/보안**: 잘못된 타입, 중복·유실된 JSON 키, 파일 심볼릭링크·권한, 크기 상한, SQLite 부분 커밋, 프로세스 생존 확인, 데이터 내구 경계를 코드 근거로 평가한다. `return` 값만으로 무손실을 단정할 수 없다.
+
+**함수 원본 전체**
+
+```python
+def _raw_counts(db, cgroup=None, rule_id=None, kind=None, start_ns=None, end_ns=None,
+                end_inclusive=False, include_untracked=True):
+    where, args = ['(flags & ?) != 0'], [Q_QUARANTINE]
+    for key, value in (('cgroup', cgroup), ('rule_id', rule_id), ('kind', kind)):
+        if value is not None:
+            where.append(key + '=?')
+            args.append(value)
+    for operator, value in (('>=', start_ns), ('<=' if end_inclusive else '<', end_ns)):
+        if value is not None:
+            where.append('monotonic_ns' + operator + '?')
+            args.append(_seq_key(value))
+    if not include_untracked:
+        where.append('(flags & ?) = 0')
+        args.append(Q_UNTRACKED)
+    row = db.execute('SELECT '
+        'coalesce(sum((flags & 512)!=0 AND (flags & 4096)=0),0),'
+        'coalesce(sum((flags & 1024)!=0 AND (flags & 4096)=0),0),'
+        'coalesce(sum((flags & 512)!=0 AND (flags & 4096)!=0),0),'
+        'coalesce(sum((flags & 1024)!=0 AND (flags & 4096)!=0),0) '
+        'FROM durable WHERE ' + ' AND '.join(where), args).fetchone()
+    return dict(owned_initial_full=row[0], owned_periodic_sample=row[1],
+                untracked_initial_full=row[2], untracked_periodic_sample=row[3],
+                initial_full_total=row[0]+row[2], periodic_sample_total=row[1]+row[3])
+```
+
+#### _counter_reconciliation — [ledger.py:674–705](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L674-L705)
+
+**정의(원문)**: `def _counter_reconciliation(counters, stored, finalized):`
+
+**1. 목적**: 커널·userspace·원본 카운터의 동일 관측 범위 정합성을 확인한다.
+
+**2. 인자·자료형·전달**: 서명에 적힌 파이썬 매개변수를 순서대로 확인한다. 위치 인자는 값으로 참조가 전달되고, `Path`는 경로 객체, `run`은 run 디렉터리, `cfg`는 정규화된 dict인 경우가 많다. 변경 가능한 list/dict는 복사 없이 전달되면 함수 안의 수정이 호출자에게도 보일 수 있다. `*` 뒤의 매개변수는 키워드 전용이다. `=...`는 명시한 기본값이다. 이 함수에서 실제로 사용하는 타입·키는 코드의 `[]` 접근과 validation을 참고한다.
+
+**3. 반환/오류**: `return result` · `return result`. Python은 `raise`한 에러를 상위 호출자로 전달하며 CLI의 `main` 진입 보호 코드가 일부 오류를 잡는다.
+
+**4. 내부 처리 순서·데이터 변화**: 아래는 실제 선언 내부의 중요한 조건과 루프(원본 정의 번호):
+- [L689](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L689-L689) `if stored is None:`
+
+메모리/파일/SQL 관련 식별자: 별도 I/O나 자원 호출이 표시되지 않는 단순 유틸리티일 수 있다. 본문 확인 필요.
+
+**5. 연결 관계**: 코드에서 직접 참조하는 호출 후보(정적 검색 결과): `_counter_reconciliation`, `get`, `update`. 이는 분기별 동적 호출 확정이 아니라 코드를 따라갈 때 찾을 식별자 목록이다. 공유 자원은 전역 `DATA`, `BUILD`, `BINARY`, run의 JSON/SQLite 등이 있는지 본문에서 확인한다.
+
+**6. Python 문법**: `with`는 자원 정리, `try/except/finally`는 오류/항상 수행 경로, `yield`가 있다면 generator, `dict`/list comprehension은 자료 변환, `path / 'file'`은 pathlib 경로 결합, `with db:`는 transaction 문맥 관리다. 반드시 아래 실제 사용 문법만 해당한다고 판단한다.
+
+**7. 구체 예시(실제 실행이 아닌 가상 시나리오)**: 예시 입력에서 반환 조건, 예외 조건, 파일 경로 경계를 한 줄씩 따라가며 함수 실행 전·후 dict/파일/SQLite/프로세스 상태를 기록한다. 숫자나 임계치는 예시이지 측정·고정 값이 아니다.
+
+**8. 경계/성능/보안**: 잘못된 타입, 중복·유실된 JSON 키, 파일 심볼릭링크·권한, 크기 상한, SQLite 부분 커밋, 프로세스 생존 확인, 데이터 내구 경계를 코드 근거로 평가한다. `return` 값만으로 무손실을 단정할 수 없다.
+
+**함수 원본 전체**
+
+```python
+def _counter_reconciliation(counters, stored, finalized):
+    seen = counters.get('seen', counters.get('q_seen', 0))
+    full = counters.get('full_selected', 0)
+    sampled = counters.get('sample_selected', 0)
+    summarized = counters.get('summarized', 0)
+    full_submitted = counters.get('full_submitted', 0)
+    sample_submitted = counters.get('sample_submitted', 0)
+    ring_failed = counters.get('ring_failed', 0)
+    result = dict(scope='TRACKED_KERNEL_OWNED_QUARANTINE_EVENTS', seen=seen,
+        selected_initial_full=full, selected_periodic_sample=sampled,
+        summarized=summarized, ring_failed=ring_failed,
+        submitted_initial_full=full_submitted, submitted_periodic_sample=sample_submitted,
+        partition_consistent=seen == full+sampled+summarized,
+        selection_consistent=full+sampled == full_submitted+sample_submitted+ring_failed,
+        summary_reason='CRITICAL_QUARANTINE', summary_kind='AGGREGATE_ONLY', individual_event_ids=None)
+    if stored is None:
+        result.update(durable_initial_full=None, durable_periodic_sample=None,
+                      not_durable=None, reconciliation_complete=False)
+        return result
+    saved_full, saved_sample = stored['owned_initial_full'], stored['owned_periodic_sample']
+    difference = seen-saved_full-saved_sample
+    after_ring = full_submitted+sample_submitted-saved_full-saved_sample
+    result.update(durable_initial_full=saved_full, durable_periodic_sample=saved_sample,
+        durable_selection_consistent=saved_full <= full_submitted and saved_sample <= sample_submitted,
+        not_durable=difference if finalized and difference >= 0 else None,
+        pending_or_not_durable=difference if difference >= 0 else None,
+        submitted_not_durable=after_ring if finalized and after_ring >= 0 else None,
+        reconciliation_complete=finalized and result['partition_consistent'] and result['selection_consistent'] and
+            saved_full <= full_submitted and saved_sample <= sample_submitted)
+    return result
+```
+
+#### _episode_report — [ledger.py:706–739](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L706-L739)
+
+**정의(원문)**: `def _episode_report(db, key, episode, label, final_scope):`
+
+**1. 목적**: 격리 episode 관련 샘플·관측·저장 근거를 보고서로 정리한다.
+
+**2. 인자·자료형·전달**: 서명에 적힌 파이썬 매개변수를 순서대로 확인한다. 위치 인자는 값으로 참조가 전달되고, `Path`는 경로 객체, `run`은 run 디렉터리, `cfg`는 정규화된 dict인 경우가 많다. 변경 가능한 list/dict는 복사 없이 전달되면 함수 안의 수정이 호출자에게도 보일 수 있다. `*` 뒤의 매개변수는 키워드 전용이다. `=...`는 명시한 기본값이다. 이 함수에서 실제로 사용하는 타입·키는 코드의 `[]` 접근과 validation을 참고한다.
+
+**3. 반환/오류**: `raise LedgerError('quarantine enter/exit ordering or bounds mismatch')` · `return dict(cgroup_id=int(cgroup), rule_id=rule_id, kind=kind,`. Python은 `raise`한 에러를 상위 호출자로 전달하며 CLI의 `main` 진입 보호 코드가 일부 오류를 잡는다.
+
+**4. 내부 처리 순서·데이터 변화**: 아래는 실제 선언 내부의 중요한 조건과 루프(원본 정의 번호):
+- [L713](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L713-L713) `if enter and exit_:`
+- [L714](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L714-L714) `if enter['first_seq'] != exit_['first_seq'] or enter['monotonic_ns'] > exit_['monotonic_ns']:`
+- [L724](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L724-L724) `if controls_complete and bounds_match and end_ns >= episode['start_ns'] else None`
+
+메모리/파일/SQL 관련 식별자: `db.execute`.
+
+**5. 연결 관계**: 코드에서 직접 참조하는 호출 후보(정적 검색 결과): `_episode_report`, `_seq_key`, `execute`, `_json`, `LedgerError`, `and`, `get`, `_raw_counts`, `_counter_reconciliation`. 이는 분기별 동적 호출 확정이 아니라 코드를 따라갈 때 찾을 식별자 목록이다. 공유 자원은 전역 `DATA`, `BUILD`, `BINARY`, run의 JSON/SQLite 등이 있는지 본문에서 확인한다.
+
+**6. Python 문법**: `with`는 자원 정리, `try/except/finally`는 오류/항상 수행 경로, `yield`가 있다면 generator, `dict`/list comprehension은 자료 변환, `path / 'file'`은 pathlib 경로 결합, `with db:`는 transaction 문맥 관리다. 반드시 아래 실제 사용 문법만 해당한다고 판단한다.
+
+**7. 구체 예시(실제 실행이 아닌 가상 시나리오)**: 예시 입력에서 반환 조건, 예외 조건, 파일 경로 경계를 한 줄씩 따라가며 함수 실행 전·후 dict/파일/SQLite/프로세스 상태를 기록한다. 숫자나 임계치는 예시이지 측정·고정 값이 아니다.
+
+**8. 경계/성능/보안**: 잘못된 타입, 중복·유실된 JSON 키, 파일 심볼릭링크·권한, 크기 상한, SQLite 부분 커밋, 프로세스 생존 확인, 데이터 내구 경계를 코드 근거로 평가한다. `return` 값만으로 무손실을 단정할 수 없다.
+
+**함수 원본 전체**
+
+```python
+def _episode_report(db, key, episode, label, final_scope):
+    cgroup, rule_id, kind = key
+    eid = _seq_key(episode['episode_id'])
+    rows = dict(db.execute('SELECT transition,payload FROM controls WHERE cgroup=? AND rule_id=? AND kind=? AND episode_id=?',
+                           (cgroup, rule_id, kind, eid)))
+    enter = _json(rows['quarantine_enter']) if 'quarantine_enter' in rows else None
+    exit_ = _json(rows['quarantine_exit']) if 'quarantine_exit' in rows else None
+    if enter and exit_:
+        if enter['first_seq'] != exit_['first_seq'] or enter['monotonic_ns'] > exit_['monotonic_ns']:
+            raise LedgerError('quarantine enter/exit ordering or bounds mismatch')
+    closed = bool(episode['end_ns'])
+    controls_complete = bool(enter and (exit_ or not closed))
+    bounds_match = bool(enter and enter['first_seq'] == episode['first_sequence'] and
+                       (not exit_ or exit_['last_seq'] == episode['last_sequence']))
+    tracking_complete = bool(episode.get('tracking_complete', False))
+    end_ns = episode['end_ns'] if closed else episode.get('last_event_ns', 0)
+    actual = _raw_counts(db, cgroup, rule_id, kind, episode['start_ns'], end_ns,
+                        end_inclusive=not closed, include_untracked=False) \
+        if controls_complete and bounds_match and end_ns >= episode['start_ns'] else None
+    finalized = bool(final_scope and controls_complete and bounds_match and tracking_complete)
+    span = episode.get('last_event_ns', 0)-episode['start_ns']
+    return dict(cgroup_id=int(cgroup), rule_id=rule_id, kind=kind,
+        episode_id=episode['episode_id'], role=label, scope_source='COMMITTED_EPISODE_METADATA',
+        episode=episode, controls_complete=controls_complete, bounds_match=bounds_match,
+        tracking_complete=tracking_complete, transition_records=[name for name in rows],
+        enter_transition=enter, exit_transition=exit_,
+        sequence_fields_do_not_identify_missing_ids=True,
+        membership='same cgroup/rule/kind, Q policy, non-UNTRACKED, start_ns <= monotonic_ns < end_ns; current last_event_ns inclusive',
+        first_last_sequences_are_event_ids_not_ordering_bounds=True,
+        average_rate_eps=episode['seen']*1_000_000_000/span if span > 0 else None,
+        average_rate_definition='seen / (last_event_ns - start_ns), seconds; null for zero span',
+        actual_durable=actual, reconciliation=_counter_reconciliation(episode, actual, finalized))
+```
+
+#### _quarantine_report — [ledger.py:740–815](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L740-L815)
+
+**정의(원문)**: `def _quarantine_report(db, snapshot, report):`
+
+**1. 목적**: 전체 격리 stream/episode 및 불완전 tracking 범위를 구성한다.
+
+**2. 인자·자료형·전달**: 서명에 적힌 파이썬 매개변수를 순서대로 확인한다. 위치 인자는 값으로 참조가 전달되고, `Path`는 경로 객체, `run`은 run 디렉터리, `cfg`는 정규화된 dict인 경우가 많다. 변경 가능한 list/dict는 복사 없이 전달되면 함수 안의 수정이 호출자에게도 보일 수 있다. `*` 뒤의 매개변수는 키워드 전용이다. `=...`는 명시한 기본값이다. 이 함수에서 실제로 사용하는 타입·키는 코드의 `[]` 접근과 validation을 참고한다.
+
+**3. 반환/오류**: `return`. Python은 `raise`한 에러를 상위 호출자로 전달하며 CLI의 `main` 진입 보호 코드가 일부 오류를 잡는다.
+
+**4. 내부 처리 순서·데이터 변화**: 아래는 실제 선언 내부의 중요한 조건과 루프(원본 정의 번호):
+- [L741](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L741-L741) `if not snapshot or 'quarantine' not in snapshot['durable_offsets']:`
+- [L750](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L750-L750) `if 'peak_critical_rate_scope' in snapshot:`
+- [L752](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L752-L752) `if 'quarantine_by_reason' in snapshot:`
+- [L766](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L766-L766) `for stream in snapshot.get('streams', []):`
+- [L774](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L774-L774) `if reconciliation.get('submitted_not_durable') is not None:`
+- [L783](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L783-L783) `for label in ('current', 'last'):`
+- [L785](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L785-L785) `if episode.get('episode_id'):`
+- [L789](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L789-L789) `for cgroup, rule_id, kind, eid, payload in db.execute(`
+- [L792](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L792-L792) `if (*key, eid) in known_episode_ids:`
+- [L794](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L794-L794) `if len(result['episodes']) >= MAX_RANGES:`
+- [L812](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L812-L812) `if 'quarantine_full_saved_total' in snapshot and 'quarantine_sampled_total' in snapshot else None`
+
+메모리/파일/SQL 관련 식별자: `db.execute`.
+
+**5. 연결 관계**: 코드에서 직접 참조하는 호출 후보(정적 검색 결과): `_quarantine_report`, `_raw_counts`, `get`, `any`, `update`, `_stream_key`, `_counter_reconciliation`, `sum`, `in`, `append`, `items`, `startswith`, `add`, `_seq_key`, `_episode_report`, `execute`, `_json`. 이는 분기별 동적 호출 확정이 아니라 코드를 따라갈 때 찾을 식별자 목록이다. 공유 자원은 전역 `DATA`, `BUILD`, `BINARY`, run의 JSON/SQLite 등이 있는지 본문에서 확인한다.
+
+**6. Python 문법**: `with`는 자원 정리, `try/except/finally`는 오류/항상 수행 경로, `yield`가 있다면 generator, `dict`/list comprehension은 자료 변환, `path / 'file'`은 pathlib 경로 결합, `with db:`는 transaction 문맥 관리다. 반드시 아래 실제 사용 문법만 해당한다고 판단한다.
+
+**7. 구체 예시(실제 실행이 아닌 가상 시나리오)**: 예시 입력에서 반환 조건, 예외 조건, 파일 경로 경계를 한 줄씩 따라가며 함수 실행 전·후 dict/파일/SQLite/프로세스 상태를 기록한다. 숫자나 임계치는 예시이지 측정·고정 값이 아니다.
+
+**8. 경계/성능/보안**: 잘못된 타입, 중복·유실된 JSON 키, 파일 심볼릭링크·권한, 크기 상한, SQLite 부분 커밋, 프로세스 생존 확인, 데이터 내구 경계를 코드 근거로 평가한다. `return` 값만으로 무손실을 단정할 수 없다.
+
+**함수 원본 전체**
+
+```python
+def _quarantine_report(db, snapshot, report):
+    if not snapshot or 'quarantine' not in snapshot['durable_offsets']:
+        return
+    actual = _raw_counts(db)
+    result = dict(summary_reason='CRITICAL_QUARANTINE', summary_kind='AGGREGATE_ONLY',
+        individual_event_ids=None, actual_durable=actual,
+        full_saved_total=actual['initial_full_total'], sampled_total=actual['periodic_sample_total'],
+        streams=[], episodes=[], episode_metadata_truncated=False,
+        policy='ORIGINAL_CRITICAL_PRIORITY_PRESERVED', global_counters=snapshot.get('quarantine_global', {}))
+    result['declared_metric_aliases'] = {key:snapshot[key] for key in QUARANTINE_METRIC_ALIASES if key in snapshot}
+    if 'peak_critical_rate_scope' in snapshot:
+        result['declared_metric_aliases']['peak_critical_rate_scope'] = snapshot['peak_critical_rate_scope']
+    if 'quarantine_by_reason' in snapshot:
+        result['quarantine_by_reason'] = snapshot['quarantine_by_reason']
+        result['quarantine_by_reason_scope'] = snapshot['quarantine_by_reason_scope']
+    stream_complete = snapshot.get('stream_snapshot_complete') is True
+    storage_complete = snapshot.get('stream_storage_complete') is True
+    tracking_complete = snapshot.get('quarantine_tracking_complete',
+        not any(stream.get('tracking_failed', 0) for stream in snapshot.get('streams', [])) and
+        not snapshot.get('quarantine_global', {}).get('stream_map_full', 0) and
+        not snapshot.get('quarantine_global', {}).get('state_contention', 0)) is True
+    final_scope = bool(report['clean_seal'] and stream_complete and storage_complete and tracking_complete)
+    result.update(stream_snapshot_complete=stream_complete, stream_storage_complete=storage_complete,
+                  tracking_complete=tracking_complete, final_scope_complete=final_scope,
+                  selected_pending_total=snapshot.get('quarantine_pending_total'))
+    known_episode_ids = set()
+    for stream in snapshot.get('streams', []):
+        key = _stream_key(stream)
+        engine, collector = stream['engine'], stream['collector']
+        counts = _raw_counts(db, *key)
+        reconciliation = _counter_reconciliation(engine, counts, final_scope and not stream.get('tracking_failed', 0))
+        rejections = sum(collector.get(name, 0) for name in ('queue_rejected_full', 'queue_rejected_sample',
+                         'storage_rejected_full', 'storage_rejected_sample'))
+        reconciliation['userspace_rejected_aggregate'] = rejections
+        if reconciliation.get('submitted_not_durable') is not None:
+            remainder = reconciliation['submitted_not_durable']-rejections
+            reconciliation['unsynced_or_unexplained_after_rejections'] = remainder if remainder >= 0 else None
+        result['streams'].append(dict(cgroup_id=int(key[0]), rule_id=key[1], kind=key[2],
+            seen_total=stream.get('seen', 0), protected_seen=stream.get('protected_seen', 0),
+            tracking_failed=stream.get('tracking_failed', 0),
+            untracked_counters={name:value for name,value in stream.items() if name.startswith('untracked_')},
+            lifetime=reconciliation, collector=collector, actual_durable=counts,
+            current_rate_eps=engine.get('current_rate_eps'), peak_rate_eps=engine.get('peak_rate_eps')))
+        for label in ('current', 'last'):
+            episode = engine.get(label, {})
+            if episode.get('episode_id'):
+                known_episode_ids.add((*key, _seq_key(episode['episode_id'])))
+                result['episodes'].append(_episode_report(db, key, episode, label, final_scope))
+    # Exit controls retain older episodes even after current/last roll forward.
+    for cgroup, rule_id, kind, eid, payload in db.execute(
+            'SELECT cgroup,rule_id,kind,episode_id,payload FROM controls WHERE transition=\'quarantine_exit\' ORDER BY cgroup,rule_id,kind,episode_id'):
+        key = (cgroup, rule_id, kind)
+        if (*key, eid) in known_episode_ids:
+            continue
+        if len(result['episodes']) >= MAX_RANGES:
+            result['episode_metadata_truncated'] = True
+            break
+        result['episodes'].append(_episode_report(db, key, _json(payload)['episode'], 'closed_history', final_scope))
+    result['critical_seen_total'] = result['global_counters'].get('critical_events_total',
+        sum(stream.get('seen', 0) for stream in snapshot.get('streams', [])) + result['global_counters'].get('stream_map_full', 0))
+    result['protected_seen_total'] = result['global_counters'].get('protected_events_total',
+        sum(stream.get('protected_seen', 0) for stream in snapshot.get('streams', [])) + result['global_counters'].get('untracked_protected', 0))
+    result['critical_seen_scope_complete'] = stream_complete and not snapshot['faults'][3]
+    result['quarantine_seen_total'] = result['global_counters'].get('quarantined_events_total',
+        sum(stream['engine'].get('q_seen', 0) for stream in snapshot.get('streams', [])) +
+        result['global_counters'].get('untracked_seen', 0)-result['global_counters'].get('untracked_protected', 0))
+    difference = result['quarantine_seen_total']-actual['initial_full_total']-actual['periodic_sample_total']
+    result['quarantine_not_stored_total'] = difference if final_scope and result['critical_seen_scope_complete'] and difference >= 0 else None
+    result['quarantine_pending_or_not_stored_total'] = difference if difference >= 0 else None
+    result['collector_durable_totals_match_raw'] = (
+        snapshot.get('quarantine_full_saved_total') == actual['initial_full_total'] and
+        snapshot.get('quarantine_sampled_total') == actual['periodic_sample_total']) \
+        if 'quarantine_full_saved_total' in snapshot and 'quarantine_sampled_total' in snapshot else None
+    report['critical_quarantine'] = result
+```
+
+#### _rule_evidence — [ledger.py:816–874](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L816-L874)
+
+**정의(원문)**: `def _rule_evidence(db, snapshot, report):`
+
+**1. 목적**: 규칙별 평가·제출·저장·미관측 통계 근거를 비교한다.
+
+**2. 인자·자료형·전달**: 서명에 적힌 파이썬 매개변수를 순서대로 확인한다. 위치 인자는 값으로 참조가 전달되고, `Path`는 경로 객체, `run`은 run 디렉터리, `cfg`는 정규화된 dict인 경우가 많다. 변경 가능한 list/dict는 복사 없이 전달되면 함수 안의 수정이 호출자에게도 보일 수 있다. `*` 뒤의 매개변수는 키워드 전용이다. `=...`는 명시한 기본값이다. 이 함수에서 실제로 사용하는 타입·키는 코드의 `[]` 접근과 validation을 참고한다.
+
+**3. 반환/오류**: `raise LedgerError('rule_stats/config rule ID set mismatch')` · `raise LedgerError('rule_stats/config policy mismatch')`. Python은 `raise`한 에러를 상위 호출자로 전달하며 CLI의 `main` 진입 보호 코드가 일부 오류를 잡는다.
+
+**4. 내부 처리 순서·데이터 변화**: 아래는 실제 선언 내부의 중요한 조건과 루프(원본 정의 번호):
+- [L826](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L826-L826) `if stats is not None and snapshot.get('rule_stats_snapshot_complete') is False:`
+- [L828](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L828-L828) `if stats is not None and set(stats_by_id) != {rule['id'] for rule in rules}:`
+- [L831](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L831-L831) `for rule in rules:`
+- [L834](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L834-L834) `if counters:`
+- [L839](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L839-L839) `if (counters['priority'] != expected_priority or`
+
+메모리/파일/SQL 관련 식별자: `db.execute`, `Path`.
+
+**5. 연결 관계**: 코드에서 직접 참조하는 호출 후보(정적 검색 결과): `_rule_evidence`, `Path`, `_object`, `get`, `execute`, `count`, `append`, `LedgerError`, `pop`, `sum`. 이는 분기별 동적 호출 확정이 아니라 코드를 따라갈 때 찾을 식별자 목록이다. 공유 자원은 전역 `DATA`, `BUILD`, `BINARY`, run의 JSON/SQLite 등이 있는지 본문에서 확인한다.
+
+**6. Python 문법**: `with`는 자원 정리, `try/except/finally`는 오류/항상 수행 경로, `yield`가 있다면 generator, `dict`/list comprehension은 자료 변환, `path / 'file'`은 pathlib 경로 결합, `with db:`는 transaction 문맥 관리다. 반드시 아래 실제 사용 문법만 해당한다고 판단한다.
+
+**7. 구체 예시(실제 실행이 아닌 가상 시나리오)**: 예시 입력에서 반환 조건, 예외 조건, 파일 경로 경계를 한 줄씩 따라가며 함수 실행 전·후 dict/파일/SQLite/프로세스 상태를 기록한다. 숫자나 임계치는 예시이지 측정·고정 값이 아니다.
+
+**8. 경계/성능/보안**: 잘못된 타입, 중복·유실된 JSON 키, 파일 심볼릭링크·권한, 크기 상한, SQLite 부분 커밋, 프로세스 생존 확인, 데이터 내구 경계를 코드 근거로 평가한다. `return` 값만으로 무손실을 단정할 수 없다.
+
+**함수 원본 전체**
+
+```python
+def _rule_evidence(db, snapshot, report):
+    """Keep durable raw counts distinct from pre-sequence aggregate counters."""
+    run = Path(report['run_path'])
+    config = _object(run / 'config.json')
+    manifest = _object(run / 'manifest.json')
+    rules = config.get('event_rules', config.get('critical_rules', []))
+    actual = {rid: count for rid, count in db.execute(
+        'SELECT rule_id,count(*) FROM durable GROUP BY rule_id')}
+    stats = snapshot.get('rule_stats') if snapshot else None
+    stats_by_id = {row['rule_id']: row for row in stats} if stats else {}
+    if stats is not None and snapshot.get('rule_stats_snapshot_complete') is False:
+        report['warnings'].append('RULE_STATS_SNAPSHOT_INCOMPLETE: kernel rule counters may be unavailable')
+    if stats is not None and set(stats_by_id) != {rule['id'] for rule in rules}:
+        raise LedgerError('rule_stats/config rule ID set mismatch')
+    rows = []
+    for rule in rules:
+        rid = rule['id']
+        counters = stats_by_id.get(rid)
+        if counters:
+            expected_priority = {'BULK': 0, 'NORMAL': 1, 'CRITICAL': 2}.get(
+                rule.get('priority', 'CRITICAL'))
+            expected_policy = {'NORMAL_COLLECTION': 0, 'QUARANTINE': 1, 'QUARANTINE_EXEMPT': 2}.get(
+                rule.get('overload_policy', 'QUARANTINE_EXEMPT' if rule.get('protected') else 'QUARANTINE'))
+            if (counters['priority'] != expected_priority or
+                    counters['configured_policy'] != expected_policy or
+                    counters['precedence'] != rule.get('precedence', 0)):
+                raise LedgerError('rule_stats/config policy mismatch')
+        durable = actual.pop(rid, 0)
+        declared_durable = sum(counters['collector_durable']) if counters else None
+        reconciled = declared_durable == durable if counters else None
+        rows.append(dict(rule_id=rid, priority=rule.get('priority', 'CRITICAL'),
+                         configured_policy=rule.get('overload_policy',
+                             'QUARANTINE_EXEMPT' if rule.get('protected') else 'QUARANTINE'),
+                         raw_durable_count=durable,
+                         checkpoint_counters=counters,
+                         kernel_counters_available=counters.get('stats_available', True) if counters else None,
+                         collector_durable_matches_raw=reconciled,
+                         counter_scope=('COMMITTED_CHECKPOINT_AGGREGATE' if counters.get('stats_available', True)
+                                        else 'COMMITTED_CHECKPOINT_PARTIAL_KERNEL_STATS') if counters else 'NOT_AVAILABLE',
+                         complete_to_durable=bool(report['clean_seal'] and
+                             snapshot.get('rule_stats_snapshot_complete') is True and reconciled) if snapshot else False,
+                         per_rule_unobserved_event_count=None,
+                         per_rule_loss_attribution_complete=False))
+    report['rule_evidence'] = dict(
+        policy_version=manifest.get('policy_version'),
+        rule_engine_schema_version=manifest.get('rule_engine_schema_version'),
+        config_sha256=manifest.get('config_sha256'),
+        rules_bin_sha256=manifest.get('rules_bin_sha256'),
+        snapshot_scope=snapshot.get('rule_stats_scope') if snapshot else None,
+        snapshot_complete=snapshot.get('rule_stats_snapshot_complete') if snapshot else None,
+        source='COMMITTED_CHECKPOINT_AND_DURABLE_RAW' if snapshot else 'DURABLE_RAW_ONLY',
+        matched_means='ALL_MATCHING_RULES_INCLUDING_NON_WINNERS',
+        selected_means='FINAL_WINNER_ONLY_PRE_SEQUENCE_AGGREGATE',
+        pre_sequence_and_kernel_losses_cannot_be_assigned_to_rule=True,
+        unmatched_or_legacy_raw_count=actual.pop(0, 0),
+        unknown_rule_raw_counts=actual,
+        rules=rows)
+```
+
+#### _witness_entry — [ledger.py:875–887](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L875-L887)
+
+**정의(원문)**: `def _witness_entry(lineage, row):`
+
+**1. 목적**: 손실 witness 내용을 lineage 포함 보고서 형태로 변환한다.
+
+**2. 인자·자료형·전달**: 서명에 적힌 파이썬 매개변수를 순서대로 확인한다. 위치 인자는 값으로 참조가 전달되고, `Path`는 경로 객체, `run`은 run 디렉터리, `cfg`는 정규화된 dict인 경우가 많다. 변경 가능한 list/dict는 복사 없이 전달되면 함수 안의 수정이 호출자에게도 보일 수 있다. `*` 뒤의 매개변수는 키워드 전용이다. `=...`는 명시한 기본값이다. 이 함수에서 실제로 사용하는 타입·키는 코드의 `[]` 접근과 validation을 참고한다.
+
+**3. 반환/오류**: `return dict(run_id=lineage['run_id'], boot_id=lineage['boot_id'],`. Python은 `raise`한 에러를 상위 호출자로 전달하며 CLI의 `main` 진입 보호 코드가 일부 오류를 잡는다.
+
+**4. 내부 처리 순서·데이터 변화**: 아래는 실제 선언 내부의 중요한 조건과 루프(원본 정의 번호):
+- 명시 분기 없이 순차 계산/반환한다.
+
+메모리/파일/SQL 관련 식별자: 별도 I/O나 자원 호출이 표시되지 않는 단순 유틸리티일 수 있다. 본문 확인 필요.
+
+**5. 연결 관계**: 코드에서 직접 참조하는 호출 후보(정적 검색 결과): `_witness_entry`, `_json`. 이는 분기별 동적 호출 확정이 아니라 코드를 따라갈 때 찾을 식별자 목록이다. 공유 자원은 전역 `DATA`, `BUILD`, `BINARY`, run의 JSON/SQLite 등이 있는지 본문에서 확인한다.
+
+**6. Python 문법**: `with`는 자원 정리, `try/except/finally`는 오류/항상 수행 경로, `yield`가 있다면 generator, `dict`/list comprehension은 자료 변환, `path / 'file'`은 pathlib 경로 결합, `with db:`는 transaction 문맥 관리다. 반드시 아래 실제 사용 문법만 해당한다고 판단한다.
+
+**7. 구체 예시(실제 실행이 아닌 가상 시나리오)**: 예시 입력에서 반환 조건, 예외 조건, 파일 경로 경계를 한 줄씩 따라가며 함수 실행 전·후 dict/파일/SQLite/프로세스 상태를 기록한다. 숫자나 임계치는 예시이지 측정·고정 값이 아니다.
+
+**8. 경계/성능/보안**: 잘못된 타입, 중복·유실된 JSON 키, 파일 심볼릭링크·권한, 크기 상한, SQLite 부분 커밋, 프로세스 생존 확인, 데이터 내구 경계를 코드 근거로 평가한다. `return` 값만으로 무손실을 단정할 수 없다.
+
+**함수 원본 전체**
+
+```python
+def _witness_entry(lineage, row):
+    cgroup, seq, lane, reason, timestamp, payload = row
+    witness = _json(payload)
+    quality = witness['quality']
+    return dict(run_id=lineage['run_id'], boot_id=lineage['boot_id'],
+                cgroup_id=int(cgroup), seq=int(seq), lane=lane,
+                reason=reason, monotonic_ns=int(timestamp), witness=witness,
+                truth_binding='UNMATCHED',
+                quarantine_selection=('INITIAL_FULL' if quality & Q_INITIAL else
+                                      'PERIODIC_SAMPLE' if quality & Q_PERIODIC else 'NONE'),
+                durable_raw=False)
+```
+
+#### _summarize — [ledger.py:888–983](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L888-L983)
+
+**정의(원문)**: `def _summarize(db, snapshot, report):`
+
+**1. 목적**: 확정된 원장/원본과 미확정 영역을 분리한 최종 판정 정보를 합성한다.
+
+**2. 인자·자료형·전달**: 서명에 적힌 파이썬 매개변수를 순서대로 확인한다. 위치 인자는 값으로 참조가 전달되고, `Path`는 경로 객체, `run`은 run 디렉터리, `cfg`는 정규화된 dict인 경우가 많다. 변경 가능한 list/dict는 복사 없이 전달되면 함수 안의 수정이 호출자에게도 보일 수 있다. `*` 뒤의 매개변수는 키워드 전용이다. `=...`는 명시한 기본값이다. 이 함수에서 실제로 사용하는 타입·키는 코드의 `[]` 접근과 validation을 참고한다.
+
+**3. 반환/오류**: `raise LedgerError('durable event exceeds final tenant sequence')` · `raise LedgerError('final snapshot omits sequenced durable/loss tenant')` · `raise LedgerError('loss tombstone exceeds final tenant sequence')`. Python은 `raise`한 에러를 상위 호출자로 전달하며 CLI의 `main` 진입 보호 코드가 일부 오류를 잡는다.
+
+**4. 내부 처리 순서·데이터 변화**: 아래는 실제 선언 내부의 중요한 조건과 루프(원본 정의 번호):
+- [L890](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L890-L890) `for cgroup, lane, reason in db.execute('SELECT DISTINCT cgroup,lane,reason FROM losses ORDER BY cgroup,lane,reason'):`
+- [L899](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L899-L899) `for row in db.execute(`
+- [L907](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L907-L907) `if snapshot is None and report['committed_quarantine_control_count']:`
+- [L924](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L924-L924) `if snapshot:`
+- [L932](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L932-L932) `if 'quarantine' in snapshot['durable_offsets']:`
+- [L936](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L936-L936) `else:`
+- [L940](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L940-L940) `for tenant in snapshot['tenants']:`
+- [L944](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L944-L944) `if outlier and report['absence_set_complete']:`
+- [L955](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L955-L955) `if report['absence_set_complete']:`
+- [L957](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L957-L957) `else:`
+- [L962](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L962-L962) `if report['absence_set_complete']:`
+- [L964](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L964-L964) `for (cgroup,) in db.execute('SELECT DISTINCT cgroup FROM durable UNION SELECT DISTINCT cgroup FROM losses'):`
+- [L965](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L965-L965) `if cgroup not in snapshot_ids:`
+- [L967](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L967-L967) `for tenant in snapshot['tenants']:`
+- [L968](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L968-L968) `if db.execute('SELECT 1 FROM losses WHERE cgroup=? AND seq>? LIMIT 1',`
+- [L971](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L971-L971) `if snapshot['metadata_overflow'] or snapshot['metadata_dropped']:`
+
+메모리/파일/SQL 관련 식별자: `db.execute`.
+
+**5. 연결 관계**: 코드에서 직접 참조하는 호출 후보(정적 검색 결과): `_summarize`, `execute`, `append`, `_ranges`, `count`, `fetchone`, `_witness_entry`, `_json`, `get`, `_seq_key`, `LedgerError`, `max`, `_contiguous_frontier`, `_gaps`, `_quarantine_report`, `_rule_evidence`. 이는 분기별 동적 호출 확정이 아니라 코드를 따라갈 때 찾을 식별자 목록이다. 공유 자원은 전역 `DATA`, `BUILD`, `BINARY`, run의 JSON/SQLite 등이 있는지 본문에서 확인한다.
+
+**6. Python 문법**: `with`는 자원 정리, `try/except/finally`는 오류/항상 수행 경로, `yield`가 있다면 generator, `dict`/list comprehension은 자료 변환, `path / 'file'`은 pathlib 경로 결합, `with db:`는 transaction 문맥 관리다. 반드시 아래 실제 사용 문법만 해당한다고 판단한다.
+
+**7. 구체 예시(실제 실행이 아닌 가상 시나리오)**: 예시 입력에서 반환 조건, 예외 조건, 파일 경로 경계를 한 줄씩 따라가며 함수 실행 전·후 dict/파일/SQLite/프로세스 상태를 기록한다. 숫자나 임계치는 예시이지 측정·고정 값이 아니다.
+
+**8. 경계/성능/보안**: 잘못된 타입, 중복·유실된 JSON 키, 파일 심볼릭링크·권한, 크기 상한, SQLite 부분 커밋, 프로세스 생존 확인, 데이터 내구 경계를 코드 근거로 평가한다. `return` 값만으로 무손실을 단정할 수 없다.
+
+**함수 원본 전체**
+
+```python
+def _summarize(db, snapshot, report):
+    report['exact_userspace_losses'] = []
+    for cgroup, lane, reason in db.execute('SELECT DISTINCT cgroup,lane,reason FROM losses ORDER BY cgroup,lane,reason'):
+        values = (row[0] for row in db.execute('SELECT seq FROM losses WHERE cgroup=? AND lane=? AND reason=? ORDER BY seq',
+                                              (cgroup, lane, reason)))
+        report['exact_userspace_losses'].append(dict(cgroup_id=int(cgroup), lane=lane,
+            reason=reason, **_ranges(values, 'CONFIRMED_USERSPACE_LOSS')))
+    report['exact_userspace_loss_count'] = db.execute('SELECT count(*) FROM losses').fetchone()[0]
+    witness_count = db.execute('SELECT count(*) FROM losses WHERE witness IS NOT NULL').fetchone()[0]
+    report['exact_userspace_loss_witnesses'] = dict(count=witness_count,
+        entries=[_witness_entry(report['lineage'], row)
+                 for row in db.execute(
+                     'SELECT cgroup,seq,lane,reason,monotonic_ns,witness FROM losses '
+                     'WHERE witness IS NOT NULL ORDER BY cgroup,seq LIMIT ?', (MAX_RANGES,))],
+        entries_truncated=witness_count > MAX_RANGES,
+        legacy_tombstones_without_witness=report['exact_userspace_loss_count']-witness_count,
+        identity_scope='SENSOR_CGROUP_SEQUENCE_WITHIN_RUN_AND_BOOT',
+        truth_id_scope='UNBOUND_UNTIL_UNIQUE_NOTEBOOK_MONOTONIC_CONTEXT_MATCH')
+    report['committed_quarantine_control_count'] = db.execute('SELECT count(*) FROM controls').fetchone()[0]
+    if snapshot is None and report['committed_quarantine_control_count']:
+        report['partial_quarantine_controls'] = dict(durability='COMMITTED_JOURNAL_FENCE',
+            entries=[_json(row[0]) for row in db.execute('SELECT payload FROM controls LIMIT ?', (MAX_RANGES,))],
+            entries_truncated=report['committed_quarantine_control_count'] > MAX_RANGES,
+            actual_durable_episode_counts=None)
+    report['exact_userspace_loss_durability'] = 'COMMITTED_JOURNAL_FENCE'
+    report['raw_recovery_supported'] = snapshot is not None
+    report['clean_seal'] = bool(snapshot and snapshot['record_type'] == 'seal' and snapshot.get('state') == 'STOPPED')
+    report['absence_set_complete'] = bool(report['clean_seal'] and
+        snapshot.get('sequence_snapshot_complete') is True)
+    report['checkpoint_userspace_loss_reason_coverage_complete'] = bool(snapshot and snapshot['exact_loss_available'])
+    report['userspace_loss_reason_coverage_complete'] = bool(report['clean_seal'] and snapshot['exact_loss_available'])
+    report['userspace_loss_witness_coverage_complete'] = bool(
+        report['userspace_loss_reason_coverage_complete'] and
+        witness_count == report['exact_userspace_loss_count'])
+    report['exact_loss_scope'] = 'USERSPACE_REJECTIONS'
+    report['tenant_evidence'] = []
+    if snapshot:
+        # Aggregate counters never enter either exact loss or per-gap reasons.
+        report['last_trusted_checkpoint'] = snapshot
+        report['unsequenced_faults'] = dict(summary_kind='AGGREGATE_ONLY',
+            counters=dict(tenant_map_missing=snapshot['faults'][0],
+                          pending_update_failed=snapshot['faults'][1], pending_lookup_missing=snapshot['faults'][2]),
+            affected_event_ids=None, exact_unobserved_event_count=None,
+            explanation='Pre-sequence observation faults have no recoverable event IDs; counters are not assigned to gaps')
+        if 'quarantine' in snapshot['durable_offsets']:
+            report['pre_sequence_policy_faults'] = dict(summary_kind='AGGREGATE_ONLY',
+                counters=dict(quarantine_global_lookup_failed=snapshot['faults'][3]), affected_event_ids=None,
+                explanation='Policy lookup failed before sequence assignment; later fallback may still allocate a sequence. No event IDs or missing counts are inferred')
+        else:
+            report['sequenced_aggregate_faults'] = dict(summary_kind='AGGREGATE_ONLY',
+                counters=dict(shared_critical_budget_lookup_failed=snapshot['faults'][3]), affected_event_ids=None,
+                explanation='This legacy fault occurs after sequence allocation; its aggregate count is not assigned to individual missing IDs')
+        for tenant in snapshot['tenants']:
+            cgroup, upper = tenant['cgroup_id'], tenant['sequence']
+            outlier = db.execute('SELECT seq FROM durable WHERE cgroup=? AND seq>? LIMIT 1',
+                                  (str(cgroup), _seq_key(upper))).fetchone()
+            if outlier and report['absence_set_complete']:
+                raise LedgerError('durable event exceeds final tenant sequence')
+            row = dict(cgroup_id=cgroup, checkpoint_sequence=upper)
+            latest_raw = db.execute('SELECT max(seq) FROM durable WHERE cgroup=?',
+                                    (str(cgroup),)).fetchone()[0]
+            latest_loss = db.execute('SELECT max(seq) FROM losses WHERE cgroup=?',
+                                     (str(cgroup),)).fetchone()[0]
+            row['max_seen_exact_sequence'] = max(int(latest_raw or 0), int(latest_loss or 0))
+            row['contiguous_raw_frontier'] = _contiguous_frontier(db, cgroup, False)
+            row['accounted_frontier'] = _contiguous_frontier(db, cgroup, True)
+            row['frontier_scope'] = 'COMMITTED_DURABLE_RAW_AND_EXACT_USERSPACE_TOMBSTONES_ONLY'
+            if report['absence_set_complete']:
+                row['final_absence'] = _gaps(db, cgroup, upper)
+            else:
+                row['unknown_tail'] = dict(status='UNBOUNDED_UNKNOWN_TAIL',
+                    after_checkpoint_sequence=upper, end=None, count=None,
+                    reason='No complete clean-stop sequence boundary; no exact tail count is inferred')
+            report['tenant_evidence'].append(row)
+        if report['absence_set_complete']:
+            snapshot_ids = {str(tenant['cgroup_id']) for tenant in snapshot['tenants']}
+            for (cgroup,) in db.execute('SELECT DISTINCT cgroup FROM durable UNION SELECT DISTINCT cgroup FROM losses'):
+                if cgroup not in snapshot_ids:
+                    raise LedgerError('final snapshot omits sequenced durable/loss tenant')
+            for tenant in snapshot['tenants']:
+                if db.execute('SELECT 1 FROM losses WHERE cgroup=? AND seq>? LIMIT 1',
+                              (str(tenant['cgroup_id']), _seq_key(tenant['sequence']))).fetchone():
+                    raise LedgerError('loss tombstone exceeds final tenant sequence')
+        if snapshot['metadata_overflow'] or snapshot['metadata_dropped']:
+            report['warnings'].append('METADATA_COVERAGE_DEGRADED: some exact userspace reasons were not committed')
+    if not report['absence_set_complete']:
+        report['unknown_future'] = dict(status='UNBOUNDED_UNKNOWN_TAIL', count=None,
+            reason='No complete clean seal; tenants/events after the last committed snapshot may be unknown')
+    if snapshot and snapshot.get('metadata_failed'):
+        report['warnings'].append('METADATA_IO_FAILURE: checkpoint reports failed metadata persistence')
+    if report['clean_seal'] and not report['absence_set_complete']:
+        report['warnings'].append('SEQUENCE_BOUNDARY_INCOMPLETE: clean stop lacks a complete sequence snapshot')
+    _quarantine_report(db, snapshot, report)
+    _rule_evidence(db, snapshot, report)
+```
+
+#### recover — [ledger.py:984–1074](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L984-L1074)
+
+**정의(원문)**: `def recover(run, out=None):`
+
+**1. 목적**: source를 고치지 않고 manifest·fence·journal·raw를 검증하여 report status를 만든다.
+
+**2. 인자·자료형·전달**: 서명에 적힌 파이썬 매개변수를 순서대로 확인한다. 위치 인자는 값으로 참조가 전달되고, `Path`는 경로 객체, `run`은 run 디렉터리, `cfg`는 정규화된 dict인 경우가 많다. 변경 가능한 list/dict는 복사 없이 전달되면 함수 안의 수정이 호출자에게도 보일 수 있다. `*` 뒤의 매개변수는 키워드 전용이다. `=...`는 명시한 기본값이다. 이 함수에서 실제로 사용하는 타입·키는 코드의 `[]` 접근과 validation을 참고한다.
+
+**3. 반환/오류**: `raise LedgerError('source run directory does not exist')` · `raise LedgerError('commit fence exists without metadata journal')` · `raise LedgerError('commit fence schema mismatch')` · `raise LedgerError('Recovery output must be outside the source run')` · `return report`. Python은 `raise`한 에러를 상위 호출자로 전달하며 CLI의 `main` 진입 보호 코드가 일부 오류를 잡는다.
+
+**4. 내부 처리 순서·데이터 변화**: 아래는 실제 선언 내부의 중요한 조건과 루프(원본 정의 번호):
+- [L1002](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L1002-L1002) `try:`
+- [L1003](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L1003-L1003) `if not run.is_dir():`
+- [L1005](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L1005-L1005) `if not journal.exists() and not fence_path.exists():`
+- [L1007](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L1007-L1007) `else:`
+- [L1010](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L1010-L1010) `if not journal.is_file():`
+- [L1013](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L1013-L1013) `if not fence_path.exists():`
+- [L1016](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L1016-L1016) `for lane in (ALL_LANES if (run / 'quarantine.raw').exists() else LANES):`
+- [L1022](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L1022-L1022) `else:`
+- [L1024](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L1024-L1024) `if type(fence.get('schema')) is not int or fence['schema'] != 1:`
+- [L1027](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L1027-L1027) `with tempfile.TemporaryDirectory(prefix='mglogwh-ledger-') as temporary:`
+- [L1029](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L1029-L1029) `try:`
+- [L1041](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L1041-L1041) `if snapshot is None:`
+- [L1045](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L1045-L1045) `else:`
+- [L1047](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L1047-L1047) `finally:`
+- [L1049](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L1049-L1049) `except (OSError, ValueError, UnicodeError, sqlite3.Error, struct.error) as exc:`
+- [L1052](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L1052-L1052) `for key in ('last_trusted_checkpoint', 'exact_userspace_losses', 'exact_userspace_loss_count', 'tenant_evidence',`
+
+메모리/파일/SQL 관련 식별자: `sqlite3.connect`, `db.execute`, `db.executescript`, `Path`, `_read_journal`, `_read_raw`.
+
+**5. 연결 관계**: 코드에서 직접 참조하는 호출 후보(정적 검색 결과): `recover`, `Path`, `resolve`, `is_dir`, `LedgerError`, `exists`, `update`, `_lineage`, `is_file`, `stat`, `in`, `append`, `_object`, `type`, `get`, `_bound_lineage`, `TemporaryDirectory`, `connect`, `execute`, `executescript`. 이는 분기별 동적 호출 확정이 아니라 코드를 따라갈 때 찾을 식별자 목록이다. 공유 자원은 전역 `DATA`, `BUILD`, `BINARY`, run의 JSON/SQLite 등이 있는지 본문에서 확인한다.
+
+**6. Python 문법**: `with`는 자원 정리, `try/except/finally`는 오류/항상 수행 경로, `yield`가 있다면 generator, `dict`/list comprehension은 자료 변환, `path / 'file'`은 pathlib 경로 결합, `with db:`는 transaction 문맥 관리다. 반드시 아래 실제 사용 문법만 해당한다고 판단한다.
+
+**7. 구체 예시(실제 실행이 아닌 가상 시나리오)**: evidence.meta 파일이 있어도 commit fence가 없으면 미커밋 바이트는 보존하지만 RECOVERED라고 분류하지 않는다.
+
+**8. 경계/성능/보안**: 잘못된 타입, 중복·유실된 JSON 키, 파일 심볼릭링크·권한, 크기 상한, SQLite 부분 커밋, 프로세스 생존 확인, 데이터 내구 경계를 코드 근거로 평가한다. `return` 값만으로 무손실을 단정할 수 없다.
+
+**함수 원본 전체**
+
+```python
+def recover(run, out=None):
+    """Return a serializable report; optional out must be outside the source run.
+
+    INVALID reports make no partial evidence claims. Legacy runs and journals
+    lacking a commit fence have explicit unsupported/uncommitted states.
+    """
+    run = Path(run).resolve()
+    report = dict(schema=1, program='MGlogWHLedger', version='0.4.0', run_path=str(run),
+                  status='INVALID', errors=[], warnings=[], journal={}, raw={},
+                  clean_seal=False, absence_set_complete=False, raw_recovery_supported=False, durable_records=0,
+                  durable_unique_events=0, duplicate_loss_records=0,
+                  duplicate_quarantine_controls=0,
+                  source_modified=False, recovery_policy='COMMITTED_FENCE_ONLY_NO_TAIL_PROMOTION',
+                  verification_progress=dict(scope='DIAGNOSTIC_ONLY_NOT_PARTIAL_RECOVERY',
+                    journal_committed_boundary_bytes=None, journal_verified_prefix_bytes=0,
+                    journal_verified_frames=0, raw_verified_prefix_bytes={}),
+                  counter_reason_policy='AGGREGATE_ONLY_NEVER_ASSIGN_TO_GAPS')
+    journal, fence_path = run / 'evidence.meta', run / 'evidence.meta.commit'
+    try:
+        if not run.is_dir():
+            raise LedgerError('source run directory does not exist')
+        if not journal.exists() and not fence_path.exists():
+            report.update(status='LEGACY_UNSUPPORTED', unsupported_reason='This run has no metadata ledger')
+        else:
+            lineage = _lineage(run)
+            report['lineage'] = lineage
+            if not journal.is_file():
+                raise LedgerError('commit fence exists without metadata journal')
+            report['journal']['file_bytes'] = journal.stat().st_size
+            if not fence_path.exists():
+                report.update(status='UNCOMMITTED', unknown_future=dict(status='UNBOUNDED_UNKNOWN_TAIL', count=None))
+                report['journal'].update(committed_bytes=0, uncommitted_bytes=journal.stat().st_size)
+                for lane in (ALL_LANES if (run / 'quarantine.raw').exists() else LANES):
+                    path = run / (lane + '.raw')
+                    size = path.stat().st_size if path.exists() else 0
+                    report['raw'][lane] = dict(file_bytes=size, durable_bytes=0,
+                        uncommitted_bytes=size, partial_tail_bytes=size % RECORD_SIZE)
+                report['warnings'].append('NO_COMMIT_FENCE: journal bytes are preserved and provide no durable evidence')
+            else:
+                fence = _object(fence_path)
+                if type(fence.get('schema')) is not int or fence['schema'] != 1:
+                    raise LedgerError('commit fence schema mismatch')
+                _bound_lineage(fence, lineage)
+                with tempfile.TemporaryDirectory(prefix='mglogwh-ledger-') as temporary:
+                    db = sqlite3.connect(str(Path(temporary) / 'recover.sqlite'))
+                    try:
+                        db.execute('PRAGMA cache_size=-4096')
+                        db.execute('PRAGMA journal_mode=OFF')
+                        db.execute('PRAGMA synchronous=OFF')
+                        db.executescript('CREATE TABLE durable(cgroup TEXT,seq TEXT,digest TEXT,lane TEXT,rule_id INTEGER,kind INTEGER,flags INTEGER,monotonic_ns TEXT,PRIMARY KEY(cgroup,seq));'
+                                         'CREATE INDEX durable_stream ON durable(cgroup,rule_id,kind,seq);'
+                                         'CREATE INDEX durable_stream_time ON durable(cgroup,rule_id,kind,monotonic_ns);'
+                                         'CREATE TABLE losses(cgroup TEXT,seq TEXT,lane TEXT,reason TEXT,monotonic_ns TEXT,witness TEXT,PRIMARY KEY(cgroup,seq));'
+                                         'CREATE TABLE controls(cgroup TEXT,rule_id INTEGER,kind INTEGER,episode_id TEXT,transition TEXT,payload TEXT,PRIMARY KEY(cgroup,rule_id,kind,episode_id,transition));')
+                        snapshot = _read_journal(run, fence, lineage, db, report)
+                        _read_raw(run, snapshot, db, report)
+                        _summarize(db, snapshot, report)
+                        if snapshot is None:
+                            report['status'] = 'PARTIAL_RECOVERY' if report['exact_userspace_loss_count'] or report['committed_quarantine_control_count'] else 'UNCOMMITTED'
+                            report['unsupported_reason'] = 'No committed checkpoint supplies raw durable boundaries'
+                            report['warnings'].append('NO_COMMITTED_CHECKPOINT: raw bytes remain uncommitted; independently committed loss/transition metadata remain exact')
+                        else:
+                            report['status'] = 'RECOVERED'
+                    finally:
+                        db.close()
+    except (OSError, ValueError, UnicodeError, sqlite3.Error, struct.error) as exc:
+        report.update(status='INVALID', clean_seal=False, absence_set_complete=False)
+        report['errors'].append(str(exc))
+        for key in ('last_trusted_checkpoint', 'exact_userspace_losses', 'exact_userspace_loss_count', 'tenant_evidence',
+                    'checkpoint_userspace_loss_reason_coverage_complete', 'unsequenced_faults', 'sequenced_aggregate_faults',
+                    'pre_sequence_policy_faults', 'critical_quarantine', 'partial_quarantine_controls', 'committed_quarantine_control_count',
+                    'exact_userspace_loss_witnesses', 'rule_evidence'):
+            report.pop(key, None)
+        report['durable_unique_events'] = 0
+        report['durable_records'] = 0
+        report['userspace_loss_reason_coverage_complete'] = False
+        report['userspace_loss_witness_coverage_complete'] = False
+        report['raw_recovery_supported'] = False
+        report.pop('exact_userspace_loss_durability', None)
+    if out is not None:
+        destination = Path(out).resolve()
+        if destination == run or run in destination.parents:
+            raise LedgerError('Recovery output must be outside the source run')
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        # Do not overwrite a previous recovery report.
+        with destination.open('x', encoding='utf-8', newline='\n') as handle:
+            json.dump(report, handle, ensure_ascii=False, indent=2, allow_nan=False)
+            handle.write('\n')
+    return report
+```
+
+#### main — [ledger.py:1075–1087](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L1075-L1087)
+
+**정의(원문)**: `def main(argv=None):`
+
+**1. 목적**: argparse CLI를 action별 validate/prepare/run/start/stop/query/index/recover 구현으로 분배한다.
+
+**2. 인자·자료형·전달**: 서명에 적힌 파이썬 매개변수를 순서대로 확인한다. 위치 인자는 값으로 참조가 전달되고, `Path`는 경로 객체, `run`은 run 디렉터리, `cfg`는 정규화된 dict인 경우가 많다. 변경 가능한 list/dict는 복사 없이 전달되면 함수 안의 수정이 호출자에게도 보일 수 있다. `*` 뒤의 매개변수는 키워드 전용이다. `=...`는 명시한 기본값이다. 이 함수에서 실제로 사용하는 타입·키는 코드의 `[]` 접근과 validation을 참고한다.
+
+**3. 반환/오류**: `return 2 if result['status'] == 'INVALID' else 0`. Python은 `raise`한 에러를 상위 호출자로 전달하며 CLI의 `main` 진입 보호 코드가 일부 오류를 잡는다.
+
+**4. 내부 처리 순서·데이터 변화**: 아래는 실제 선언 내부의 중요한 조건과 루프(원본 정의 번호):
+- [L1080](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L1080-L1080) `try:`
+- [L1082](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/ledger.py#L1082-L1082) `except (OSError, ValueError) as exc:`
+
+메모리/파일/SQL 관련 식별자: `argparse.ArgumentParser`, `parse_args`, `json.dumps`, `Path`.
+
+**5. 연결 관계**: 코드에서 직접 참조하는 호출 후보(정적 검색 결과): `main`, `ArgumentParser`, `add_argument`, `parse_args`, `recover`, `except`, `exit`, `dumps`. 이는 분기별 동적 호출 확정이 아니라 코드를 따라갈 때 찾을 식별자 목록이다. 공유 자원은 전역 `DATA`, `BUILD`, `BINARY`, run의 JSON/SQLite 등이 있는지 본문에서 확인한다.
+
+**6. Python 문법**: `with`는 자원 정리, `try/except/finally`는 오류/항상 수행 경로, `yield`가 있다면 generator, `dict`/list comprehension은 자료 변환, `path / 'file'`은 pathlib 경로 결합, `with db:`는 transaction 문맥 관리다. 반드시 아래 실제 사용 문법만 해당한다고 판단한다.
+
+**7. 구체 예시(실제 실행이 아닌 가상 시나리오)**: 예시 입력에서 반환 조건, 예외 조건, 파일 경로 경계를 한 줄씩 따라가며 함수 실행 전·후 dict/파일/SQLite/프로세스 상태를 기록한다. 숫자나 임계치는 예시이지 측정·고정 값이 아니다.
+
+**8. 경계/성능/보안**: 잘못된 타입, 중복·유실된 JSON 키, 파일 심볼릭링크·권한, 크기 상한, SQLite 부분 커밋, 프로세스 생존 확인, 데이터 내구 경계를 코드 근거로 평가한다. `return` 값만으로 무손실을 단정할 수 없다.
+
+**함수 원본 전체**
+
+```python
+def main(argv=None):
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--run', required=True, type=Path, help='Existing sensor run directory')
+    parser.add_argument('--out', type=Path, help='New report JSON outside the source run')
+    args = parser.parse_args(argv)
+    try:
+        result = recover(args.run, args.out)
+    except (OSError, ValueError) as exc:
+        parser.exit(2, f'Recovery report failed: {exc}\n')
+    print(json.dumps(result, ensure_ascii=False, allow_nan=False))
+    return 2 if result['status'] == 'INVALID' else 0
+```
+
 
 # PART 10. 설정·빌드·설치
 
