@@ -4376,7 +4376,611 @@ struct eq_record { struct eq_event event; unsigned crc32, reserved; };
 
 BPF map `tenants`와 `quarantine_streams`는 각각 key/value가 있는 커널 공간 해시 맵으로 크기 한도가 있다. `exec_scratch`·`rule_lookup_scratch`는 per-CPU 배열로 BPF의 제한된 스택 사용량을 줄인다. `state_lock`은 C queue/meta/counters에 대한 스레드 간 동기화를 맡고, `pthread_cond_signal`은 새 이벤트가 생겼음을 writer에게 알린다.
 
-<!-- PART5_STRUCTS -->
+
+## 정의된 구조체·enum/전역 상태를 실제 코드로 해석하기
+
+
+### [tenant.h](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/tenant.h)
+
+
+#### struct eq_tenant_stats ([L6–L12](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/tenant.h#L6-L12))
+
+cgroup별 sequence 및 budget/ring/격리 진단 누적값. BPF map tenants의 value.
+
+```c
+struct eq_tenant_stats {
+    unsigned long long sequence, next_ns;
+    unsigned long long submitted[3], budget_suppress, general_full, critical_full;
+    unsigned long long budget_contention;
+    unsigned long long quarantine_submitted, quarantine_full, quarantine_summarized;
+    unsigned long long stream_map_full, stream_contention;
+};
+```
+
+| 선언(자료형 포함) | 데이터 소유·접근 시 확인할 점 |
+|---|---|
+| `unsigned long long sequence, next_ns;` | 이 필드를 쓰는 함수/맵을 원본 검색해 **초기값 → 갱신 → 조회 → 해제** 순서를 확인한다. 숫자 카운터면 누적 또는 샘플인지 이름·갱신 조건을 구분한다. |
+| `unsigned long long submitted[3], budget_suppress, general_full, critical_full;` | 이 필드를 쓰는 함수/맵을 원본 검색해 **초기값 → 갱신 → 조회 → 해제** 순서를 확인한다. 숫자 카운터면 누적 또는 샘플인지 이름·갱신 조건을 구분한다. |
+| `unsigned long long budget_contention;` | 이 필드를 쓰는 함수/맵을 원본 검색해 **초기값 → 갱신 → 조회 → 해제** 순서를 확인한다. 숫자 카운터면 누적 또는 샘플인지 이름·갱신 조건을 구분한다. |
+| `unsigned long long quarantine_submitted, quarantine_full, quarantine_summarized;` | 이 필드를 쓰는 함수/맵을 원본 검색해 **초기값 → 갱신 → 조회 → 해제** 순서를 확인한다. 숫자 카운터면 누적 또는 샘플인지 이름·갱신 조건을 구분한다. |
+| `unsigned long long stream_map_full, stream_contention;` | 이 필드를 쓰는 함수/맵을 원본 검색해 **초기값 → 갱신 → 조회 → 해제** 순서를 확인한다. 숫자 카운터면 누적 또는 샘플인지 이름·갱신 조건을 구분한다. |
+
+### [quarantine.h](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/quarantine.h)
+
+
+#### struct eq_quarantine_rule ([L12–L15](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/quarantine.h#L12-L15))
+
+legacy/격리 규칙의 정적 속성 묶음.
+
+```c
+struct eq_quarantine_rule {
+    unsigned id, kind, protected_rule, enabled;
+    char path[EQ_PATH];
+};
+```
+
+| 선언(자료형 포함) | 데이터 소유·접근 시 확인할 점 |
+|---|---|
+| `unsigned id, kind, protected_rule, enabled;` | 이 필드를 쓰는 함수/맵을 원본 검색해 **초기값 → 갱신 → 조회 → 해제** 순서를 확인한다. 숫자 카운터면 누적 또는 샘플인지 이름·갱신 조건을 구분한다. |
+| `char path[EQ_PATH];` | 이 필드를 쓰는 함수/맵을 원본 검색해 **초기값 → 갱신 → 조회 → 해제** 순서를 확인한다. 숫자 카운터면 누적 또는 샘플인지 이름·갱신 조건을 구분한다. |
+
+#### struct eq_quarantine_config ([L16–L19](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/quarantine.h#L16-L19))
+
+초당 rate·duration·recovery·initial sample·interval. 전역/규칙별 정책 인자.
+
+```c
+struct eq_quarantine_config {
+    unsigned long long threshold_eps, duration_ms, recovery_eps, cooldown_ms;
+    unsigned long long initial_full, sample_interval_ms;
+};
+```
+
+| 선언(자료형 포함) | 데이터 소유·접근 시 확인할 점 |
+|---|---|
+| `unsigned long long threshold_eps, duration_ms, recovery_eps, cooldown_ms;` | 이 필드를 쓰는 함수/맵을 원본 검색해 **초기값 → 갱신 → 조회 → 해제** 순서를 확인한다. 숫자 카운터면 누적 또는 샘플인지 이름·갱신 조건을 구분한다. |
+| `unsigned long long initial_full, sample_interval_ms;` | 이 필드를 쓰는 함수/맵을 원본 검색해 **초기값 → 갱신 → 조회 → 해제** 순서를 확인한다. 숫자 카운터면 누적 또는 샘플인지 이름·갱신 조건을 구분한다. |
+
+#### struct eq_quarantine_key ([L20–L23](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/quarantine.h#L20-L23))
+
+cgroup_id×rule_id×kind: 하나의 정책 stream 식별자.
+
+```c
+struct eq_quarantine_key {
+    unsigned long long cgroup_id;
+    unsigned rule_id, kind;
+};
+```
+
+| 선언(자료형 포함) | 데이터 소유·접근 시 확인할 점 |
+|---|---|
+| `unsigned long long cgroup_id;` | 이 필드를 쓰는 함수/맵을 원본 검색해 **초기값 → 갱신 → 조회 → 해제** 순서를 확인한다. 숫자 카운터면 누적 또는 샘플인지 이름·갱신 조건을 구분한다. |
+| `unsigned rule_id, kind;` | 이 필드를 쓰는 함수/맵을 원본 검색해 **초기값 → 갱신 → 조회 → 해제** 순서를 확인한다. 숫자 카운터면 누적 또는 샘플인지 이름·갱신 조건을 구분한다. |
+
+#### struct eq_quarantine_episode ([L28–L39](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/quarantine.h#L28-L39))
+
+격리 단일 episode의 시작/종료·샘플 선택·요약·추적 불완전성 통계.
+
+```c
+struct eq_quarantine_episode {
+    unsigned long long episode_id, start_ns, end_ns;
+    unsigned long long last_event_ns, burst_start_ns, peak_rate_eps, high_rate_duration_ms;
+    unsigned long long threshold_eps, observed_eps, duration_ms;
+    unsigned long long first_sequence, last_sequence;
+    unsigned long long first_pid, first_uid, last_pid, last_uid;
+    unsigned long long seen, full_selected, sample_selected, summarized;
+    unsigned long long full_submitted, sample_submitted, ring_failed;
+    unsigned long long pid_bitmap[EQ_Q_BITMAP_WORDS], uid_bitmap[EQ_Q_BITMAP_WORDS];
+    unsigned long long unique_pid_lower_bound, unique_uid_lower_bound;
+    unsigned long long tracking_failed_start, tracking_failed_end, tracking_complete;
+};
+```
+
+| 선언(자료형 포함) | 데이터 소유·접근 시 확인할 점 |
+|---|---|
+| `unsigned long long episode_id, start_ns, end_ns;` | 이 필드를 쓰는 함수/맵을 원본 검색해 **초기값 → 갱신 → 조회 → 해제** 순서를 확인한다. 숫자 카운터면 누적 또는 샘플인지 이름·갱신 조건을 구분한다. |
+| `unsigned long long last_event_ns, burst_start_ns, peak_rate_eps, high_rate_duration_ms;` | 이 필드를 쓰는 함수/맵을 원본 검색해 **초기값 → 갱신 → 조회 → 해제** 순서를 확인한다. 숫자 카운터면 누적 또는 샘플인지 이름·갱신 조건을 구분한다. |
+| `unsigned long long threshold_eps, observed_eps, duration_ms;` | 이 필드를 쓰는 함수/맵을 원본 검색해 **초기값 → 갱신 → 조회 → 해제** 순서를 확인한다. 숫자 카운터면 누적 또는 샘플인지 이름·갱신 조건을 구분한다. |
+| `unsigned long long first_sequence, last_sequence;` | 이 필드를 쓰는 함수/맵을 원본 검색해 **초기값 → 갱신 → 조회 → 해제** 순서를 확인한다. 숫자 카운터면 누적 또는 샘플인지 이름·갱신 조건을 구분한다. |
+| `unsigned long long first_pid, first_uid, last_pid, last_uid;` | 이 필드를 쓰는 함수/맵을 원본 검색해 **초기값 → 갱신 → 조회 → 해제** 순서를 확인한다. 숫자 카운터면 누적 또는 샘플인지 이름·갱신 조건을 구분한다. |
+| `unsigned long long seen, full_selected, sample_selected, summarized;` | 이 필드를 쓰는 함수/맵을 원본 검색해 **초기값 → 갱신 → 조회 → 해제** 순서를 확인한다. 숫자 카운터면 누적 또는 샘플인지 이름·갱신 조건을 구분한다. |
+| `unsigned long long full_submitted, sample_submitted, ring_failed;` | 이 필드를 쓰는 함수/맵을 원본 검색해 **초기값 → 갱신 → 조회 → 해제** 순서를 확인한다. 숫자 카운터면 누적 또는 샘플인지 이름·갱신 조건을 구분한다. |
+| `unsigned long long pid_bitmap[EQ_Q_BITMAP_WORDS], uid_bitmap[EQ_Q_BITMAP_WORDS];` | 이 필드를 쓰는 함수/맵을 원본 검색해 **초기값 → 갱신 → 조회 → 해제** 순서를 확인한다. 숫자 카운터면 누적 또는 샘플인지 이름·갱신 조건을 구분한다. |
+| `unsigned long long unique_pid_lower_bound, unique_uid_lower_bound;` | 이 필드를 쓰는 함수/맵을 원본 검색해 **초기값 → 갱신 → 조회 → 해제** 순서를 확인한다. 숫자 카운터면 누적 또는 샘플인지 이름·갱신 조건을 구분한다. |
+| `unsigned long long tracking_failed_start, tracking_failed_end, tracking_complete;` | 이 필드를 쓰는 함수/맵을 원본 검색해 **초기값 → 갱신 → 조회 → 해제** 순서를 확인한다. 숫자 카운터면 누적 또는 샘플인지 이름·갱신 조건을 구분한다. |
+
+#### struct eq_quarantine_engine ([L40–L49](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/quarantine.h#L40-L49))
+
+이전 완료 창·현재 EPS·현재/이전 episode·enter/exit 상태 머신.
+
+```c
+struct eq_quarantine_engine {
+    unsigned long long initialized, window_start_ns, window_count, window_complete;
+    unsigned long long accounted_seen, high_windows, low_windows;
+    unsigned long long current_rate_eps, peak_rate_eps, burst_start_ns;
+    unsigned long long quarantined, next_sample_ns;
+    unsigned long long q_seen, full_selected, sample_selected, summarized;
+    unsigned long long full_submitted, sample_submitted, ring_failed;
+    unsigned long long enter_count, exit_count;
+    struct eq_quarantine_episode current, last;
+};
+```
+
+| 선언(자료형 포함) | 데이터 소유·접근 시 확인할 점 |
+|---|---|
+| `unsigned long long initialized, window_start_ns, window_count, window_complete;` | 이 필드를 쓰는 함수/맵을 원본 검색해 **초기값 → 갱신 → 조회 → 해제** 순서를 확인한다. 숫자 카운터면 누적 또는 샘플인지 이름·갱신 조건을 구분한다. |
+| `unsigned long long accounted_seen, high_windows, low_windows;` | 이 필드를 쓰는 함수/맵을 원본 검색해 **초기값 → 갱신 → 조회 → 해제** 순서를 확인한다. 숫자 카운터면 누적 또는 샘플인지 이름·갱신 조건을 구분한다. |
+| `unsigned long long current_rate_eps, peak_rate_eps, burst_start_ns;` | 이 필드를 쓰는 함수/맵을 원본 검색해 **초기값 → 갱신 → 조회 → 해제** 순서를 확인한다. 숫자 카운터면 누적 또는 샘플인지 이름·갱신 조건을 구분한다. |
+| `unsigned long long quarantined, next_sample_ns;` | 이 필드를 쓰는 함수/맵을 원본 검색해 **초기값 → 갱신 → 조회 → 해제** 순서를 확인한다. 숫자 카운터면 누적 또는 샘플인지 이름·갱신 조건을 구분한다. |
+| `unsigned long long q_seen, full_selected, sample_selected, summarized;` | 이 필드를 쓰는 함수/맵을 원본 검색해 **초기값 → 갱신 → 조회 → 해제** 순서를 확인한다. 숫자 카운터면 누적 또는 샘플인지 이름·갱신 조건을 구분한다. |
+| `unsigned long long full_submitted, sample_submitted, ring_failed;` | 이 필드를 쓰는 함수/맵을 원본 검색해 **초기값 → 갱신 → 조회 → 해제** 순서를 확인한다. 숫자 카운터면 누적 또는 샘플인지 이름·갱신 조건을 구분한다. |
+| `unsigned long long enter_count, exit_count;` | 이 필드를 쓰는 함수/맵을 원본 검색해 **초기값 → 갱신 → 조회 → 해제** 순서를 확인한다. 숫자 카운터면 누적 또는 샘플인지 이름·갱신 조건을 구분한다. |
+| `struct eq_quarantine_episode current, last;` | 이 필드를 쓰는 함수/맵을 원본 검색해 **초기값 → 갱신 → 조회 → 해제** 순서를 확인한다. 숫자 카운터면 누적 또는 샘플인지 이름·갱신 조건을 구분한다. |
+
+#### struct eq_quarantine_stream ([L52–L58](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/quarantine.h#L52-L58))
+
+원자적 CAS 락, raw/격리/미추적 횟수 및 engine. 사용자 공간 스레드 mutex와 구별.
+
+```c
+struct eq_quarantine_stream {
+    unsigned long long lock, seen, tracking_failed, protected_seen;
+    unsigned long long critical_submitted, critical_ring_failed;
+    unsigned long long untracked_seen, untracked_selected, untracked_summarized;
+    unsigned long long untracked_submitted, untracked_ring_failed, transition_ring_failed;
+    struct eq_quarantine_engine engine;
+};
+```
+
+| 선언(자료형 포함) | 데이터 소유·접근 시 확인할 점 |
+|---|---|
+| `unsigned long long lock, seen, tracking_failed, protected_seen;` | 이 필드를 쓰는 함수/맵을 원본 검색해 **초기값 → 갱신 → 조회 → 해제** 순서를 확인한다. 숫자 카운터면 누적 또는 샘플인지 이름·갱신 조건을 구분한다. |
+| `unsigned long long critical_submitted, critical_ring_failed;` | 이 필드를 쓰는 함수/맵을 원본 검색해 **초기값 → 갱신 → 조회 → 해제** 순서를 확인한다. 숫자 카운터면 누적 또는 샘플인지 이름·갱신 조건을 구분한다. |
+| `unsigned long long untracked_seen, untracked_selected, untracked_summarized;` | 이 필드를 쓰는 함수/맵을 원본 검색해 **초기값 → 갱신 → 조회 → 해제** 순서를 확인한다. 숫자 카운터면 누적 또는 샘플인지 이름·갱신 조건을 구분한다. |
+| `unsigned long long untracked_submitted, untracked_ring_failed, transition_ring_failed;` | 이 필드를 쓰는 함수/맵을 원본 검색해 **초기값 → 갱신 → 조회 → 해제** 순서를 확인한다. 숫자 카운터면 누적 또는 샘플인지 이름·갱신 조건을 구분한다. |
+| `struct eq_quarantine_engine engine;` | 이 필드를 쓰는 함수/맵을 원본 검색해 **초기값 → 갱신 → 조회 → 해제** 순서를 확인한다. 숫자 카운터면 누적 또는 샘플인지 이름·갱신 조건을 구분한다. |
+
+#### enum eq_q_transition ([L59–L59](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/quarantine.h#L59-L59))
+
+코드의 타입 정의다. 이 구조체는 값/포인터 형태로 호출자와 BPF map 사이에서 전달될 수 있으므로 실제 사용 위치를 확인한다.
+
+```c
+enum eq_q_transition { EQ_Q_ENTER = 1, EQ_Q_EXIT = 2 };
+```
+
+
+#### enum eq_q_reason ([L60–L60](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/quarantine.h#L60-L60))
+
+코드의 타입 정의다. 이 구조체는 값/포인터 형태로 호출자와 BPF map 사이에서 전달될 수 있으므로 실제 사용 위치를 확인한다.
+
+```c
+enum eq_q_reason { EQ_Q_HIGH_RATE = 1, EQ_Q_LOW_RATE = 2 };
+```
+
+
+#### enum eq_q_route ([L61–L61](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/quarantine.h#L61-L61))
+
+코드의 타입 정의다. 이 구조체는 값/포인터 형태로 호출자와 BPF map 사이에서 전달될 수 있으므로 실제 사용 위치를 확인한다.
+
+```c
+enum eq_q_route { EQ_Q_NORMAL, EQ_Q_FULL, EQ_Q_SAMPLE, EQ_Q_SUMMARIZE };
+```
+
+
+#### struct eq_quarantine_control ([L62–L68](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/quarantine.h#L62-L68))
+
+격리 전이를 네 번째 ring에 직렬화하기 위한 event 구조체.
+
+```c
+struct eq_quarantine_control {
+    struct eq_quarantine_key key;
+    unsigned transition, reason;
+    unsigned long long monotonic_ns, transition_sequence;
+    unsigned long long threshold_eps, observed_eps, duration_ms;
+    struct eq_quarantine_episode episode;
+};
+```
+
+| 선언(자료형 포함) | 데이터 소유·접근 시 확인할 점 |
+|---|---|
+| `struct eq_quarantine_key key;` | 이 필드를 쓰는 함수/맵을 원본 검색해 **초기값 → 갱신 → 조회 → 해제** 순서를 확인한다. 숫자 카운터면 누적 또는 샘플인지 이름·갱신 조건을 구분한다. |
+| `unsigned transition, reason;` | 이 필드를 쓰는 함수/맵을 원본 검색해 **초기값 → 갱신 → 조회 → 해제** 순서를 확인한다. 숫자 카운터면 누적 또는 샘플인지 이름·갱신 조건을 구분한다. |
+| `unsigned long long monotonic_ns, transition_sequence;` | 이 필드를 쓰는 함수/맵을 원본 검색해 **초기값 → 갱신 → 조회 → 해제** 순서를 확인한다. 숫자 카운터면 누적 또는 샘플인지 이름·갱신 조건을 구분한다. |
+| `unsigned long long threshold_eps, observed_eps, duration_ms;` | 이 필드를 쓰는 함수/맵을 원본 검색해 **초기값 → 갱신 → 조회 → 해제** 순서를 확인한다. 숫자 카운터면 누적 또는 샘플인지 이름·갱신 조건을 구분한다. |
+| `struct eq_quarantine_episode episode;` | 이 필드를 쓰는 함수/맵을 원본 검색해 **초기값 → 갱신 → 조회 → 해제** 순서를 확인한다. 숫자 카운터면 누적 또는 샘플인지 이름·갱신 조건을 구분한다. |
+
+#### struct eq_quarantine_global ([L69–L76](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/quarantine.h#L69-L76))
+
+stream 포화·CAS 실패·fallback 표본 등 전역 보조 통계.
+
+```c
+struct eq_quarantine_global {
+    unsigned long long critical_events_total, protected_events_total, quarantined_events_total;
+    unsigned long long fallback_next_ns, stream_map_full, state_contention;
+    unsigned long long untracked_seen, untracked_selected, untracked_summarized;
+    unsigned long long untracked_submitted, untracked_ring_failed;
+    unsigned long long untracked_protected, untracked_protected_submitted;
+    unsigned long long untracked_protected_ring_failed, transition_ring_failed;
+};
+```
+
+| 선언(자료형 포함) | 데이터 소유·접근 시 확인할 점 |
+|---|---|
+| `unsigned long long critical_events_total, protected_events_total, quarantined_events_total;` | 이 필드를 쓰는 함수/맵을 원본 검색해 **초기값 → 갱신 → 조회 → 해제** 순서를 확인한다. 숫자 카운터면 누적 또는 샘플인지 이름·갱신 조건을 구분한다. |
+| `unsigned long long fallback_next_ns, stream_map_full, state_contention;` | 이 필드를 쓰는 함수/맵을 원본 검색해 **초기값 → 갱신 → 조회 → 해제** 순서를 확인한다. 숫자 카운터면 누적 또는 샘플인지 이름·갱신 조건을 구분한다. |
+| `unsigned long long untracked_seen, untracked_selected, untracked_summarized;` | 이 필드를 쓰는 함수/맵을 원본 검색해 **초기값 → 갱신 → 조회 → 해제** 순서를 확인한다. 숫자 카운터면 누적 또는 샘플인지 이름·갱신 조건을 구분한다. |
+| `unsigned long long untracked_submitted, untracked_ring_failed;` | 이 필드를 쓰는 함수/맵을 원본 검색해 **초기값 → 갱신 → 조회 → 해제** 순서를 확인한다. 숫자 카운터면 누적 또는 샘플인지 이름·갱신 조건을 구분한다. |
+| `unsigned long long untracked_protected, untracked_protected_submitted;` | 이 필드를 쓰는 함수/맵을 원본 검색해 **초기값 → 갱신 → 조회 → 해제** 순서를 확인한다. 숫자 카운터면 누적 또는 샘플인지 이름·갱신 조건을 구분한다. |
+| `unsigned long long untracked_protected_ring_failed, transition_ring_failed;` | 이 필드를 쓰는 함수/맵을 원본 검색해 **초기값 → 갱신 → 조회 → 해제** 순서를 확인한다. 숫자 카운터면 누적 또는 샘플인지 이름·갱신 조건을 구분한다. |
+
+#### struct eq_q_decision ([L78–L81](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/quarantine.h#L78-L81))
+
+eq_q_step이 외부 emit에 돌려주는 경로·전이 판단.
+
+```c
+struct eq_q_decision {
+    unsigned route, transition;
+    unsigned long long monotonic_ns, transition_sequence, observed_eps;
+};
+```
+
+| 선언(자료형 포함) | 데이터 소유·접근 시 확인할 점 |
+|---|---|
+| `unsigned route, transition;` | 이 필드를 쓰는 함수/맵을 원본 검색해 **초기값 → 갱신 → 조회 → 해제** 순서를 확인한다. 숫자 카운터면 누적 또는 샘플인지 이름·갱신 조건을 구분한다. |
+| `unsigned long long monotonic_ns, transition_sequence, observed_eps;` | 이 필드를 쓰는 함수/맵을 원본 검색해 **초기값 → 갱신 → 조회 → 해제** 순서를 확인한다. 숫자 카운터면 누적 또는 샘플인지 이름·갱신 조건을 구분한다. |
+
+### [rules.h](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/rules.h)
+
+
+#### struct eq_rule_trie_key ([L15–L25](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/rules.h#L15-L25))
+
+rule-slot+token-slot+string으로 namespace를 분리하는 LPM trie 키.
+
+```c
+struct eq_rule_trie_key {
+    unsigned prefixlen;
+    unsigned char rule_slot, token_slot;
+    char text[EQ_PATH];
+} __attribute__((packed));
+#define EQ_RULE_TRIE_META_BITS 16u
+#define EQ_RULE_TRIE_QUERY_BITS (EQ_RULE_TRIE_META_BITS + 8u * EQ_PATH)
+/* Linux x86_64 O_PATH opens a path descriptor without read/write access. */
+#define EQ_OPEN_PATH_ONLY 010000000u
+
+enum eq_rule_opcode { EQ_TEST = 1, EQ_ALL = 2, EQ_ANY = 3, EQ_NOT = 4 };
+```
+
+| 선언(자료형 포함) | 데이터 소유·접근 시 확인할 점 |
+|---|---|
+| `unsigned prefixlen;` | 이 필드를 쓰는 함수/맵을 원본 검색해 **초기값 → 갱신 → 조회 → 해제** 순서를 확인한다. 숫자 카운터면 누적 또는 샘플인지 이름·갱신 조건을 구분한다. |
+| `unsigned char rule_slot, token_slot;` | 이 필드를 쓰는 함수/맵을 원본 검색해 **초기값 → 갱신 → 조회 → 해제** 순서를 확인한다. 숫자 카운터면 누적 또는 샘플인지 이름·갱신 조건을 구분한다. |
+| `char text[EQ_PATH];` | 이 필드를 쓰는 함수/맵을 원본 검색해 **초기값 → 갱신 → 조회 → 해제** 순서를 확인한다. 숫자 카운터면 누적 또는 샘플인지 이름·갱신 조건을 구분한다. |
+| `} __attribute__((packed));` | 이 필드를 쓰는 함수/맵을 원본 검색해 **초기값 → 갱신 → 조회 → 해제** 순서를 확인한다. 숫자 카운터면 누적 또는 샘플인지 이름·갱신 조건을 구분한다. |
+
+#### enum eq_rule_field ([L26–L31](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/rules.h#L26-L31))
+
+코드의 타입 정의다. 이 구조체는 값/포인터 형태로 호출자와 BPF map 사이에서 전달될 수 있으므로 실제 사용 위치를 확인한다.
+
+```c
+enum eq_rule_field {
+    EQ_FIELD_KIND = 1, EQ_FIELD_SUCCESS, EQ_FIELD_RESULT,
+    EQ_FIELD_ACCESS_MODE, EQ_FIELD_CREATE, EQ_FIELD_TRUNCATE,
+    EQ_FIELD_PATH, EQ_FIELD_UID, EQ_FIELD_PID, EQ_FIELD_COMM,
+    EQ_FIELD_CGROUP, EQ_FIELD_ROOT, EQ_FIELD_WRITE_ACCESS
+};
+```
+
+| 선언(자료형 포함) | 데이터 소유·접근 시 확인할 점 |
+|---|---|
+| `EQ_FIELD_KIND = 1, EQ_FIELD_SUCCESS, EQ_FIELD_RESULT,` | 이 필드를 쓰는 함수/맵을 원본 검색해 **초기값 → 갱신 → 조회 → 해제** 순서를 확인한다. 숫자 카운터면 누적 또는 샘플인지 이름·갱신 조건을 구분한다. |
+| `EQ_FIELD_ACCESS_MODE, EQ_FIELD_CREATE, EQ_FIELD_TRUNCATE,` | 이 필드를 쓰는 함수/맵을 원본 검색해 **초기값 → 갱신 → 조회 → 해제** 순서를 확인한다. 숫자 카운터면 누적 또는 샘플인지 이름·갱신 조건을 구분한다. |
+| `EQ_FIELD_PATH, EQ_FIELD_UID, EQ_FIELD_PID, EQ_FIELD_COMM,` | 이 필드를 쓰는 함수/맵을 원본 검색해 **초기값 → 갱신 → 조회 → 해제** 순서를 확인한다. 숫자 카운터면 누적 또는 샘플인지 이름·갱신 조건을 구분한다. |
+| `EQ_FIELD_CGROUP, EQ_FIELD_ROOT, EQ_FIELD_WRITE_ACCESS` | 이 필드를 쓰는 함수/맵을 원본 검색해 **초기값 → 갱신 → 조회 → 해제** 순서를 확인한다. 숫자 카운터면 누적 또는 샘플인지 이름·갱신 조건을 구분한다. |
+
+#### enum eq_rule_operator ([L32–L35](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/rules.h#L32-L35))
+
+코드의 타입 정의다. 이 구조체는 값/포인터 형태로 호출자와 BPF map 사이에서 전달될 수 있으므로 실제 사용 위치를 확인한다.
+
+```c
+enum eq_rule_operator {
+    EQ_OP_EQ = 1, EQ_OP_NE, EQ_OP_IN, EQ_OP_NOT_IN, EQ_OP_PREFIX,
+    EQ_OP_GT, EQ_OP_GE, EQ_OP_LT, EQ_OP_LE
+};
+```
+
+| 선언(자료형 포함) | 데이터 소유·접근 시 확인할 점 |
+|---|---|
+| `EQ_OP_EQ = 1, EQ_OP_NE, EQ_OP_IN, EQ_OP_NOT_IN, EQ_OP_PREFIX,` | 이 필드를 쓰는 함수/맵을 원본 검색해 **초기값 → 갱신 → 조회 → 해제** 순서를 확인한다. 숫자 카운터면 누적 또는 샘플인지 이름·갱신 조건을 구분한다. |
+| `EQ_OP_GT, EQ_OP_GE, EQ_OP_LT, EQ_OP_LE` | 이 필드를 쓰는 함수/맵을 원본 검색해 **초기값 → 갱신 → 조회 → 해제** 순서를 확인한다. 숫자 카운터면 누적 또는 샘플인지 이름·갱신 조건을 구분한다. |
+
+#### enum eq_overload_policy ([L36–L39](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/rules.h#L36-L39))
+
+코드의 타입 정의다. 이 구조체는 값/포인터 형태로 호출자와 BPF map 사이에서 전달될 수 있으므로 실제 사용 위치를 확인한다.
+
+```c
+enum eq_overload_policy {
+    EQ_COLLECTION = 0, EQ_POLICY_QUARANTINE = 1,
+    EQ_POLICY_EXEMPT = 2
+};
+```
+
+| 선언(자료형 포함) | 데이터 소유·접근 시 확인할 점 |
+|---|---|
+| `EQ_COLLECTION = 0, EQ_POLICY_QUARANTINE = 1,` | 이 필드를 쓰는 함수/맵을 원본 검색해 **초기값 → 갱신 → 조회 → 해제** 순서를 확인한다. 숫자 카운터면 누적 또는 샘플인지 이름·갱신 조건을 구분한다. |
+| `EQ_POLICY_EXEMPT = 2` | 이 필드를 쓰는 함수/맵을 원본 검색해 **초기값 → 갱신 → 조회 → 해제** 순서를 확인한다. 숫자 카운터면 누적 또는 샘플인지 이름·갱신 조건을 구분한다. |
+
+#### enum eq_truth ([L40–L40](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/rules.h#L40-L40))
+
+코드의 타입 정의다. 이 구조체는 값/포인터 형태로 호출자와 BPF map 사이에서 전달될 수 있으므로 실제 사용 위치를 확인한다.
+
+```c
+enum eq_truth { EQ_FALSE = 0, EQ_TRUE = 1, EQ_UNKNOWN = 2 };
+```
+
+
+#### struct eq_rule_token ([L42–L45](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/rules.h#L42-L45))
+
+opcode, field, comparison, value_count, 최대 4개 64비트 operand. 각 48바이트.
+
+```c
+struct eq_rule_token {
+    unsigned opcode, field, comparison, value_count;
+    long long values[EQ_RULE_VALUES];
+};
+```
+
+| 선언(자료형 포함) | 데이터 소유·접근 시 확인할 점 |
+|---|---|
+| `unsigned opcode, field, comparison, value_count;` | 이 필드를 쓰는 함수/맵을 원본 검색해 **초기값 → 갱신 → 조회 → 해제** 순서를 확인한다. 숫자 카운터면 누적 또는 샘플인지 이름·갱신 조건을 구분한다. |
+| `long long values[EQ_RULE_VALUES];` | 이 필드를 쓰는 함수/맵을 원본 검색해 **초기값 → 갱신 → 조회 → 해제** 순서를 확인한다. 숫자 카운터면 누적 또는 샘플인지 이름·갱신 조건을 구분한다. |
+
+#### struct eq_rule_program ([L46–L52](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/rules.h#L46-L52))
+
+하나의 고정 2256B compiled rule 프로그램과 토큰 배열·문자열 pool·정책.
+
+```c
+struct eq_rule_program {
+    unsigned id, enabled, precedence, priority;
+    unsigned overload_policy, token_count, string_bytes, reserved;
+    struct eq_quarantine_config quarantine;
+    struct eq_rule_token tokens[EQ_RULE_TOKENS];
+    char strings[EQ_RULE_STRINGS];
+};
+```
+
+| 선언(자료형 포함) | 데이터 소유·접근 시 확인할 점 |
+|---|---|
+| `unsigned id, enabled, precedence, priority;` | 이 필드를 쓰는 함수/맵을 원본 검색해 **초기값 → 갱신 → 조회 → 해제** 순서를 확인한다. 숫자 카운터면 누적 또는 샘플인지 이름·갱신 조건을 구분한다. |
+| `unsigned overload_policy, token_count, string_bytes, reserved;` | 이 필드를 쓰는 함수/맵을 원본 검색해 **초기값 → 갱신 → 조회 → 해제** 순서를 확인한다. 숫자 카운터면 누적 또는 샘플인지 이름·갱신 조건을 구분한다. |
+| `struct eq_quarantine_config quarantine;` | 이 필드를 쓰는 함수/맵을 원본 검색해 **초기값 → 갱신 → 조회 → 해제** 순서를 확인한다. 숫자 카운터면 누적 또는 샘플인지 이름·갱신 조건을 구분한다. |
+| `struct eq_rule_token tokens[EQ_RULE_TOKENS];` | 이 필드를 쓰는 함수/맵을 원본 검색해 **초기값 → 갱신 → 조회 → 해제** 순서를 확인한다. 숫자 카운터면 누적 또는 샘플인지 이름·갱신 조건을 구분한다. |
+| `char strings[EQ_RULE_STRINGS];` | 이 필드를 쓰는 함수/맵을 원본 검색해 **초기값 → 갱신 → 조회 → 해제** 순서를 확인한다. 숫자 카운터면 누적 또는 샘플인지 이름·갱신 조건을 구분한다. |
+
+#### struct eq_rule_file_header ([L53–L55](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/rules.h#L53-L55))
+
+magic/version/count/program_size/payload_crc32가 있는 rules.bin 헤더.
+
+```c
+struct eq_rule_file_header {
+    unsigned magic, version, count, program_size, payload_crc32;
+};
+```
+
+| 선언(자료형 포함) | 데이터 소유·접근 시 확인할 점 |
+|---|---|
+| `unsigned magic, version, count, program_size, payload_crc32;` | 이 필드를 쓰는 함수/맵을 원본 검색해 **초기값 → 갱신 → 조회 → 해제** 순서를 확인한다. 숫자 카운터면 누적 또는 샘플인지 이름·갱신 조건을 구분한다. |
+
+#### struct eq_rule_input ([L56–L61](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/rules.h#L56-L61))
+
+BPF가 현재 이벤트의 경로·flags·UID·PID·cgroup·kind를 evaluator에 전달하는 읽기형 입력.
+
+```c
+struct eq_rule_input {
+    unsigned kind, flags, path_quality, uid, pid;
+    long long result;
+    unsigned long long cgroup_id;
+    const char *path, *comm;
+};
+```
+
+| 선언(자료형 포함) | 데이터 소유·접근 시 확인할 점 |
+|---|---|
+| `unsigned kind, flags, path_quality, uid, pid;` | 이 필드를 쓰는 함수/맵을 원본 검색해 **초기값 → 갱신 → 조회 → 해제** 순서를 확인한다. 숫자 카운터면 누적 또는 샘플인지 이름·갱신 조건을 구분한다. |
+| `long long result;` | 이 필드를 쓰는 함수/맵을 원본 검색해 **초기값 → 갱신 → 조회 → 해제** 순서를 확인한다. 숫자 카운터면 누적 또는 샘플인지 이름·갱신 조건을 구분한다. |
+| `unsigned long long cgroup_id;` | 이 필드를 쓰는 함수/맵을 원본 검색해 **초기값 → 갱신 → 조회 → 해제** 순서를 확인한다. 숫자 카운터면 누적 또는 샘플인지 이름·갱신 조건을 구분한다. |
+| `const char *path, *comm;` | 이 필드를 쓰는 함수/맵을 원본 검색해 **초기값 → 갱신 → 조회 → 해제** 순서를 확인한다. 숫자 카운터면 누적 또는 샘플인지 이름·갱신 조건을 구분한다. |
+
+#### struct eq_rule_stats ([L62–L66](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/rules.h#L62-L66))
+
+커널 규칙별 evaluated/matched/unknown/selected/submitted/summarized/ring_failed 등의 누적값.
+
+```c
+struct eq_rule_stats {
+    unsigned long long evaluated, matched, unknown, selected;
+    unsigned long long submitted, summarized, ring_failed;
+    unsigned long long budget_suppress, budget_contention;
+};
+```
+
+| 선언(자료형 포함) | 데이터 소유·접근 시 확인할 점 |
+|---|---|
+| `unsigned long long evaluated, matched, unknown, selected;` | 이 필드를 쓰는 함수/맵을 원본 검색해 **초기값 → 갱신 → 조회 → 해제** 순서를 확인한다. 숫자 카운터면 누적 또는 샘플인지 이름·갱신 조건을 구분한다. |
+| `unsigned long long submitted, summarized, ring_failed;` | 이 필드를 쓰는 함수/맵을 원본 검색해 **초기값 → 갱신 → 조회 → 해제** 순서를 확인한다. 숫자 카운터면 누적 또는 샘플인지 이름·갱신 조건을 구분한다. |
+| `unsigned long long budget_suppress, budget_contention;` | 이 필드를 쓰는 함수/맵을 원본 검색해 **초기값 → 갱신 → 조회 → 해제** 순서를 확인한다. 숫자 카운터면 누적 또는 샘플인지 이름·갱신 조건을 구분한다. |
+
+### [collector.c](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/collector.c)
+
+
+#### struct lane ([L38–L45](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/collector.c#L38-L45))
+
+C 사용자 공간 한 raw lane의 FILE·queue·capacity/head/count·durable 통계·조건변수.
+
+```c
+struct lane {
+    FILE *file;
+    struct eq_event *queue;
+    size_t capacity, head, count;
+    uint64_t received, durable, observed, admitted, queue_overflow, high_water;
+    int closed, in_flight;
+    pthread_cond_t ready;
+};
+```
+
+| 선언(자료형 포함) | 데이터 소유·접근 시 확인할 점 |
+|---|---|
+| `FILE *file;` | 이 필드를 쓰는 함수/맵을 원본 검색해 **초기값 → 갱신 → 조회 → 해제** 순서를 확인한다. 숫자 카운터면 누적 또는 샘플인지 이름·갱신 조건을 구분한다. |
+| `struct eq_event *queue;` | 이 필드를 쓰는 함수/맵을 원본 검색해 **초기값 → 갱신 → 조회 → 해제** 순서를 확인한다. 숫자 카운터면 누적 또는 샘플인지 이름·갱신 조건을 구분한다. |
+| `size_t capacity, head, count;` | 이 필드를 쓰는 함수/맵을 원본 검색해 **초기값 → 갱신 → 조회 → 해제** 순서를 확인한다. 숫자 카운터면 누적 또는 샘플인지 이름·갱신 조건을 구분한다. |
+| `uint64_t received, durable, observed, admitted, queue_overflow, high_water;` | 이 필드를 쓰는 함수/맵을 원본 검색해 **초기값 → 갱신 → 조회 → 해제** 순서를 확인한다. 숫자 카운터면 누적 또는 샘플인지 이름·갱신 조건을 구분한다. |
+| `int closed, in_flight;` | 이 필드를 쓰는 함수/맵을 원본 검색해 **초기값 → 갱신 → 조회 → 해제** 순서를 확인한다. 숫자 카운터면 누적 또는 샘플인지 이름·갱신 조건을 구분한다. |
+| `pthread_cond_t ready;` | 이 필드를 쓰는 함수/맵을 원본 검색해 **초기값 → 갱신 → 조회 → 해제** 순서를 확인한다. 숫자 카운터면 누적 또는 샘플인지 이름·갱신 조건을 구분한다. |
+
+#### enum loss_reason ([L54–L54](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/collector.c#L54-L54))
+
+코드의 타입 정의다. 이 구조체는 값/포인터 형태로 호출자와 BPF map 사이에서 전달될 수 있으므로 실제 사용 위치를 확인한다.
+
+```c
+enum loss_reason { GENERAL_QUOTA, RAW_QUOTA, QUEUE_FULL, Q_STORAGE_LIMIT };
+```
+
+
+#### struct meta_item ([L55–L62](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/collector.c#L55-L62))
+
+metadata 큐에 보낼 checkpoint/loss/control payload 또는 event witness.
+
+```c
+struct meta_item {
+    char *payload;
+    size_t length;
+    struct eq_event event;
+    enum loss_reason reason;
+    int loss, terminal, lane, control;
+    struct eq_quarantine_control transition;
+};
+```
+
+| 선언(자료형 포함) | 데이터 소유·접근 시 확인할 점 |
+|---|---|
+| `char *payload;` | 이 필드를 쓰는 함수/맵을 원본 검색해 **초기값 → 갱신 → 조회 → 해제** 순서를 확인한다. 숫자 카운터면 누적 또는 샘플인지 이름·갱신 조건을 구분한다. |
+| `size_t length;` | 이 필드를 쓰는 함수/맵을 원본 검색해 **초기값 → 갱신 → 조회 → 해제** 순서를 확인한다. 숫자 카운터면 누적 또는 샘플인지 이름·갱신 조건을 구분한다. |
+| `struct eq_event event;` | 이 필드를 쓰는 함수/맵을 원본 검색해 **초기값 → 갱신 → 조회 → 해제** 순서를 확인한다. 숫자 카운터면 누적 또는 샘플인지 이름·갱신 조건을 구분한다. |
+| `enum loss_reason reason;` | 이 필드를 쓰는 함수/맵을 원본 검색해 **초기값 → 갱신 → 조회 → 해제** 순서를 확인한다. 숫자 카운터면 누적 또는 샘플인지 이름·갱신 조건을 구분한다. |
+| `int loss, terminal, lane, control;` | 이 필드를 쓰는 함수/맵을 원본 검색해 **초기값 → 갱신 → 조회 → 해제** 순서를 확인한다. 숫자 카운터면 누적 또는 샘플인지 이름·갱신 조건을 구분한다. |
+| `struct eq_quarantine_control transition;` | 이 필드를 쓰는 함수/맵을 원본 검색해 **초기값 → 갱신 → 조회 → 해제** 순서를 확인한다. 숫자 카운터면 누적 또는 샘플인지 이름·갱신 조건을 구분한다. |
+
+#### struct stream_storage ([L74–L79](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/collector.c#L74-L79))
+
+C 사용자 공간 (cgroup,rule,kind)별 append/durable/queue/storage 거부 통계.
+
+```c
+struct stream_storage {
+    struct eq_quarantine_key key;
+    uint64_t appended[3], durable[3]; /* normal critical, Q initial, Q periodic */
+    uint64_t queue_rejected[2], storage_rejected[2];
+    int used;
+};
+```
+
+| 선언(자료형 포함) | 데이터 소유·접근 시 확인할 점 |
+|---|---|
+| `struct eq_quarantine_key key;` | 이 필드를 쓰는 함수/맵을 원본 검색해 **초기값 → 갱신 → 조회 → 해제** 순서를 확인한다. 숫자 카운터면 누적 또는 샘플인지 이름·갱신 조건을 구분한다. |
+| `uint64_t appended[3], durable[3]; /* normal critical, Q initial, Q periodic */` | 이 필드를 쓰는 함수/맵을 원본 검색해 **초기값 → 갱신 → 조회 → 해제** 순서를 확인한다. 숫자 카운터면 누적 또는 샘플인지 이름·갱신 조건을 구분한다. |
+| `uint64_t queue_rejected[2], storage_rejected[2];` | 이 필드를 쓰는 함수/맵을 원본 검색해 **초기값 → 갱신 → 조회 → 해제** 순서를 확인한다. 숫자 카운터면 누적 또는 샘플인지 이름·갱신 조건을 구분한다. |
+| `int used;` | 이 필드를 쓰는 함수/맵을 원본 검색해 **초기값 → 갱신 → 조회 → 해제** 순서를 확인한다. 숫자 카운터면 누적 또는 샘플인지 이름·갱신 조건을 구분한다. |
+
+#### struct rule_storage ([L83–L86](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/collector.c#L83-L86))
+
+C 사용자 공간 rule id별 observed/appended/durable/queue/quota 계수.
+
+```c
+struct rule_storage {
+    uint64_t observed[LANE_COUNT], appended[LANE_COUNT], durable[LANE_COUNT];
+    uint64_t queue_rejected[LANE_COUNT], quota_rejected[LANE_COUNT];
+};
+```
+
+| 선언(자료형 포함) | 데이터 소유·접근 시 확인할 점 |
+|---|---|
+| `uint64_t observed[LANE_COUNT], appended[LANE_COUNT], durable[LANE_COUNT];` | 이 필드를 쓰는 함수/맵을 원본 검색해 **초기값 → 갱신 → 조회 → 해제** 순서를 확인한다. 숫자 카운터면 누적 또는 샘플인지 이름·갱신 조건을 구분한다. |
+| `uint64_t queue_rejected[LANE_COUNT], quota_rejected[LANE_COUNT];` | 이 필드를 쓰는 함수/맵을 원본 검색해 **초기값 → 갱신 → 조회 → 해제** 순서를 확인한다. 숫자 카운터면 누적 또는 샘플인지 이름·갱신 조건을 구분한다. |
+
+#### struct drain_context ([L595–L595](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/collector.c#L595-L595))
+
+코드의 타입 정의다. 이 구조체는 값/포인터 형태로 호출자와 BPF map 사이에서 전달될 수 있으므로 실제 사용 위치를 확인한다.
+
+```c
+struct drain_context { struct ring_buffer *rings[RING_COUNT]; };
+```
+
+
+### [sensor.bpf.c](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/sensor.bpf.c)
+
+
+#### struct pending_open ([L15–L15](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/sensor.bpf.c#L15-L15))
+
+openat entry의 path/flags/캡처 상태를 syscall exit까지 보존.
+
+```c
+struct pending_open { char path[EQ_PATH]; __u32 flags, captured_len, quality; };
+```
+
+
+#### struct eq_rule_lookup_scratch ([L87–L92](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/sensor.bpf.c#L87-L92))
+
+BPF 규칙 평가 stack 및 문자열 인수용 per-CPU scratch.
+
+```c
+struct eq_rule_lookup_scratch {
+    struct eq_rule_trie_key path, comm;
+    volatile unsigned long long eval_stack;
+    volatile unsigned eval_depth;
+    unsigned long long busy;
+};
+```
+
+| 선언(자료형 포함) | 데이터 소유·접근 시 확인할 점 |
+|---|---|
+| `struct eq_rule_trie_key path, comm;` | 이 필드를 쓰는 함수/맵을 원본 검색해 **초기값 → 갱신 → 조회 → 해제** 순서를 확인한다. 숫자 카운터면 누적 또는 샘플인지 이름·갱신 조건을 구분한다. |
+| `volatile unsigned long long eval_stack;` | 이 필드를 쓰는 함수/맵을 원본 검색해 **초기값 → 갱신 → 조회 → 해제** 순서를 확인한다. 숫자 카운터면 누적 또는 샘플인지 이름·갱신 조건을 구분한다. |
+| `volatile unsigned eval_depth;` | 이 필드를 쓰는 함수/맵을 원본 검색해 **초기값 → 갱신 → 조회 → 해제** 순서를 확인한다. 숫자 카운터면 누적 또는 샘플인지 이름·갱신 조건을 구분한다. |
+| `unsigned long long busy;` | 이 필드를 쓰는 함수/맵을 원본 검색해 **초기값 → 갱신 → 조회 → 해제** 순서를 확인한다. 숫자 카운터면 누적 또는 샘플인지 이름·갱신 조건을 구분한다. |
+
+#### struct eq_match_walk ([L123–L127](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/sensor.bpf.c#L123-L127))
+
+BPF rule iterator callback이 공유하는 input/lookup/승리 슬롯.
+
+```c
+struct eq_match_walk {
+    const struct eq_rule_input *input;
+    struct eq_rule_lookup_scratch *lookup;
+    int winner;
+};
+```
+
+| 선언(자료형 포함) | 데이터 소유·접근 시 확인할 점 |
+|---|---|
+| `const struct eq_rule_input *input;` | 이 필드를 쓰는 함수/맵을 원본 검색해 **초기값 → 갱신 → 조회 → 해제** 순서를 확인한다. 숫자 카운터면 누적 또는 샘플인지 이름·갱신 조건을 구분한다. |
+| `struct eq_rule_lookup_scratch *lookup;` | 이 필드를 쓰는 함수/맵을 원본 검색해 **초기값 → 갱신 → 조회 → 해제** 순서를 확인한다. 숫자 카운터면 누적 또는 샘플인지 이름·갱신 조건을 구분한다. |
+| `int winner;` | 이 필드를 쓰는 함수/맵을 원본 검색해 **초기값 → 갱신 → 조회 → 해제** 순서를 확인한다. 숫자 카운터면 누적 또는 샘플인지 이름·갱신 조건을 구분한다. |
+
+### eBPF Map 실제 선언과 사용 규칙
+
+
+### 사용자 공간과 커널의 주요 전역 상태
+
+| 변수/Map | 누가 만들고 수정하는가 | 언제 사라지는가 |
+|---|---|---|
+| `lanes[3]` | `collector.c`의 static 전역. `queue_init`로 각 큐 calloc; ring callback과 writer가 `state_lock`을 써서 공유. | collector 종료에서 `queue_destroy`; FILE fclose |
+| `state_lock` | 정적 PTHREAD_MUTEX_INITIALIZER; callback/writer/metadata의 공유 카운터 보호. | 프로세스 종료, 명시 파괴 없음 |
+| `metadata` | static 전역 및 `meta_init` queue; `write_metadata` 소유 FILE. | `meta_close`→writer join→`meta_destroy` |
+| `stream_storage[EQ_STREAMS]` | `storage_for`에서 open addressing; `state_lock` 필요. | run 동안 삭제하지 않는 static table |
+| `rule_storage[256]` | 수신·저장·durable rule 통계; C `save_event`·`write_lane`·`sync_lane`. | 프로세스 종료 |
+| `tenants` | BPF map cgroup별 seq/counters; `emit`에서 atomic 갱신. | skeleton BPF 해제 후 |
+| `quarantine_streams` | BPF map 개별 격리 상태; `eq_q_step`에서 보유한 CAS owner가 engine 수정. | skeleton BPF 해제 후 |
+| `pending` | BPF HASH로 entry/exit 경로 pairing; 완료 시 delete. | 각 호출 후 및 skeleton 해제 |
+| `rule_strings` | C `install_rule_strings`가 초기 trie 키 설치; BPF 평가 함수가 조회. | skeleton 해제 |
+| `exec_scratch`, `rule_lookup_scratch` | PERCPU_ARRAY, 큰 임시 구조체를 512B BPF stack 대신 사용. | skeleton 해제 |
+
+**구조체 레이아웃 주의**: 실제 C의 padding/alignment는 ABI와 컴파일 옵션에 좌우된다. 이 프로젝트는 `_Static_assert`로 이벤트·레코드·rule 구조 크기를 고정했고, Python은 `struct.Struct`로 endian/길이를 맞춘다. 의미가 같아 보이는 두 구조체라도 `sizeof`나 필드 순서를 함부로 바꿔서는 안 된다.
+
 
 # PART 6. eBPF와 Linux 커널
 
@@ -9264,7 +9868,164 @@ WantedBy=multi-user.target
 ```
 이 logrotate는 `collector.log`/`service.log`/`indexer.log`의 *진단 텍스트 로그만* 대상으로 한다. raw·메타데이터·기존 run은 자동 삭제/회전 대상으로 설정돼 있지 않다.
 
-<!-- PART10_EXAMPLES -->
+
+## examples/의 실제 규칙 설정 파일
+
+
+### [examples/A-nonroot-etc-write.json](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/examples/A-nonroot-etc-write.json)
+
+```json
+{
+  "bulk_rate": 500,
+  "bulk_burst": 1000,
+  "protected_path": "/tmp/mglogwh-decoy.txt",
+  "max_raw_mib": 512,
+  "critical_reserve_mib": 64,
+  "max_index_mib": 256,
+  "minimum_free_mib": 1024,
+  "metadata_max_mib": 16,
+  "critical_rate_threshold": 10000,
+  "critical_rate_duration_seconds": 3,
+  "critical_recovery_threshold": 2000,
+  "critical_recovery_duration_seconds": 10,
+  "quarantine_initial_full_events": 8,
+  "quarantine_sample_interval_ms": 100,
+  "quarantine_max_mib": 16,
+  "event_rules": [
+    {
+      "id": 1,
+      "priority": "CRITICAL",
+      "overload_policy": "QUARANTINE",
+      "when": {
+        "all": [
+          {"field": "event_type", "op": "eq", "value": "openat"},
+          {"field": "path", "op": "prefix", "value": "/etc/"},
+          {"field": "uid", "op": "ne", "value": 0},
+          {"field": "write_access", "op": "eq", "value": true},
+          {"field": "success", "op": "eq", "value": true}
+        ]
+      }
+    }
+  ]
+}
+```
+
+이 설정은 `manage.config`의 중복키·범위·규칙 검증을 거친 다음, legacy면 `legacy_program`, advanced면 `compile_rule_file`을 통해 collector에 전달된다. `when`에 맞지 않는 이벤트는 구성된 경로/중요도 규칙이 적용되지 않는다.
+
+### [examples/B-cgroup-shell-exec.json](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/examples/B-cgroup-shell-exec.json)
+
+```json
+{
+  "bulk_rate": 500,
+  "bulk_burst": 1000,
+  "protected_path": "/tmp/mglogwh-decoy.txt",
+  "max_raw_mib": 512,
+  "critical_reserve_mib": 64,
+  "max_index_mib": 256,
+  "minimum_free_mib": 1024,
+  "metadata_max_mib": 16,
+  "critical_rate_threshold": 10000,
+  "critical_rate_duration_seconds": 3,
+  "critical_recovery_threshold": 2000,
+  "critical_recovery_duration_seconds": 10,
+  "quarantine_initial_full_events": 8,
+  "quarantine_sample_interval_ms": 100,
+  "quarantine_max_mib": 16,
+  "event_rules": [
+    {
+      "id": 2,
+      "priority": "CRITICAL",
+      "overload_policy": "QUARANTINE",
+      "when": {
+        "all": [
+          {"field": "event_type", "op": "eq", "value": "exec"},
+          {"field": "cgroup_id", "op": "eq", "value": 12345},
+          {"field": "comm", "op": "in", "value": ["bash", "python3"]}
+        ]
+      }
+    }
+  ]
+}
+```
+
+이 설정은 `manage.config`의 중복키·범위·규칙 검증을 거친 다음, legacy면 `legacy_program`, advanced면 `compile_rule_file`을 통해 collector에 전달된다. `when`에 맞지 않는 이벤트는 구성된 경로/중요도 규칙이 적용되지 않는다.
+
+### [examples/C-shadow-exempt.json](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/examples/C-shadow-exempt.json)
+
+```json
+{
+  "bulk_rate": 500,
+  "bulk_burst": 1000,
+  "protected_path": "/tmp/mglogwh-decoy.txt",
+  "max_raw_mib": 512,
+  "critical_reserve_mib": 64,
+  "max_index_mib": 256,
+  "minimum_free_mib": 1024,
+  "metadata_max_mib": 16,
+  "critical_rate_threshold": 10000,
+  "critical_rate_duration_seconds": 3,
+  "critical_recovery_threshold": 2000,
+  "critical_recovery_duration_seconds": 10,
+  "quarantine_initial_full_events": 8,
+  "quarantine_sample_interval_ms": 100,
+  "quarantine_max_mib": 16,
+  "event_rules": [
+    {
+      "id": 3,
+      "precedence": 100,
+      "priority": "CRITICAL",
+      "overload_policy": "QUARANTINE_EXEMPT",
+      "when": {
+        "all": [
+          {"field": "event_type", "op": "eq", "value": "openat"},
+          {"field": "path", "op": "eq", "value": "/etc/shadow"}
+        ]
+      }
+    }
+  ]
+}
+```
+
+이 설정은 `manage.config`의 중복키·범위·규칙 검증을 거친 다음, legacy면 `legacy_program`, advanced면 `compile_rule_file`을 통해 collector에 전달된다. `when`에 맞지 않는 이벤트는 구성된 경로/중요도 규칙이 적용되지 않는다.
+
+### [examples/D-uid-specific-file.json](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/examples/D-uid-specific-file.json)
+
+```json
+{
+  "bulk_rate": 500,
+  "bulk_burst": 1000,
+  "protected_path": "/tmp/mglogwh-decoy.txt",
+  "max_raw_mib": 512,
+  "critical_reserve_mib": 64,
+  "max_index_mib": 256,
+  "minimum_free_mib": 1024,
+  "metadata_max_mib": 16,
+  "critical_rate_threshold": 10000,
+  "critical_rate_duration_seconds": 3,
+  "critical_recovery_threshold": 2000,
+  "critical_recovery_duration_seconds": 10,
+  "quarantine_initial_full_events": 8,
+  "quarantine_sample_interval_ms": 100,
+  "quarantine_max_mib": 16,
+  "event_rules": [
+    {
+      "id": 4,
+      "priority": "CRITICAL",
+      "overload_policy": "QUARANTINE",
+      "when": {
+        "all": [
+          {"field": "event_type", "op": "eq", "value": "openat"},
+          {"field": "uid", "op": "eq", "value": 1001},
+          {"field": "path", "op": "eq", "value": "/srv/finance/payroll.csv"}
+        ]
+      }
+    }
+  ]
+}
+```
+
+이 설정은 `manage.config`의 중복키·범위·규칙 검증을 거친 다음, legacy면 `legacy_program`, advanced면 `compile_rule_file`을 통해 collector에 전달된다. `when`에 맞지 않는 이벤트는 구성된 경로/중요도 규칙이 적용되지 않는다.
+
 
 # PART 11. 모든 테스트 로직 분석
 
