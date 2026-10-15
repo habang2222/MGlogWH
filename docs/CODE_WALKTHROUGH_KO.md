@@ -10031,7 +10031,5181 @@ WantedBy=multi-user.target
 
 테스트마다 작성된 입력, 검증하려는 조건·단언식과 성공/실패 의미를 실제 테스트 함수 코드로 보여준다. **이 문서 생성 중 실행하지 않았다.** 정상·오류 경로의 단위 테스트가 실환경 커널 부하·장기간 안정성을 자동 보장하지 않는다.
 
-<!-- PART11_INSERT -->
+
+## 11.1 테스트를 읽을 때의 검증 규칙
+
+- **입력**: `setUp`·fixture 작성 함수와 `with ...` 내부의 임시 run/file/JSON 값이 테스트 입력이다. 같은 이름의 `test_...`라도 순서에 의존해서는 안 된다.
+- **성공 조건**: 실제 `assert`/`self.assert...`/`assertRaises` 명령 또는 C `assert`/테스트 매크로의 검사식이 참이어야 한다.
+- **실패 조건**: 잘못된 CRC·파일 상태·타입·경계값에 대해 예외나 특정 오류 상태가 발생함을 검증한다. 테스트 실패 시 데이터 변경 여부까지 검사하는 경우 그 부분을 별도로 해석한다.
+- **검증 범위**: fake event/가상 시간 테스트는 커널 로드·메모리 경합·디스크 장애 전체를 재현한 것이 아니다. `test_live.py`·`test_budget.py`는 실제 환경의 별도 통합 시험이므로 명시 실행과 적절한 권한이 필요하다.
+
+
+## test_manage.py — 설정·ABI·인덱스·경로 및 lock·파일안전
+
+[원본 전체](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py); 추출한 메서드·함수 57개. 다음 각 테스트 함수는 **코드 전체**와 검증 표현식을 같이 싣는다.
+
+
+#### record — [test_manage.py:16–21](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L16-L21)
+
+**정의 위치·목적**: 원하는 필드를 갖는 임의 raw record를 생성한다. 입력으로 준비한 fixture 또는 실제 시험용 경로를 사용한다.
+
+**매개변수/반환 및 실행 관계**: `def record(seq=1, priority=1, path=b'/tmp/file', schema=1, quality=0):`를 확인한다. `self`는 unittest 인스턴스이며, 인자가 있는 helper는 테스트의 setup/record 생성 시 전달받는다. 명시적 `return`이 없다면 `None`을 반환하고 성공 판단은 예외/단언문으로 한다. 본문에서 관찰되는 호출 이름: `record`, `pack`, `crc32`.
+
+**입력·상태 변경 지점(원본)**:
+- [L19](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L19) `return payload + struct.pack('<II', zlib.crc32(payload), 0)`
+
+**성공 조건·실패 조건을 표현한 실제 검사식**:
+- 직접 `assert`하지 않는 fixture helper다. 이를 호출하는 개별 `test_*` 메서드의 검사식을 봐야 한다.
+
+**검증 범위와 한계**: 이 함수는 위에 명시한 입력·성공 조건까지 검사한다. 가상 데이터/SQLite/원장 fixture의 통과는 커널 eBPF verifier, 실제 드라이브 전원 장애 또는 타 Linux 버전의 수집 무손실을 검증하지 못한다. `assertRaises`는 오류가 발생해야 통과하며, 정상 실행을 확인하는 검사와 방향이 반대다. 테스트용 정해진 ID/시간/경로는 서비스의 실제 고정값이 아니다.
+
+**원본 함수 전체**
+
+```python
+def record(seq=1, priority=1, path=b'/tmp/file', schema=1, quality=0):
+    payload = eq.EVENT.pack(10, 20, seq, 30, 0, 0x31514f45, schema, 2, priority,
+                            40, 40, 1000, 1, 0, 0, len(path), quality, b'test', path)
+    return payload + struct.pack('<II', zlib.crc32(payload), 0)
+```
+
+#### setUp — [test_manage.py:23–33](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L23-L33)
+
+**정의 위치·목적**: 각 unit test 앞에서 fixture 저장소·기본 자료를 준비한다. 입력으로 준비한 fixture 또는 실제 시험용 경로를 사용한다.
+
+**매개변수/반환 및 실행 관계**: `def setUp(self):`를 확인한다. `self`는 unittest 인스턴스이며, 인자가 있는 helper는 테스트의 setup/record 생성 시 전달받는다. 명시적 `return`이 없다면 `None`을 반환하고 성공 판단은 예외/단언문으로 한다. 본문에서 관찰되는 호출 이름: `setUp`, `TemporaryDirectory`, `Path`, `config`, `atomic_json`, `write_bytes`, `record`, `save_health`.
+
+**입력·상태 변경 지점(원본)**:
+- [L24](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L24) `self.temp = tempfile.TemporaryDirectory(prefix='eq-unit-')`
+- [L25](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L25) `self.run = Path(self.temp.name)`
+- [L26](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L26) `self.cfg = eq.config(eq.ROOT / 'config.json')`
+- [L27](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L27) `eq.atomic_json(self.run / 'config.json', self.cfg)`
+- [L28](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L28) `eq.atomic_json(self.run / 'manifest.json', dict(run_id='test', config_sha256='cfg', bpf_sha256='obj'))`
+- [L29](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L29) `(self.run / 'critical.raw').write_bytes(b'')`
+- [L30](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L30) `(self.run / 'general.raw').write_bytes(record())`
+
+**성공 조건·실패 조건을 표현한 실제 검사식**:
+- 직접 `assert`하지 않는 fixture helper다. 이를 호출하는 개별 `test_*` 메서드의 검사식을 봐야 한다.
+
+**검증 범위와 한계**: 이 함수는 위에 명시한 입력·성공 조건까지 검사한다. 가상 데이터/SQLite/원장 fixture의 통과는 커널 eBPF verifier, 실제 드라이브 전원 장애 또는 타 Linux 버전의 수집 무손실을 검증하지 못한다. `assertRaises`는 오류가 발생해야 통과하며, 정상 실행을 확인하는 검사와 방향이 반대다. 테스트용 정해진 ID/시간/경로는 서비스의 실제 고정값이 아니다.
+
+**원본 함수 전체**
+
+```python
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory(prefix='eq-unit-')
+        self.run = Path(self.temp.name)
+        self.cfg = eq.config(eq.ROOT / 'config.json')
+        eq.atomic_json(self.run / 'config.json', self.cfg)
+        eq.atomic_json(self.run / 'manifest.json', dict(run_id='test', config_sha256='cfg', bpf_sha256='obj'))
+        (self.run / 'critical.raw').write_bytes(b'')
+        (self.run / 'general.raw').write_bytes(record())
+        self.health = dict(state='STOPPED', durable={'critical.raw': 0, 'general.raw': 240})
+        self.save_health()
+```
+
+#### tearDown — [test_manage.py:34–36](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L34-L36)
+
+**정의 위치·목적**: 각 unit test 뒤에 임시 파일과 상태를 정리한다. 입력으로 준비한 fixture 또는 실제 시험용 경로를 사용한다.
+
+**매개변수/반환 및 실행 관계**: `def tearDown(self):`를 확인한다. `self`는 unittest 인스턴스이며, 인자가 있는 helper는 테스트의 setup/record 생성 시 전달받는다. 명시적 `return`이 없다면 `None`을 반환하고 성공 판단은 예외/단언문으로 한다. 본문에서 관찰되는 호출 이름: `tearDown`, `cleanup`.
+
+**입력·상태 변경 지점(원본)**:
+- 이 함수가 fixture 전역값·기본 객체를 그대로 사용하거나 순수하게 값을 계산한다.
+
+**성공 조건·실패 조건을 표현한 실제 검사식**:
+- 직접 `assert`하지 않는 fixture helper다. 이를 호출하는 개별 `test_*` 메서드의 검사식을 봐야 한다.
+
+**검증 범위와 한계**: 이 함수는 위에 명시한 입력·성공 조건까지 검사한다. 가상 데이터/SQLite/원장 fixture의 통과는 커널 eBPF verifier, 실제 드라이브 전원 장애 또는 타 Linux 버전의 수집 무손실을 검증하지 못한다. `assertRaises`는 오류가 발생해야 통과하며, 정상 실행을 확인하는 검사와 방향이 반대다. 테스트용 정해진 ID/시간/경로는 서비스의 실제 고정값이 아니다.
+
+**원본 함수 전체**
+
+```python
+    def tearDown(self):
+        self.temp.cleanup()
+```
+
+#### save_health — [test_manage.py:37–39](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L37-L39)
+
+**정의 위치·목적**: 테스트 fixture의 입력·출력을 구성한다. 입력으로 준비한 fixture 또는 실제 시험용 경로를 사용한다.
+
+**매개변수/반환 및 실행 관계**: `def save_health(self):`를 확인한다. `self`는 unittest 인스턴스이며, 인자가 있는 helper는 테스트의 setup/record 생성 시 전달받는다. 명시적 `return`이 없다면 `None`을 반환하고 성공 판단은 예외/단언문으로 한다. 본문에서 관찰되는 호출 이름: `save_health`, `atomic_json`.
+
+**입력·상태 변경 지점(원본)**:
+- [L38](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L38) `eq.atomic_json(self.run / 'health.json', self.health)`
+
+**성공 조건·실패 조건을 표현한 실제 검사식**:
+- 직접 `assert`하지 않는 fixture helper다. 이를 호출하는 개별 `test_*` 메서드의 검사식을 봐야 한다.
+
+**검증 범위와 한계**: 이 함수는 위에 명시한 입력·성공 조건까지 검사한다. 가상 데이터/SQLite/원장 fixture의 통과는 커널 eBPF verifier, 실제 드라이브 전원 장애 또는 타 Linux 버전의 수집 무손실을 검증하지 못한다. `assertRaises`는 오류가 발생해야 통과하며, 정상 실행을 확인하는 검사와 방향이 반대다. 테스트용 정해진 ID/시간/경로는 서비스의 실제 고정값이 아니다.
+
+**원본 함수 전체**
+
+```python
+    def save_health(self):
+        eq.atomic_json(self.run / 'health.json', self.health)
+```
+
+#### rows — [test_manage.py:40–43](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L40-L43)
+
+**정의 위치·목적**: 테스트 fixture의 입력·출력을 구성한다. 입력으로 준비한 fixture 또는 실제 시험용 경로를 사용한다.
+
+**매개변수/반환 및 실행 관계**: `def rows(self):`를 확인한다. `self`는 unittest 인스턴스이며, 인자가 있는 helper는 테스트의 setup/record 생성 시 전달받는다. 명시적 `return`이 없다면 `None`을 반환하고 성공 판단은 예외/단언문으로 한다. 본문에서 관찰되는 호출 이름: `rows`, `connect`, `execute`, `count`, `fetchone`.
+
+**입력·상태 변경 지점(원본)**:
+- 이 함수가 fixture 전역값·기본 객체를 그대로 사용하거나 순수하게 값을 계산한다.
+
+**성공 조건·실패 조건을 표현한 실제 검사식**:
+- 직접 `assert`하지 않는 fixture helper다. 이를 호출하는 개별 `test_*` 메서드의 검사식을 봐야 한다.
+
+**검증 범위와 한계**: 이 함수는 위에 명시한 입력·성공 조건까지 검사한다. 가상 데이터/SQLite/원장 fixture의 통과는 커널 eBPF verifier, 실제 드라이브 전원 장애 또는 타 Linux 버전의 수집 무손실을 검증하지 못한다. `assertRaises`는 오류가 발생해야 통과하며, 정상 실행을 확인하는 검사와 방향이 반대다. 테스트용 정해진 ID/시간/경로는 서비스의 실제 고정값이 아니다.
+
+**원본 함수 전체**
+
+```python
+    def rows(self):
+        with sqlite3.connect(self.run / 'index.sqlite') as db:
+            return db.execute('SELECT count(*) FROM events').fetchone()[0]
+```
+
+#### test_abi — [test_manage.py:44–47](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L44-L47)
+
+**정의 위치·목적**: abi의 정상·거부/오류 경로를 코드로 검증한다. 입력으로 준비한 fixture 또는 실제 시험용 경로를 사용한다.
+
+**매개변수/반환 및 실행 관계**: `def test_abi(self):`를 확인한다. `self`는 unittest 인스턴스이며, 인자가 있는 helper는 테스트의 setup/record 생성 시 전달받는다. 명시적 `return`이 없다면 `None`을 반환하고 성공 판단은 예외/단언문으로 한다. 본문에서 관찰되는 호출 이름: `test_abi`, `assertEqual`, `decode_record`, `record`.
+
+**입력·상태 변경 지점(원본)**:
+- 이 함수가 fixture 전역값·기본 객체를 그대로 사용하거나 순수하게 값을 계산한다.
+
+**성공 조건·실패 조건을 표현한 실제 검사식**:
+- [L45](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L45) `self.assertEqual(eq.RECORD_SIZE, 240)`
+- [L46](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L46) `self.assertEqual(eq.decode_record(record())['uid'], 1000)`
+
+**검증 범위와 한계**: 이 함수는 위에 명시한 입력·성공 조건까지 검사한다. 가상 데이터/SQLite/원장 fixture의 통과는 커널 eBPF verifier, 실제 드라이브 전원 장애 또는 타 Linux 버전의 수집 무손실을 검증하지 못한다. `assertRaises`는 오류가 발생해야 통과하며, 정상 실행을 확인하는 검사와 방향이 반대다. 테스트용 정해진 ID/시간/경로는 서비스의 실제 고정값이 아니다.
+
+**원본 함수 전체**
+
+```python
+    def test_abi(self):
+        self.assertEqual(eq.RECORD_SIZE, 240)
+        self.assertEqual(eq.decode_record(record())['uid'], 1000)
+```
+
+#### test_crc — [test_manage.py:48–51](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L48-L51)
+
+**정의 위치·목적**: crc의 정상·거부/오류 경로를 코드로 검증한다. 입력으로 준비한 fixture 또는 실제 시험용 경로를 사용한다.
+
+**매개변수/반환 및 실행 관계**: `def test_crc(self):`를 확인한다. `self`는 unittest 인스턴스이며, 인자가 있는 helper는 테스트의 setup/record 생성 시 전달받는다. 명시적 `return`이 없다면 `None`을 반환하고 성공 판단은 예외/단언문으로 한다. 본문에서 관찰되는 호출 이름: `test_crc`, `bytearray`, `record`, `assertRaises`, `decode_record`.
+
+**입력·상태 변경 지점(원본)**:
+- 이 함수가 fixture 전역값·기본 객체를 그대로 사용하거나 순수하게 값을 계산한다.
+
+**성공 조건·실패 조건을 표현한 실제 검사식**:
+- [L50](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L50) `with self.assertRaises(ValueError): eq.decode_record(raw)`
+
+**검증 범위와 한계**: 이 함수는 위에 명시한 입력·성공 조건까지 검사한다. 가상 데이터/SQLite/원장 fixture의 통과는 커널 eBPF verifier, 실제 드라이브 전원 장애 또는 타 Linux 버전의 수집 무손실을 검증하지 못한다. `assertRaises`는 오류가 발생해야 통과하며, 정상 실행을 확인하는 검사와 방향이 반대다. 테스트용 정해진 ID/시간/경로는 서비스의 실제 고정값이 아니다.
+
+**원본 함수 전체**
+
+```python
+    def test_crc(self):
+        raw = bytearray(record()); raw[20] ^= 1
+        with self.assertRaises(ValueError): eq.decode_record(raw)
+```
+
+#### test_partial — [test_manage.py:52–54](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L52-L54)
+
+**정의 위치·목적**: partial의 정상·거부/오류 경로를 코드로 검증한다. 입력으로 준비한 fixture 또는 실제 시험용 경로를 사용한다.
+
+**매개변수/반환 및 실행 관계**: `def test_partial(self):`를 확인한다. `self`는 unittest 인스턴스이며, 인자가 있는 helper는 테스트의 setup/record 생성 시 전달받는다. 명시적 `return`이 없다면 `None`을 반환하고 성공 판단은 예외/단언문으로 한다. 본문에서 관찰되는 호출 이름: `test_partial`, `assertRaises`, `decode_record`, `record`.
+
+**입력·상태 변경 지점(원본)**:
+- 이 함수가 fixture 전역값·기본 객체를 그대로 사용하거나 순수하게 값을 계산한다.
+
+**성공 조건·실패 조건을 표현한 실제 검사식**:
+- [L53](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L53) `with self.assertRaises(ValueError): eq.decode_record(record()[:-1])`
+
+**검증 범위와 한계**: 이 함수는 위에 명시한 입력·성공 조건까지 검사한다. 가상 데이터/SQLite/원장 fixture의 통과는 커널 eBPF verifier, 실제 드라이브 전원 장애 또는 타 Linux 버전의 수집 무손실을 검증하지 못한다. `assertRaises`는 오류가 발생해야 통과하며, 정상 실행을 확인하는 검사와 방향이 반대다. 테스트용 정해진 ID/시간/경로는 서비스의 실제 고정값이 아니다.
+
+**원본 함수 전체**
+
+```python
+    def test_partial(self):
+        with self.assertRaises(ValueError): eq.decode_record(record()[:-1])
+```
+
+#### test_query_and_restart — [test_manage.py:55–65](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L55-L65)
+
+**정의 위치·목적**: query and restart의 정상·거부/오류 경로를 코드로 검증한다. 입력으로 준비한 fixture 또는 실제 시험용 경로를 사용한다.
+
+**매개변수/반환 및 실행 관계**: `def test_query_and_restart(self):`를 확인한다. `self`는 unittest 인스턴스이며, 인자가 있는 helper는 테스트의 setup/record 생성 시 전달받는다. 명시적 `return`이 없다면 `None`을 반환하고 성공 판단은 예외/단언문으로 한다. 본문에서 관찰되는 호출 이름: `test_query_and_restart`, `assertEqual`, `index_batch`, `rows`, `query`, `assertTrue`.
+
+**입력·상태 변경 지점(원본)**:
+- 이 함수가 fixture 전역값·기본 객체를 그대로 사용하거나 순수하게 값을 계산한다.
+
+**성공 조건·실패 조건을 표현한 실제 검사식**:
+- [L56](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L56) `self.assertEqual(eq.index_batch(self.run), 1)`
+- [L57](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L57) `self.assertEqual(eq.index_batch(self.run), 0)`
+- [L58](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L58) `self.assertEqual(self.rows(), 1)`
+- [L60](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L60) `self.assertEqual(result['records'][0]['path'], '/tmp/file')`
+- [L61](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L61) `self.assertTrue(result['search_complete_to_durable'])`
+- [L62](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L62) `self.assertEqual(result['index']['lag_records'], 0)`
+- [L63](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L63) `self.assertEqual(eq.query(self.run, critical=True)['zero_results_mean'],`
+
+**검증 범위와 한계**: 이 함수는 위에 명시한 입력·성공 조건까지 검사한다. 가상 데이터/SQLite/원장 fixture의 통과는 커널 eBPF verifier, 실제 드라이브 전원 장애 또는 타 Linux 버전의 수집 무손실을 검증하지 못한다. `assertRaises`는 오류가 발생해야 통과하며, 정상 실행을 확인하는 검사와 방향이 반대다. 테스트용 정해진 ID/시간/경로는 서비스의 실제 고정값이 아니다.
+
+**원본 함수 전체**
+
+```python
+    def test_query_and_restart(self):
+        self.assertEqual(eq.index_batch(self.run), 1)
+        self.assertEqual(eq.index_batch(self.run), 0)
+        self.assertEqual(self.rows(), 1)
+        result = eq.query(self.run)
+        self.assertEqual(result['records'][0]['path'], '/tmp/file')
+        self.assertTrue(result['search_complete_to_durable'])
+        self.assertEqual(result['index']['lag_records'], 0)
+        self.assertEqual(eq.query(self.run, critical=True)['zero_results_mean'],
+                         'ABSENT_FROM_INDEXED_DURABLE_RAW_ONLY')
+```
+
+#### test_cursor_replay_dedup — [test_manage.py:66–72](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L66-L72)
+
+**정의 위치·목적**: cursor replay dedup의 정상·거부/오류 경로를 코드로 검증한다. 입력으로 준비한 fixture 또는 실제 시험용 경로를 사용한다.
+
+**매개변수/반환 및 실행 관계**: `def test_cursor_replay_dedup(self):`를 확인한다. `self`는 unittest 인스턴스이며, 인자가 있는 helper는 테스트의 setup/record 생성 시 전달받는다. 명시적 `return`이 없다면 `None`을 반환하고 성공 판단은 예외/단언문으로 한다. 본문에서 관찰되는 호출 이름: `test_cursor_replay_dedup`, `index_batch`, `connect`, `execute`, `assertEqual`, `rows`.
+
+**입력·상태 변경 지점(원본)**:
+- 이 함수가 fixture 전역값·기본 객체를 그대로 사용하거나 순수하게 값을 계산한다.
+
+**성공 조건·실패 조건을 표현한 실제 검사식**:
+- [L71](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L71) `self.assertEqual(self.rows(), 1)`
+
+**검증 범위와 한계**: 이 함수는 위에 명시한 입력·성공 조건까지 검사한다. 가상 데이터/SQLite/원장 fixture의 통과는 커널 eBPF verifier, 실제 드라이브 전원 장애 또는 타 Linux 버전의 수집 무손실을 검증하지 못한다. `assertRaises`는 오류가 발생해야 통과하며, 정상 실행을 확인하는 검사와 방향이 반대다. 테스트용 정해진 ID/시간/경로는 서비스의 실제 고정값이 아니다.
+
+**원본 함수 전체**
+
+```python
+    def test_cursor_replay_dedup(self):
+        eq.index_batch(self.run)
+        with sqlite3.connect(self.run / 'index.sqlite') as db:
+            db.execute('DELETE FROM cursor')
+        eq.index_batch(self.run)
+        self.assertEqual(self.rows(), 1)
+```
+
+#### test_no_undurable_tail_promotion — [test_manage.py:73–78](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L73-L78)
+
+**정의 위치·목적**: no undurable tail promotion의 정상·거부/오류 경로를 코드로 검증한다. 입력으로 준비한 fixture 또는 실제 시험용 경로를 사용한다.
+
+**매개변수/반환 및 실행 관계**: `def test_no_undurable_tail_promotion(self):`를 확인한다. `self`는 unittest 인스턴스이며, 인자가 있는 helper는 테스트의 setup/record 생성 시 전달받는다. 명시적 `return`이 없다면 `None`을 반환하고 성공 판단은 예외/단언문으로 한다. 본문에서 관찰되는 호출 이름: `test_no_undurable_tail_promotion`, `write_bytes`, `record`, `index_batch`, `assertEqual`, `rows`, `stat`.
+
+**입력·상태 변경 지점(원본)**:
+- [L74](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L74) `(self.run / 'general.raw').write_bytes(record() + record(2) + b'partial')`
+
+**성공 조건·실패 조건을 표현한 실제 검사식**:
+- [L76](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L76) `self.assertEqual(self.rows(), 1)`
+- [L77](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L77) `self.assertEqual((self.run / 'general.raw').stat().st_size, 487)`
+
+**검증 범위와 한계**: 이 함수는 위에 명시한 입력·성공 조건까지 검사한다. 가상 데이터/SQLite/원장 fixture의 통과는 커널 eBPF verifier, 실제 드라이브 전원 장애 또는 타 Linux 버전의 수집 무손실을 검증하지 못한다. `assertRaises`는 오류가 발생해야 통과하며, 정상 실행을 확인하는 검사와 방향이 반대다. 테스트용 정해진 ID/시간/경로는 서비스의 실제 고정값이 아니다.
+
+**원본 함수 전체**
+
+```python
+    def test_no_undurable_tail_promotion(self):
+        (self.run / 'general.raw').write_bytes(record() + record(2) + b'partial')
+        eq.index_batch(self.run)
+        self.assertEqual(self.rows(), 1)
+        self.assertEqual((self.run / 'general.raw').stat().st_size, 487)
+```
+
+#### test_short_committed_file_rejected — [test_manage.py:79–82](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L79-L82)
+
+**정의 위치·목적**: short committed file rejected의 정상·거부/오류 경로를 코드로 검증한다. 입력으로 준비한 fixture 또는 실제 시험용 경로를 사용한다.
+
+**매개변수/반환 및 실행 관계**: `def test_short_committed_file_rejected(self):`를 확인한다. `self`는 unittest 인스턴스이며, 인자가 있는 helper는 테스트의 setup/record 생성 시 전달받는다. 명시적 `return`이 없다면 `None`을 반환하고 성공 판단은 예외/단언문으로 한다. 본문에서 관찰되는 호출 이름: `test_short_committed_file_rejected`, `save_health`, `assertRaises`, `index_batch`.
+
+**입력·상태 변경 지점(원본)**:
+- 이 함수가 fixture 전역값·기본 객체를 그대로 사용하거나 순수하게 값을 계산한다.
+
+**성공 조건·실패 조건을 표현한 실제 검사식**:
+- [L81](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L81) `with self.assertRaises(ValueError): eq.index_batch(self.run)`
+
+**검증 범위와 한계**: 이 함수는 위에 명시한 입력·성공 조건까지 검사한다. 가상 데이터/SQLite/원장 fixture의 통과는 커널 eBPF verifier, 실제 드라이브 전원 장애 또는 타 Linux 버전의 수집 무손실을 검증하지 못한다. `assertRaises`는 오류가 발생해야 통과하며, 정상 실행을 확인하는 검사와 방향이 반대다. 테스트용 정해진 ID/시간/경로는 서비스의 실제 고정값이 아니다.
+
+**원본 함수 전체**
+
+```python
+    def test_short_committed_file_rejected(self):
+        self.health['durable']['general.raw'] = 480; self.save_health()
+        with self.assertRaises(ValueError): eq.index_batch(self.run)
+```
+
+#### test_corruption_rolls_back_batch — [test_manage.py:83–89](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L83-L89)
+
+**정의 위치·목적**: corruption rolls back batch의 정상·거부/오류 경로를 코드로 검증한다. 입력으로 준비한 fixture 또는 실제 시험용 경로를 사용한다.
+
+**매개변수/반환 및 실행 관계**: `def test_corruption_rolls_back_batch(self):`를 확인한다. `self`는 unittest 인스턴스이며, 인자가 있는 helper는 테스트의 setup/record 생성 시 전달받는다. 명시적 `return`이 없다면 `None`을 반환하고 성공 판단은 예외/단언문으로 한다. 본문에서 관찰되는 호출 이름: `test_corruption_rolls_back_batch`, `bytearray`, `record`, `write_bytes`, `save_health`, `assertRaises`, `index_batch`, `assertEqual`, `rows`.
+
+**입력·상태 변경 지점(원본)**:
+- [L85](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L85) `(self.run / 'general.raw').write_bytes(record() + raw)`
+
+**성공 조건·실패 조건을 표현한 실제 검사식**:
+- [L87](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L87) `with self.assertRaises(ValueError): eq.index_batch(self.run)`
+- [L88](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L88) `self.assertEqual(self.rows(), 0)`
+
+**검증 범위와 한계**: 이 함수는 위에 명시한 입력·성공 조건까지 검사한다. 가상 데이터/SQLite/원장 fixture의 통과는 커널 eBPF verifier, 실제 드라이브 전원 장애 또는 타 Linux 버전의 수집 무손실을 검증하지 못한다. `assertRaises`는 오류가 발생해야 통과하며, 정상 실행을 확인하는 검사와 방향이 반대다. 테스트용 정해진 ID/시간/경로는 서비스의 실제 고정값이 아니다.
+
+**원본 함수 전체**
+
+```python
+    def test_corruption_rolls_back_batch(self):
+        raw = bytearray(record(2)); raw[90] ^= 1
+        (self.run / 'general.raw').write_bytes(record() + raw)
+        self.health['durable']['general.raw'] = 480; self.save_health()
+        with self.assertRaises(ValueError): eq.index_batch(self.run)
+        self.assertEqual(self.rows(), 0)
+```
+
+#### test_duplicate_payload_conflict — [test_manage.py:90–95](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L90-L95)
+
+**정의 위치·목적**: duplicate payload conflict의 정상·거부/오류 경로를 코드로 검증한다. 입력으로 준비한 fixture 또는 실제 시험용 경로를 사용한다.
+
+**매개변수/반환 및 실행 관계**: `def test_duplicate_payload_conflict(self):`를 확인한다. `self`는 unittest 인스턴스이며, 인자가 있는 helper는 테스트의 setup/record 생성 시 전달받는다. 명시적 `return`이 없다면 `None`을 반환하고 성공 판단은 예외/단언문으로 한다. 본문에서 관찰되는 호출 이름: `test_duplicate_payload_conflict`, `write_bytes`, `record`, `save_health`, `assertRaisesRegex`, `index_batch`, `assertEqual`, `rows`.
+
+**입력·상태 변경 지점(원본)**:
+- [L91](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L91) `(self.run / 'general.raw').write_bytes(record() + record(path=b'/different'))`
+
+**성공 조건·실패 조건을 표현한 실제 검사식**:
+- [L93](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L93) `with self.assertRaisesRegex(ValueError, 'payload'): eq.index_batch(self.run)`
+- [L94](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L94) `self.assertEqual(self.rows(), 0)`
+
+**검증 범위와 한계**: 이 함수는 위에 명시한 입력·성공 조건까지 검사한다. 가상 데이터/SQLite/원장 fixture의 통과는 커널 eBPF verifier, 실제 드라이브 전원 장애 또는 타 Linux 버전의 수집 무손실을 검증하지 못한다. `assertRaises`는 오류가 발생해야 통과하며, 정상 실행을 확인하는 검사와 방향이 반대다. 테스트용 정해진 ID/시간/경로는 서비스의 실제 고정값이 아니다.
+
+**원본 함수 전체**
+
+```python
+    def test_duplicate_payload_conflict(self):
+        (self.run / 'general.raw').write_bytes(record() + record(path=b'/different'))
+        self.health['durable']['general.raw'] = 480; self.save_health()
+        with self.assertRaisesRegex(ValueError, 'payload'): eq.index_batch(self.run)
+        self.assertEqual(self.rows(), 0)
+```
+
+#### test_lineage — [test_manage.py:96–100](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L96-L100)
+
+**정의 위치·목적**: lineage의 정상·거부/오류 경로를 코드로 검증한다. 입력으로 준비한 fixture 또는 실제 시험용 경로를 사용한다.
+
+**매개변수/반환 및 실행 관계**: `def test_lineage(self):`를 확인한다. `self`는 unittest 인스턴스이며, 인자가 있는 helper는 테스트의 setup/record 생성 시 전달받는다. 명시적 `return`이 없다면 `None`을 반환하고 성공 판단은 예외/단언문으로 한다. 본문에서 관찰되는 호출 이름: `test_lineage`, `index_batch`, `atomic_json`, `assertRaises`.
+
+**입력·상태 변경 지점(원본)**:
+- [L98](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L98) `eq.atomic_json(self.run / 'manifest.json', dict(run_id='other', config_sha256='cfg', bpf_sha256='obj'))`
+
+**성공 조건·실패 조건을 표현한 실제 검사식**:
+- [L99](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L99) `with self.assertRaises(ValueError): eq.index_batch(self.run)`
+
+**검증 범위와 한계**: 이 함수는 위에 명시한 입력·성공 조건까지 검사한다. 가상 데이터/SQLite/원장 fixture의 통과는 커널 eBPF verifier, 실제 드라이브 전원 장애 또는 타 Linux 버전의 수집 무손실을 검증하지 못한다. `assertRaises`는 오류가 발생해야 통과하며, 정상 실행을 확인하는 검사와 방향이 반대다. 테스트용 정해진 ID/시간/경로는 서비스의 실제 고정값이 아니다.
+
+**원본 함수 전체**
+
+```python
+    def test_lineage(self):
+        eq.index_batch(self.run)
+        eq.atomic_json(self.run / 'manifest.json', dict(run_id='other', config_sha256='cfg', bpf_sha256='obj'))
+        with self.assertRaises(ValueError): eq.index_batch(self.run)
+```
+
+#### test_bounded_batch — [test_manage.py:101–113](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L101-L113)
+
+**정의 위치·목적**: bounded batch의 정상·거부/오류 경로를 코드로 검증한다. 입력으로 준비한 fixture 또는 실제 시험용 경로를 사용한다.
+
+**매개변수/반환 및 실행 관계**: `def test_bounded_batch(self):`를 확인한다. `self`는 unittest 인스턴스이며, 인자가 있는 helper는 테스트의 setup/record 생성 시 전달받는다. 명시적 `return`이 없다면 `None`을 반환하고 성공 판단은 예외/단언문으로 한다. 본문에서 관찰되는 호출 이름: `test_bounded_batch`, `write_bytes`, `join`, `record`, `save_health`, `assertEqual`, `index_batch`, `rows`, `read_json`, `status`, `query`, `assertFalse`.
+
+**입력·상태 변경 지점(원본)**:
+- [L102](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L102) `(self.run / 'general.raw').write_bytes(b''.join(record(i) for i in range(1, 11)))`
+- [L106](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L106) `index = eq.read_json(self.run / 'index-health.json')`
+
+**성공 조건·실패 조건을 표현한 실제 검사식**:
+- [L104](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L104) `self.assertEqual(eq.index_batch(self.run, max_records=6), 3)`
+- [L105](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L105) `self.assertEqual(self.rows(), 3)`
+- [L107](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L107) `self.assertEqual(index['state'], 'INDEX_LAG')`
+- [L108](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L108) `self.assertEqual(index['lane_coverage']['general.raw']['lag_records'], 7)`
+- [L109](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L109) `self.assertEqual(eq.status(self.run)['index']['lag_records'], 7)`
+- [L111](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L111) `self.assertFalse(query['search_complete_to_durable'])`
+- [L112](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L112) `self.assertEqual(query['zero_results_mean'], 'INDEX_INCOMPLETE_OR_RUN_OPEN')`
+
+**검증 범위와 한계**: 이 함수는 위에 명시한 입력·성공 조건까지 검사한다. 가상 데이터/SQLite/원장 fixture의 통과는 커널 eBPF verifier, 실제 드라이브 전원 장애 또는 타 Linux 버전의 수집 무손실을 검증하지 못한다. `assertRaises`는 오류가 발생해야 통과하며, 정상 실행을 확인하는 검사와 방향이 반대다. 테스트용 정해진 ID/시간/경로는 서비스의 실제 고정값이 아니다.
+
+**원본 함수 전체**
+
+```python
+    def test_bounded_batch(self):
+        (self.run / 'general.raw').write_bytes(b''.join(record(i) for i in range(1, 11)))
+        self.health['durable']['general.raw'] = 2400; self.save_health()
+        self.assertEqual(eq.index_batch(self.run, max_records=6), 3)
+        self.assertEqual(self.rows(), 3)
+        index = eq.read_json(self.run / 'index-health.json')
+        self.assertEqual(index['state'], 'INDEX_LAG')
+        self.assertEqual(index['lane_coverage']['general.raw']['lag_records'], 7)
+        self.assertEqual(eq.status(self.run)['index']['lag_records'], 7)
+        query = eq.query(self.run, critical=True)
+        self.assertFalse(query['search_complete_to_durable'])
+        self.assertEqual(query['zero_results_mean'], 'INDEX_INCOMPLETE_OR_RUN_OPEN')
+```
+
+#### test_bounded_final_catchup_and_resume — [test_manage.py:114–126](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L114-L126)
+
+**정의 위치·목적**: bounded final catchup and resume의 정상·거부/오류 경로를 코드로 검증한다. 입력으로 준비한 fixture 또는 실제 시험용 경로를 사용한다.
+
+**매개변수/반환 및 실행 관계**: `def test_bounded_final_catchup_and_resume(self):`를 확인한다. `self`는 unittest 인스턴스이며, 인자가 있는 helper는 테스트의 setup/record 생성 시 전달받는다. 명시적 `return`이 없다면 `None`을 반환하고 성공 판단은 예외/단언문으로 한다. 본문에서 관찰되는 호출 이름: `test_bounded_final_catchup_and_resume`, `write_bytes`, `join`, `record`, `save_health`, `object`, `original`, `index_run`, `assertEqual`, `read_json`, `rows`, `assertTrue`, `query`.
+
+**입력·상태 변경 지점(원본)**:
+- [L115](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L115) `(self.run / 'general.raw').write_bytes(b''.join(record(i) for i in range(1, 11)))`
+- [L120](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L120) `self.assertEqual(eq.read_json(self.run / 'index-health.json')['state'], 'INDEX_LAG')`
+- [L124](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L124) `self.assertEqual(eq.read_json(self.run / 'index-health.json')['state'], 'INDEX_COMPLETE')`
+
+**성공 조건·실패 조건을 표현한 실제 검사식**:
+- [L120](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L120) `self.assertEqual(eq.read_json(self.run / 'index-health.json')['state'], 'INDEX_LAG')`
+- [L121](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L121) `self.assertEqual(self.rows(), 1)`
+- [L123](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L123) `self.assertEqual(self.rows(), 10)`
+- [L124](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L124) `self.assertEqual(eq.read_json(self.run / 'index-health.json')['state'], 'INDEX_COMPLETE')`
+- [L125](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L125) `self.assertTrue(eq.query(self.run)['search_complete_to_durable'])`
+
+**검증 범위와 한계**: 이 함수는 위에 명시한 입력·성공 조건까지 검사한다. 가상 데이터/SQLite/원장 fixture의 통과는 커널 eBPF verifier, 실제 드라이브 전원 장애 또는 타 Linux 버전의 수집 무손실을 검증하지 못한다. `assertRaises`는 오류가 발생해야 통과하며, 정상 실행을 확인하는 검사와 방향이 반대다. 테스트용 정해진 ID/시간/경로는 서비스의 실제 고정값이 아니다.
+
+**원본 함수 전체**
+
+```python
+    def test_bounded_final_catchup_and_resume(self):
+        (self.run / 'general.raw').write_bytes(b''.join(record(i) for i in range(1, 11)))
+        self.health['durable']['general.raw'] = 2400; self.save_health()
+        original = eq.index_batch
+        with patch.object(eq, 'index_batch', side_effect=lambda run: original(run, max_records=2)):
+            eq.index_run(self.run, max_seconds=0)
+        self.assertEqual(eq.read_json(self.run / 'index-health.json')['state'], 'INDEX_LAG')
+        self.assertEqual(self.rows(), 1)
+        eq.index_run(self.run, max_seconds=5)
+        self.assertEqual(self.rows(), 10)
+        self.assertEqual(eq.read_json(self.run / 'index-health.json')['state'], 'INDEX_COMPLETE')
+        self.assertTrue(eq.query(self.run)['search_complete_to_durable'])
+```
+
+#### test_read_only_raw_search_reports_partial_and_exact_hit — [test_manage.py:127–140](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L127-L140)
+
+**정의 위치·목적**: read only raw search reports partial and exact hit의 정상·거부/오류 경로를 코드로 검증한다. 입력으로 준비한 fixture 또는 실제 시험용 경로를 사용한다.
+
+**매개변수/반환 및 실행 관계**: `def test_read_only_raw_search_reports_partial_and_exact_hit(self):`를 확인한다. `self`는 unittest 인스턴스이며, 인자가 있는 helper는 테스트의 setup/record 생성 시 전달받는다. 명시적 `return`이 없다면 `None`을 반환하고 성공 판단은 예외/단언문으로 한다. 본문에서 관찰되는 호출 이름: `test_read_only_raw_search_reports_partial_and_exact_hit`, `record`, `write_bytes`, `save_health`, `raw_search`, `assertFalse`, `assertEqual`, `assertTrue`, `read_bytes`, `exists`.
+
+**입력·상태 변경 지점(원본)**:
+- [L129](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L129) `(self.run / 'general.raw').write_bytes(source)`
+
+**성공 조건·실패 조건을 표현한 실제 검사식**:
+- [L132](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L132) `self.assertFalse(limited['search_complete_to_durable'])`
+- [L133](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L133) `self.assertEqual(limited['limit_reason'], 'MAX_BYTES')`
+- [L134](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L134) `self.assertEqual(limited['records'], [])`
+- [L136](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L136) `self.assertTrue(found['search_complete_to_durable'])`
+- [L137](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L137) `self.assertEqual([row['sequence'] for row in found['records']], [2])`
+- [L138](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L138) `self.assertEqual((self.run / 'general.raw').read_bytes(), source)`
+- [L139](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L139) `self.assertFalse((self.run / 'index.sqlite').exists())`
+
+**검증 범위와 한계**: 이 함수는 위에 명시한 입력·성공 조건까지 검사한다. 가상 데이터/SQLite/원장 fixture의 통과는 커널 eBPF verifier, 실제 드라이브 전원 장애 또는 타 Linux 버전의 수집 무손실을 검증하지 못한다. `assertRaises`는 오류가 발생해야 통과하며, 정상 실행을 확인하는 검사와 방향이 반대다. 테스트용 정해진 ID/시간/경로는 서비스의 실제 고정값이 아니다.
+
+**원본 함수 전체**
+
+```python
+    def test_read_only_raw_search_reports_partial_and_exact_hit(self):
+        source = record() + record(2, path=b'/tmp/marker')
+        (self.run / 'general.raw').write_bytes(source)
+        self.health['durable']['general.raw'] = len(source); self.save_health()
+        limited = eq.raw_search(self.run, '/tmp/marker', max_bytes=eq.RECORD_SIZE)
+        self.assertFalse(limited['search_complete_to_durable'])
+        self.assertEqual(limited['limit_reason'], 'MAX_BYTES')
+        self.assertEqual(limited['records'], [])
+        found = eq.raw_search(self.run, '/tmp/marker')
+        self.assertTrue(found['search_complete_to_durable'])
+        self.assertEqual([row['sequence'] for row in found['records']], [2])
+        self.assertEqual((self.run / 'general.raw').read_bytes(), source)
+        self.assertFalse((self.run / 'index.sqlite').exists())
+```
+
+#### test_live_caught_up_is_not_final_search — [test_manage.py:141–146](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L141-L146)
+
+**정의 위치·목적**: live caught up is not final search의 정상·거부/오류 경로를 코드로 검증한다. 입력으로 준비한 fixture 또는 실제 시험용 경로를 사용한다.
+
+**매개변수/반환 및 실행 관계**: `def test_live_caught_up_is_not_final_search(self):`를 확인한다. `self`는 unittest 인스턴스이며, 인자가 있는 helper는 테스트의 setup/record 생성 시 전달받는다. 명시적 `return`이 없다면 `None`을 반환하고 성공 판단은 예외/단언문으로 한다. 본문에서 관찰되는 호출 이름: `test_live_caught_up_is_not_final_search`, `save_health`, `index_batch`, `assertEqual`, `read_json`, `assertFalse`, `query`.
+
+**입력·상태 변경 지점(원본)**:
+- [L144](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L144) `self.assertEqual(eq.read_json(self.run / 'index-health.json')['state'], 'LIVE_CAUGHT_UP')`
+
+**성공 조건·실패 조건을 표현한 실제 검사식**:
+- [L144](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L144) `self.assertEqual(eq.read_json(self.run / 'index-health.json')['state'], 'LIVE_CAUGHT_UP')`
+- [L145](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L145) `self.assertFalse(eq.query(self.run)['search_complete_to_durable'])`
+
+**검증 범위와 한계**: 이 함수는 위에 명시한 입력·성공 조건까지 검사한다. 가상 데이터/SQLite/원장 fixture의 통과는 커널 eBPF verifier, 실제 드라이브 전원 장애 또는 타 Linux 버전의 수집 무손실을 검증하지 못한다. `assertRaises`는 오류가 발생해야 통과하며, 정상 실행을 확인하는 검사와 방향이 반대다. 테스트용 정해진 ID/시간/경로는 서비스의 실제 고정값이 아니다.
+
+**원본 함수 전체**
+
+```python
+    def test_live_caught_up_is_not_final_search(self):
+        self.health['state'] = 'RUNNING'; self.save_health()
+        eq.index_batch(self.run)
+        self.assertEqual(eq.read_json(self.run / 'index-health.json')['state'], 'LIVE_CAUGHT_UP')
+        self.assertFalse(eq.query(self.run)['search_complete_to_durable'])
+```
+
+#### test_critical_lane — [test_manage.py:147–152](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L147-L152)
+
+**정의 위치·목적**: critical lane의 정상·거부/오류 경로를 코드로 검증한다. 입력으로 준비한 fixture 또는 실제 시험용 경로를 사용한다.
+
+**매개변수/반환 및 실행 관계**: `def test_critical_lane(self):`를 확인한다. `self`는 unittest 인스턴스이며, 인자가 있는 helper는 테스트의 setup/record 생성 시 전달받는다. 명시적 `return`이 없다면 `None`을 반환하고 성공 판단은 예외/단언문으로 한다. 본문에서 관찰되는 호출 이름: `test_critical_lane`, `write_bytes`, `record`, `save_health`, `index_batch`, `assertEqual`, `query`.
+
+**입력·상태 변경 지점(원본)**:
+- [L148](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L148) `(self.run / 'critical.raw').write_bytes(record(2, priority=2))`
+
+**성공 조건·실패 조건을 표현한 실제 검사식**:
+- [L151](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L151) `self.assertEqual(len(eq.query(self.run, critical=True)['records']), 1)`
+
+**검증 범위와 한계**: 이 함수는 위에 명시한 입력·성공 조건까지 검사한다. 가상 데이터/SQLite/원장 fixture의 통과는 커널 eBPF verifier, 실제 드라이브 전원 장애 또는 타 Linux 버전의 수집 무손실을 검증하지 못한다. `assertRaises`는 오류가 발생해야 통과하며, 정상 실행을 확인하는 검사와 방향이 반대다. 테스트용 정해진 ID/시간/경로는 서비스의 실제 고정값이 아니다.
+
+**원본 함수 전체**
+
+```python
+    def test_critical_lane(self):
+        (self.run / 'critical.raw').write_bytes(record(2, priority=2))
+        self.health['durable']['critical.raw'] = 240; self.save_health()
+        eq.index_batch(self.run)
+        self.assertEqual(len(eq.query(self.run, critical=True)['records']), 1)
+```
+
+#### test_wrong_lane — [test_manage.py:153–156](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L153-L156)
+
+**정의 위치·목적**: wrong lane의 정상·거부/오류 경로를 코드로 검증한다. 입력으로 준비한 fixture 또는 실제 시험용 경로를 사용한다.
+
+**매개변수/반환 및 실행 관계**: `def test_wrong_lane(self):`를 확인한다. `self`는 unittest 인스턴스이며, 인자가 있는 helper는 테스트의 setup/record 생성 시 전달받는다. 명시적 `return`이 없다면 `None`을 반환하고 성공 판단은 예외/단언문으로 한다. 본문에서 관찰되는 호출 이름: `test_wrong_lane`, `write_bytes`, `record`, `assertRaisesRegex`, `index_batch`.
+
+**입력·상태 변경 지점(원본)**:
+- [L154](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L154) `(self.run / 'general.raw').write_bytes(record(priority=2))`
+
+**성공 조건·실패 조건을 표현한 실제 검사식**:
+- [L155](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L155) `with self.assertRaisesRegex(ValueError, 'lane'): eq.index_batch(self.run)`
+
+**검증 범위와 한계**: 이 함수는 위에 명시한 입력·성공 조건까지 검사한다. 가상 데이터/SQLite/원장 fixture의 통과는 커널 eBPF verifier, 실제 드라이브 전원 장애 또는 타 Linux 버전의 수집 무손실을 검증하지 못한다. `assertRaises`는 오류가 발생해야 통과하며, 정상 실행을 확인하는 검사와 방향이 반대다. 테스트용 정해진 ID/시간/경로는 서비스의 실제 고정값이 아니다.
+
+**원본 함수 전체**
+
+```python
+    def test_wrong_lane(self):
+        (self.run / 'general.raw').write_bytes(record(priority=2))
+        with self.assertRaisesRegex(ValueError, 'lane'): eq.index_batch(self.run)
+```
+
+#### test_invalid_config — [test_manage.py:157–169](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L157-L169)
+
+**정의 위치·목적**: invalid config의 정상·거부/오류 경로를 코드로 검증한다. 입력으로 준비한 fixture 또는 실제 시험용 경로를 사용한다.
+
+**매개변수/반환 및 실행 관계**: `def test_invalid_config(self):`를 확인한다. `self`는 unittest 인스턴스이며, 인자가 있는 helper는 테스트의 setup/record 생성 시 전달받는다. 명시적 `return`이 없다면 `None`을 반환하고 성공 판단은 예외/단언문으로 한다. 본문에서 관찰되는 호출 이름: `test_invalid_config`, `atomic_json`, `subTest`, `assertRaises`, `config`.
+
+**입력·상태 변경 지점(원본)**:
+- [L165](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L165) `cfg = dict(self.cfg, **{key: value})`
+- [L166](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L166) `eq.atomic_json(self.run / 'config.json', cfg)`
+- [L168](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L168) `eq.config(self.run / 'config.json')`
+
+**성공 조건·실패 조건을 표현한 실제 검사식**:
+- [L167](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L167) `with self.subTest(key=key, value=value), self.assertRaises(ValueError):`
+
+**검증 범위와 한계**: 이 함수는 위에 명시한 입력·성공 조건까지 검사한다. 가상 데이터/SQLite/원장 fixture의 통과는 커널 eBPF verifier, 실제 드라이브 전원 장애 또는 타 Linux 버전의 수집 무손실을 검증하지 못한다. `assertRaises`는 오류가 발생해야 통과하며, 정상 실행을 확인하는 검사와 방향이 반대다. 테스트용 정해진 ID/시간/경로는 서비스의 실제 고정값이 아니다.
+
+**원본 함수 전체**
+
+```python
+    def test_invalid_config(self):
+        for key, value in [('bulk_rate', 0), ('bulk_burst', True), ('max_raw_mib', 2048),
+                           ('protected_path', '/a/../b'), ('protected_path', '/'+'x'*127),
+                           ('critical_reserve_mib', 512), ('critical_rate_threshold', 0),
+                           ('critical_rate_duration_seconds', 61), ('critical_recovery_threshold', True),
+                           ('critical_recovery_threshold', 10000), ('quarantine_initial_full_events', 65),
+                           ('quarantine_sample_interval_ms', 1), ('quarantine_max_mib', 257),
+                           ('metadata_max_mib', 7)]:
+            cfg = dict(self.cfg, **{key: value})
+            eq.atomic_json(self.run / 'config.json', cfg)
+            with self.subTest(key=key, value=value), self.assertRaises(ValueError):
+                eq.config(self.run / 'config.json')
+```
+
+#### test_legacy_config_gets_quarantine_defaults — [test_manage.py:170–177](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L170-L177)
+
+**정의 위치·목적**: legacy config gets quarantine defaults의 정상·거부/오류 경로를 코드로 검증한다. 입력으로 준비한 fixture 또는 실제 시험용 경로를 사용한다.
+
+**매개변수/반환 및 실행 관계**: `def test_legacy_config_gets_quarantine_defaults(self):`를 확인한다. `self`는 unittest 인스턴스이며, 인자가 있는 helper는 테스트의 setup/record 생성 시 전달받는다. 명시적 `return`이 없다면 `None`을 반환하고 성공 판단은 예외/단언문으로 한다. 본문에서 관찰되는 호출 이름: `test_legacy_config_gets_quarantine_defaults`, `atomic_json`, `config`, `items`, `assertEqual`.
+
+**입력·상태 변경 지점(원본)**:
+- [L171](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L171) `old = {key: self.cfg[key] for key in eq.REQUIRED_KEYS}`
+- [L172](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L172) `eq.atomic_json(self.run / 'config.json', old)`
+- [L173](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L173) `normalized = eq.config(self.run / 'config.json')`
+
+**성공 조건·실패 조건을 표현한 실제 검사식**:
+- [L175](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L175) `self.assertEqual(normalized[key], value)`
+- [L176](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L176) `self.assertEqual(normalized['critical_rules'][0]['path'], old['protected_path'])`
+
+**검증 범위와 한계**: 이 함수는 위에 명시한 입력·성공 조건까지 검사한다. 가상 데이터/SQLite/원장 fixture의 통과는 커널 eBPF verifier, 실제 드라이브 전원 장애 또는 타 Linux 버전의 수집 무손실을 검증하지 못한다. `assertRaises`는 오류가 발생해야 통과하며, 정상 실행을 확인하는 검사와 방향이 반대다. 테스트용 정해진 ID/시간/경로는 서비스의 실제 고정값이 아니다.
+
+**원본 함수 전체**
+
+```python
+    def test_legacy_config_gets_quarantine_defaults(self):
+        old = {key: self.cfg[key] for key in eq.REQUIRED_KEYS}
+        eq.atomic_json(self.run / 'config.json', old)
+        normalized = eq.config(self.run / 'config.json')
+        for key, value in eq.POLICY_DEFAULTS.items():
+            self.assertEqual(normalized[key], value)
+        self.assertEqual(normalized['critical_rules'][0]['path'], old['protected_path'])
+```
+
+#### test_removed_cgroup_guard_is_not_reenabled — [test_manage.py:178–184](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L178-L184)
+
+**정의 위치·목적**: removed cgroup guard is not reenabled의 정상·거부/오류 경로를 코드로 검증한다. 입력으로 준비한 fixture 또는 실제 시험용 경로를 사용한다.
+
+**매개변수/반환 및 실행 관계**: `def test_removed_cgroup_guard_is_not_reenabled(self):`를 확인한다. `self`는 unittest 인스턴스이며, 인자가 있는 helper는 테스트의 setup/record 생성 시 전달받는다. 명시적 `return`이 없다면 `None`을 반환하고 성공 판단은 예외/단언문으로 한다. 본문에서 관찰되는 호출 이름: `test_removed_cgroup_guard_is_not_reenabled`, `in`, `atomic_json`, `subTest`, `assertRaises`, `config`.
+
+**입력·상태 변경 지점(원본)**:
+- [L181](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L181) `eq.atomic_json(self.run / 'config.json', dict(self.cfg, **{key: 1}))`
+- [L183](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L183) `eq.config(self.run / 'config.json')`
+
+**성공 조건·실패 조건을 표현한 실제 검사식**:
+- [L182](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L182) `with self.subTest(key=key), self.assertRaises(ValueError):`
+
+**검증 범위와 한계**: 이 함수는 위에 명시한 입력·성공 조건까지 검사한다. 가상 데이터/SQLite/원장 fixture의 통과는 커널 eBPF verifier, 실제 드라이브 전원 장애 또는 타 Linux 버전의 수집 무손실을 검증하지 못한다. `assertRaises`는 오류가 발생해야 통과하며, 정상 실행을 확인하는 검사와 방향이 반대다. 테스트용 정해진 ID/시간/경로는 서비스의 실제 고정값이 아니다.
+
+**원본 함수 전체**
+
+```python
+    def test_removed_cgroup_guard_is_not_reenabled(self):
+        for key in ('critical_rate', 'critical_burst', 'shared_critical_rate',
+                    'shared_critical_burst', 'protected_cgroup_id'):
+            eq.atomic_json(self.run / 'config.json', dict(self.cfg, **{key: 1}))
+            with self.subTest(key=key), self.assertRaises(ValueError):
+                eq.config(self.run / 'config.json')
+```
+
+#### test_rule_identity_and_protected_boolean_validation — [test_manage.py:185–192](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L185-L192)
+
+**정의 위치·목적**: rule identity and protected boolean validation의 정상·거부/오류 경로를 코드로 검증한다. 입력으로 준비한 fixture 또는 실제 시험용 경로를 사용한다.
+
+**매개변수/반환 및 실행 관계**: `def test_rule_identity_and_protected_boolean_validation(self):`를 확인한다. `self`는 unittest 인스턴스이며, 인자가 있는 helper는 테스트의 setup/record 생성 시 전달받는다. 명시적 `return`이 없다면 `None`을 반환하고 성공 판단은 예외/단언문으로 한다. 본문에서 관찰되는 호출 이름: `test_rule_identity_and_protected_boolean_validation`, `in`, `atomic_json`, `subTest`, `assertRaises`, `config`.
+
+**입력·상태 변경 지점(원본)**:
+- [L189](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L189) `eq.atomic_json(self.run / 'config.json', dict(self.cfg, critical_rules=rules))`
+- [L191](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L191) `eq.config(self.run / 'config.json')`
+
+**성공 조건·실패 조건을 표현한 실제 검사식**:
+- [L190](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L190) `with self.subTest(rules=rules), self.assertRaises(ValueError):`
+
+**검증 범위와 한계**: 이 함수는 위에 명시한 입력·성공 조건까지 검사한다. 가상 데이터/SQLite/원장 fixture의 통과는 커널 eBPF verifier, 실제 드라이브 전원 장애 또는 타 Linux 버전의 수집 무손실을 검증하지 못한다. `assertRaises`는 오류가 발생해야 통과하며, 정상 실행을 확인하는 검사와 방향이 반대다. 테스트용 정해진 ID/시간/경로는 서비스의 실제 고정값이 아니다.
+
+**원본 함수 전체**
+
+```python
+    def test_rule_identity_and_protected_boolean_validation(self):
+        rule = dict(id=1, event_type='openat', path='/tmp/first', protected=False)
+        for rules in ([rule, rule], [dict(rule, id=0)], [dict(rule, protected=1)],
+                      [dict(rule, event_type='credential_change')], None):
+            eq.atomic_json(self.run / 'config.json', dict(self.cfg, critical_rules=rules))
+            with self.subTest(rules=rules), self.assertRaises(ValueError):
+                eq.config(self.run / 'config.json')
+```
+
+#### advanced_config — [test_manage.py:193–205](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L193-L205)
+
+**정의 위치·목적**: 테스트 fixture의 입력·출력을 구성한다. 입력으로 준비한 fixture 또는 실제 시험용 경로를 사용한다.
+
+**매개변수/반환 및 실행 관계**: `def advanced_config(self, when=None, **changes):`를 확인한다. `self`는 unittest 인스턴스이며, 인자가 있는 helper는 테스트의 setup/record 생성 시 전달받는다. 명시적 `return`이 없다면 `None`을 반환하고 성공 판단은 예외/단언문으로 한다. 본문에서 관찰되는 호출 이름: `advanced_config`, `pop`, `update`, `atomic_json`.
+
+**입력·상태 변경 지점(원본)**:
+- [L194](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L194) `cfg = dict(self.cfg)`
+- [L195](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L195) `cfg.pop('critical_rules', None)`
+- [L201](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L201) `cfg['event_rules'] = [rule]`
+- [L202](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L202) `eq.atomic_json(self.run / 'config.json', cfg)`
+
+**성공 조건·실패 조건을 표현한 실제 검사식**:
+- 직접 `assert`하지 않는 fixture helper다. 이를 호출하는 개별 `test_*` 메서드의 검사식을 봐야 한다.
+
+**검증 범위와 한계**: 이 함수는 위에 명시한 입력·성공 조건까지 검사한다. 가상 데이터/SQLite/원장 fixture의 통과는 커널 eBPF verifier, 실제 드라이브 전원 장애 또는 타 Linux 버전의 수집 무손실을 검증하지 못한다. `assertRaises`는 오류가 발생해야 통과하며, 정상 실행을 확인하는 검사와 방향이 반대다. 테스트용 정해진 ID/시간/경로는 서비스의 실제 고정값이 아니다.
+
+**원본 함수 전체**
+
+```python
+    def advanced_config(self, when=None, **changes):
+        cfg = dict(self.cfg)
+        cfg.pop('critical_rules', None)
+        rule = dict(id=7, priority='CRITICAL', overload_policy='QUARANTINE',
+                    when=when or {'all': [
+                        dict(field='event_type', op='eq', value='openat'),
+                        dict(field='path', op='prefix', value='/etc/')]})
+        rule.update(changes)
+        cfg['event_rules'] = [rule]
+        eq.atomic_json(self.run / 'config.json', cfg)
+        return cfg
+```
+
+#### test_advanced_rules_compile_fixed_abi_and_normalize_defaults — [test_manage.py:206–224](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L206-L224)
+
+**정의 위치·목적**: advanced rules compile fixed abi and normalize defaults의 정상·거부/오류 경로를 코드로 검증한다. 입력으로 준비한 fixture 또는 실제 시험용 경로를 사용한다.
+
+**매개변수/반환 및 실행 관계**: `def test_advanced_rules_compile_fixed_abi_and_normalize_defaults(self):`를 확인한다. `self`는 unittest 인스턴스이며, 인자가 있는 helper는 테스트의 setup/record 생성 시 전달받는다. 명시적 `return`이 없다면 `None`을 반환하고 성공 판단은 예외/단언문으로 한다. 본문에서 관찰되는 호출 이름: `test_advanced_rules_compile_fixed_abi_and_normalize_defaults`, `advanced_config`, `config`, `assertTrue`, `assertEqual`, `compile_rule_file`, `unpack`, `crc32`, `encode`.
+
+**입력·상태 변경 지점(원본)**:
+- [L208](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L208) `cfg = eq.config(self.run / 'config.json')`
+- [L209](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L209) `rule = cfg['event_rules'][0]`
+- [L212](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L212) `blob = eq.compile_rule_file(cfg)`
+- [L213](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L213) `magic, version, count, size, checksum = struct.unpack('<5I', blob[:20])`
+- [L217](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L217) `values = struct.unpack('<8I6Q', blob[20:100])`
+- [L220](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L220) `path_token = struct.unpack('<4I4q', blob[20 + 80 + 48:20 + 80 + 96])`
+
+**성공 조건·실패 조건을 표현한 실제 검사식**:
+- [L210](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L210) `self.assertTrue(rule['enabled'])`
+- [L211](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L211) `self.assertEqual(rule['precedence'], 0)`
+- [L214](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L214) `self.assertEqual((magic, version, count, size),`
+- [L216](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L216) `self.assertEqual(checksum, zlib.crc32(blob[20:]))`
+- [L218](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L218) `self.assertEqual(values[:6], (7, 1, 0, 2, 1, 3))`
+- [L219](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L219) `self.assertEqual(values[8:10], (9000, 3000))`
+- [L221](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L221) `self.assertEqual(path_token[:4], (1, eq.RULE_FIELDS['path'], eq.RULE_OPERATORS['prefix'], 1))`
+- [L222](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L222) `self.assertEqual(path_token[4], len('/etc/'.encode()) << 32)`
+- [L223](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L223) `self.assertEqual(len(blob), 2276)`
+
+**검증 범위와 한계**: 이 함수는 위에 명시한 입력·성공 조건까지 검사한다. 가상 데이터/SQLite/원장 fixture의 통과는 커널 eBPF verifier, 실제 드라이브 전원 장애 또는 타 Linux 버전의 수집 무손실을 검증하지 못한다. `assertRaises`는 오류가 발생해야 통과하며, 정상 실행을 확인하는 검사와 방향이 반대다. 테스트용 정해진 ID/시간/경로는 서비스의 실제 고정값이 아니다.
+
+**원본 함수 전체**
+
+```python
+    def test_advanced_rules_compile_fixed_abi_and_normalize_defaults(self):
+        self.advanced_config(quarantine=dict(critical_rate_threshold=9000))
+        cfg = eq.config(self.run / 'config.json')
+        rule = cfg['event_rules'][0]
+        self.assertTrue(rule['enabled'])
+        self.assertEqual(rule['precedence'], 0)
+        blob = eq.compile_rule_file(cfg)
+        magic, version, count, size, checksum = struct.unpack('<5I', blob[:20])
+        self.assertEqual((magic, version, count, size),
+                         (eq.RULE_FILE_MAGIC, 1, 1, 2256))
+        self.assertEqual(checksum, zlib.crc32(blob[20:]))
+        values = struct.unpack('<8I6Q', blob[20:100])
+        self.assertEqual(values[:6], (7, 1, 0, 2, 1, 3))
+        self.assertEqual(values[8:10], (9000, 3000))
+        path_token = struct.unpack('<4I4q', blob[20 + 80 + 48:20 + 80 + 96])
+        self.assertEqual(path_token[:4], (1, eq.RULE_FIELDS['path'], eq.RULE_OPERATORS['prefix'], 1))
+        self.assertEqual(path_token[4], len('/etc/'.encode()) << 32)
+        self.assertEqual(len(blob), 2276)
+```
+
+#### test_string_operands_encode_utf8_length_and_pool_offset — [test_manage.py:225–237](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L225-L237)
+
+**정의 위치·목적**: string operands encode utf8 length and pool offset의 정상·거부/오류 경로를 코드로 검증한다. 입력으로 준비한 fixture 또는 실제 시험용 경로를 사용한다.
+
+**매개변수/반환 및 실행 관계**: `def test_string_operands_encode_utf8_length_and_pool_offset(self):`를 확인한다. `self`는 unittest 인스턴스이며, 인자가 있는 helper는 테스트의 setup/record 생성 시 전달받는다. 명시적 `return`이 없다면 `None`을 반환하고 성공 판단은 예외/단언문으로 한다. 본문에서 관찰되는 호출 이름: `test_string_operands_encode_utf8_length_and_pool_offset`, `advanced_config`, `compile_rule_file`, `config`, `unpack`, `assertEqual`.
+
+**입력·상태 변경 지점(원본)**:
+- [L229](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L229) `blob = eq.compile_rule_file(eq.config(self.run / 'config.json'))`
+- [L230](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L230) `token0 = struct.unpack('<4I4q', blob[20 + 80:20 + 128])`
+- [L231](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L231) `token1 = struct.unpack('<4I4q', blob[20 + 128:20 + 176])`
+
+**성공 조건·실패 조건을 표현한 실제 검사식**:
+- [L232](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L232) `self.assertEqual(token0[:4], (1, eq.RULE_FIELDS['path'], eq.RULE_OPERATORS['in'], 2))`
+- [L233](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L233) `self.assertEqual(token0[4:6], ((11 << 32), (11 << 32) | 12))`
+- [L234](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L234) `self.assertEqual(token1[:4], (1, eq.RULE_FIELDS['comm'], eq.RULE_OPERATORS['ne'], 1))`
+- [L235](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L235) `self.assertEqual(token1[4], (4 << 32) | 24)`
+
+**검증 범위와 한계**: 이 함수는 위에 명시한 입력·성공 조건까지 검사한다. 가상 데이터/SQLite/원장 fixture의 통과는 커널 eBPF verifier, 실제 드라이브 전원 장애 또는 타 Linux 버전의 수집 무손실을 검증하지 못한다. `assertRaises`는 오류가 발생해야 통과하며, 정상 실행을 확인하는 검사와 방향이 반대다. 테스트용 정해진 ID/시간/경로는 서비스의 실제 고정값이 아니다.
+
+**원본 함수 전체**
+
+```python
+    def test_string_operands_encode_utf8_length_and_pool_offset(self):
+        when = {'all': [dict(field='path', op='in', value=['/etc/passwd', '/etc/shadow']),
+                        dict(field='comm', op='ne', value='bash')]}
+        self.advanced_config(when)
+        blob = eq.compile_rule_file(eq.config(self.run / 'config.json'))
+        token0 = struct.unpack('<4I4q', blob[20 + 80:20 + 128])
+        token1 = struct.unpack('<4I4q', blob[20 + 128:20 + 176])
+        self.assertEqual(token0[:4], (1, eq.RULE_FIELDS['path'], eq.RULE_OPERATORS['in'], 2))
+        self.assertEqual(token0[4:6], ((11 << 32), (11 << 32) | 12))
+        self.assertEqual(token1[:4], (1, eq.RULE_FIELDS['comm'], eq.RULE_OPERATORS['ne'], 1))
+        self.assertEqual(token1[4], (4 << 32) | 24)
+```
+
+#### test_advanced_boolean_numeric_string_and_logic — [test_manage.py:238–260](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L238-L260)
+
+**정의 위치·목적**: advanced boolean numeric string and logic의 정상·거부/오류 경로를 코드로 검증한다. 입력으로 준비한 fixture 또는 실제 시험용 경로를 사용한다.
+
+**매개변수/반환 및 실행 관계**: `def test_advanced_boolean_numeric_string_and_logic(self):`를 확인한다. `self`는 unittest 인스턴스이며, 인자가 있는 helper는 테스트의 setup/record 생성 시 전달받는다. 명시적 `return`이 없다면 `None`을 반환하고 성공 판단은 예외/단언문으로 한다. 본문에서 관찰되는 호출 이름: `test_advanced_boolean_numeric_string_and_logic`, `advanced_config`, `config`, `assertEqual`, `in`, `subTest`.
+
+**입력·상태 변경 지점(원본)**:
+- [L248](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L248) `cfg = eq.config(self.run / 'config.json')`
+- [L249](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L249) `self.assertEqual(cfg['event_rules'][0]['when'], when)`
+- [L258](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L258) `eq.config(self.run / 'config.json')`
+
+**성공 조건·실패 조건을 표현한 실제 검사식**:
+- [L249](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L249) `self.assertEqual(cfg['event_rules'][0]['when'], when)`
+
+**검증 범위와 한계**: 이 함수는 위에 명시한 입력·성공 조건까지 검사한다. 가상 데이터/SQLite/원장 fixture의 통과는 커널 eBPF verifier, 실제 드라이브 전원 장애 또는 타 Linux 버전의 수집 무손실을 검증하지 못한다. `assertRaises`는 오류가 발생해야 통과하며, 정상 실행을 확인하는 검사와 방향이 반대다. 테스트용 정해진 ID/시간/경로는 서비스의 실제 고정값이 아니다.
+
+**원본 함수 전체**
+
+```python
+    def test_advanced_boolean_numeric_string_and_logic(self):
+        when = {'all': [
+            dict(field='event_type', op='eq', value='openat'),
+            {'any': [dict(field='comm', op='in', value=['bash', 'python3']),
+                     dict(field='uid', op='gt', value=0)]},
+            {'not': dict(field='path', op='prefix', value='/tmp/')},
+            dict(field='success', op='eq', value=True),
+            dict(field='access_mode', op='in', value=['write', 'read_write']),
+            dict(field='write_access', op='eq', value=True)]}
+        self.advanced_config(when)
+        cfg = eq.config(self.run / 'config.json')
+        self.assertEqual(cfg['event_rules'][0]['when'], when)
+        for leaf in (dict(field='create', op='eq', value=False),
+                     dict(field='truncate', op='ne', value=True),
+                     dict(field='root', op='eq', value=False),
+                     dict(field='pid', op='ge', value=1),
+                     dict(field='cgroup_id', op='ne', value=0),
+                     dict(field='result', op='lt', value=5)):
+            with self.subTest(leaf=leaf):
+                self.advanced_config(leaf)
+                eq.config(self.run / 'config.json')
+```
+
+#### test_advanced_rules_reject_unknown_types_and_unobservable_exec_failure — [test_manage.py:261–283](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L261-L283)
+
+**정의 위치·목적**: advanced rules reject unknown types and unobservable exec failure의 정상·거부/오류 경로를 코드로 검증한다. 입력으로 준비한 fixture 또는 실제 시험용 경로를 사용한다.
+
+**매개변수/반환 및 실행 관계**: `def test_advanced_rules_reject_unknown_types_and_unobservable_exec_failure(self):`를 확인한다. `self`는 unittest 인스턴스이며, 인자가 있는 helper는 테스트의 setup/record 생성 시 전달받는다. 명시적 `return`이 없다면 `None`을 반환하고 성공 판단은 예외/단언문으로 한다. 본문에서 관찰되는 호출 이름: `test_advanced_rules_reject_unknown_types_and_unobservable_exec_failure`, `subTest`, `advanced_config`, `assertRaises`, `config`.
+
+**입력·상태 변경 지점(원본)**:
+- [L281](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L281) `eq.config(self.run / 'config.json')`
+
+**성공 조건·실패 조건을 표현한 실제 검사식**:
+- [L280](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L280) `with self.assertRaises(ValueError):`
+
+**검증 범위와 한계**: 이 함수는 위에 명시한 입력·성공 조건까지 검사한다. 가상 데이터/SQLite/원장 fixture의 통과는 커널 eBPF verifier, 실제 드라이브 전원 장애 또는 타 Linux 버전의 수집 무손실을 검증하지 못한다. `assertRaises`는 오류가 발생해야 통과하며, 정상 실행을 확인하는 검사와 방향이 반대다. 테스트용 정해진 ID/시간/경로는 서비스의 실제 고정값이 아니다.
+
+**원본 함수 전체**
+
+```python
+    def test_advanced_rules_reject_unknown_types_and_unobservable_exec_failure(self):
+        bad_conditions = [
+            dict(field='uid', op='prefix', value=1),
+            dict(field='path', op='prefix', value='/etc'),
+            dict(field='path', op='eq', value='relative'),
+            dict(field='comm', op='eq', value='abcdefghijklmnop'),
+            dict(field='uid', op='eq', value=True),
+            dict(field='success', op='eq', value=1),
+            dict(field='uid', op='in', value=[1, 1]),
+            dict(field='cgroup_id', op='eq', value=1 << 63),
+            dict(field='unavailable', op='eq', value=1),
+            {'all': [dict(field='event_type', op='eq', value='exec'),
+                     dict(field='success', op='eq', value=False)]},
+            {'all': [dict(field='event_type', op='eq', value='exec'),
+                     dict(field='result', op='lt', value=0)]},
+        ]
+        for when in bad_conditions:
+            with self.subTest(when=when):
+                self.advanced_config(when)
+                with self.assertRaises(ValueError):
+                    eq.config(self.run / 'config.json')
+```
+
+#### test_advanced_rule_limits_and_legacy_exclusion — [test_manage.py:284–300](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L284-L300)
+
+**정의 위치·목적**: advanced rule limits and legacy exclusion의 정상·거부/오류 경로를 코드로 검증한다. 입력으로 준비한 fixture 또는 실제 시험용 경로를 사용한다.
+
+**매개변수/반환 및 실행 관계**: `def test_advanced_rule_limits_and_legacy_exclusion(self):`를 확인한다. `self`는 unittest 인스턴스이며, 인자가 있는 helper는 테스트의 setup/record 생성 시 전달받는다. 명시적 `return`이 없다면 `None`을 반환하고 성공 판단은 예외/단언문으로 한다. 본문에서 관찰되는 호출 이름: `test_advanced_rule_limits_and_legacy_exclusion`, `advanced_config`, `atomic_json`, `assertRaisesRegex`, `config`, `pop`, `assertRaises`.
+
+**입력·상태 변경 지점(원본)**:
+- [L285](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L285) `cfg = self.advanced_config()`
+- [L286](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L286) `cfg['critical_rules'] = self.cfg['critical_rules']`
+- [L287](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L287) `eq.atomic_json(self.run / 'config.json', cfg)`
+- [L289](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L289) `eq.config(self.run / 'config.json')`
+- [L290](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L290) `cfg.pop('critical_rules')`
+- [L291](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L291) `cfg['event_rules'] = cfg['event_rules'] * 9`
+- [L292](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L292) `eq.atomic_json(self.run / 'config.json', cfg)`
+- [L293](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L293) `with self.assertRaises(ValueError): eq.config(self.run / 'config.json')`
+- [L294](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L294) `cfg['event_rules'] = cfg['event_rules'][:1]`
+- [L295](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L295) `cfg['event_rules'][0]['when'] = {'not': {'not': {'not': {'not':`
+- [L297](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L297) `eq.atomic_json(self.run / 'config.json', cfg)`
+- [L298](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L298) `with self.assertRaises(ValueError): eq.config(self.run / 'config.json')`
+
+**성공 조건·실패 조건을 표현한 실제 검사식**:
+- [L288](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L288) `with self.assertRaisesRegex(ValueError, '동시에'):`
+- [L293](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L293) `with self.assertRaises(ValueError): eq.config(self.run / 'config.json')`
+- [L298](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L298) `with self.assertRaises(ValueError): eq.config(self.run / 'config.json')`
+
+**검증 범위와 한계**: 이 함수는 위에 명시한 입력·성공 조건까지 검사한다. 가상 데이터/SQLite/원장 fixture의 통과는 커널 eBPF verifier, 실제 드라이브 전원 장애 또는 타 Linux 버전의 수집 무손실을 검증하지 못한다. `assertRaises`는 오류가 발생해야 통과하며, 정상 실행을 확인하는 검사와 방향이 반대다. 테스트용 정해진 ID/시간/경로는 서비스의 실제 고정값이 아니다.
+
+**원본 함수 전체**
+
+```python
+    def test_advanced_rule_limits_and_legacy_exclusion(self):
+        cfg = self.advanced_config()
+        cfg['critical_rules'] = self.cfg['critical_rules']
+        eq.atomic_json(self.run / 'config.json', cfg)
+        with self.assertRaisesRegex(ValueError, '동시에'):
+            eq.config(self.run / 'config.json')
+        cfg.pop('critical_rules')
+        cfg['event_rules'] = cfg['event_rules'] * 9
+        eq.atomic_json(self.run / 'config.json', cfg)
+        with self.assertRaises(ValueError): eq.config(self.run / 'config.json')
+        cfg['event_rules'] = cfg['event_rules'][:1]
+        cfg['event_rules'][0]['when'] = {'not': {'not': {'not': {'not':
+            dict(field='uid', op='eq', value=0)}}}}
+        eq.atomic_json(self.run / 'config.json', cfg)
+        with self.assertRaises(ValueError): eq.config(self.run / 'config.json')
+```
+
+#### test_advanced_policy_and_quarantine_constraints — [test_manage.py:301–310](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L301-L310)
+
+**정의 위치·목적**: advanced policy and quarantine constraints의 정상·거부/오류 경로를 코드로 검증한다. 입력으로 준비한 fixture 또는 실제 시험용 경로를 사용한다.
+
+**매개변수/반환 및 실행 관계**: `def test_advanced_policy_and_quarantine_constraints(self):`를 확인한다. `self`는 unittest 인스턴스이며, 인자가 있는 helper는 테스트의 setup/record 생성 시 전달받는다. 명시적 `return`이 없다면 `None`을 반환하고 성공 판단은 예외/단언문으로 한다. 본문에서 관찰되는 호출 이름: `test_advanced_policy_and_quarantine_constraints`, `in`, `subTest`, `advanced_config`, `assertRaises`, `config`.
+
+**입력·상태 변경 지점(원본)**:
+- [L308](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L308) `with self.assertRaises(ValueError): eq.config(self.run / 'config.json')`
+
+**성공 조건·실패 조건을 표현한 실제 검사식**:
+- [L308](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L308) `with self.assertRaises(ValueError): eq.config(self.run / 'config.json')`
+
+**검증 범위와 한계**: 이 함수는 위에 명시한 입력·성공 조건까지 검사한다. 가상 데이터/SQLite/원장 fixture의 통과는 커널 eBPF verifier, 실제 드라이브 전원 장애 또는 타 Linux 버전의 수집 무손실을 검증하지 못한다. `assertRaises`는 오류가 발생해야 통과하며, 정상 실행을 확인하는 검사와 방향이 반대다. 테스트용 정해진 ID/시간/경로는 서비스의 실제 고정값이 아니다.
+
+**원본 함수 전체**
+
+```python
+    def test_advanced_policy_and_quarantine_constraints(self):
+        for changes in (dict(priority='NORMAL', overload_policy='QUARANTINE'),
+                        dict(overload_policy='NORMAL_COLLECTION', quarantine=dict(critical_rate_threshold=2)),
+                        dict(quarantine=dict(critical_recovery_threshold=10000)),
+                        dict(enabled=1), dict(precedence=1001)):
+            with self.subTest(changes=changes):
+                self.advanced_config(**changes)
+                with self.assertRaises(ValueError): eq.config(self.run / 'config.json')
+```
+
+#### test_schema3_noncritical_rule_and_policy_versions — [test_manage.py:311–320](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L311-L320)
+
+**정의 위치·목적**: schema3 noncritical rule and policy versions의 정상·거부/오류 경로를 코드로 검증한다. 입력으로 준비한 fixture 또는 실제 시험용 경로를 사용한다.
+
+**매개변수/반환 및 실행 관계**: `def test_schema3_noncritical_rule_and_policy_versions(self):`를 확인한다. `self`는 unittest 인스턴스이며, 인자가 있는 helper는 테스트의 setup/record 생성 시 전달받는다. 명시적 `return`이 없다면 `None`을 반환하고 성공 판단은 예외/단언문으로 한다. 본문에서 관찰되는 호출 이름: `test_schema3_noncritical_rule_and_policy_versions`, `decode_record`, `record`, `assertEqual`, `in`, `subTest`, `assertRaises`.
+
+**입력·상태 변경 지점(원본)**:
+- 이 함수가 fixture 전역값·기본 객체를 그대로 사용하거나 순수하게 값을 계산한다.
+
+**성공 조건·실패 조건을 표현한 실제 검사식**:
+- [L314](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L314) `self.assertEqual((value['rule_id'], value['rule_version'], value['policy_version']), (7, 1, 1))`
+- [L315](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L315) `self.assertEqual(value['configured_overload_policy'], 'NORMAL_COLLECTION')`
+- [L316](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L316) `self.assertEqual(value['effective_policy'], 'NORMAL')`
+- [L318](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L318) `with self.subTest(bad=bad), self.assertRaises(ValueError):`
+
+**검증 범위와 한계**: 이 함수는 위에 명시한 입력·성공 조건까지 검사한다. 가상 데이터/SQLite/원장 fixture의 통과는 커널 eBPF verifier, 실제 드라이브 전원 장애 또는 타 Linux 버전의 수집 무손실을 검증하지 못한다. `assertRaises`는 오류가 발생해야 통과하며, 정상 실행을 확인하는 검사와 방향이 반대다. 테스트용 정해진 ID/시간/경로는 서비스의 실제 고정값이 아니다.
+
+**원본 함수 전체**
+
+```python
+    def test_schema3_noncritical_rule_and_policy_versions(self):
+        quality = (1 << 24) | (1 << 28) | (7 << 16)
+        value = eq.decode_record(record(priority=1, schema=3, quality=quality))
+        self.assertEqual((value['rule_id'], value['rule_version'], value['policy_version']), (7, 1, 1))
+        self.assertEqual(value['configured_overload_policy'], 'NORMAL_COLLECTION')
+        self.assertEqual(value['effective_policy'], 'NORMAL')
+        for bad in (quality & ~(1 << 28), quality | (1 << 15), quality | (1 << 13)):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                eq.decode_record(record(priority=1, schema=3, quality=bad))
+```
+
+#### test_older_raw_does_not_claim_rule_or_policy_version — [test_manage.py:321–329](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L321-L329)
+
+**정의 위치·목적**: older raw does not claim rule or policy version의 정상·거부/오류 경로를 코드로 검증한다. 입력으로 준비한 fixture 또는 실제 시험용 경로를 사용한다.
+
+**매개변수/반환 및 실행 관계**: `def test_older_raw_does_not_claim_rule_or_policy_version(self):`를 확인한다. `self`는 unittest 인스턴스이며, 인자가 있는 helper는 테스트의 setup/record 생성 시 전달받는다. 명시적 `return`이 없다면 `None`을 반환하고 성공 판단은 예외/단언문으로 한다. 본문에서 관찰되는 호출 이름: `test_older_raw_does_not_claim_rule_or_policy_version`, `in`, `subTest`, `decode_record`, `record`, `assertIsNone`, `assertEqual`.
+
+**입력·상태 변경 지점(원본)**:
+- 이 함수가 fixture 전역값·기본 객체를 그대로 사용하거나 순수하게 값을 계산한다.
+
+**성공 조건·실패 조건을 표현한 실제 검사식**:
+- [L325](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L325) `self.assertIsNone(event['rule_version'])`
+- [L326](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L326) `self.assertIsNone(event['policy_version'])`
+- [L327](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L327) `self.assertEqual(event['rule_id'], None if schema == 1 else 0)`
+
+**검증 범위와 한계**: 이 함수는 위에 명시한 입력·성공 조건까지 검사한다. 가상 데이터/SQLite/원장 fixture의 통과는 커널 eBPF verifier, 실제 드라이브 전원 장애 또는 타 Linux 버전의 수집 무손실을 검증하지 못한다. `assertRaises`는 오류가 발생해야 통과하며, 정상 실행을 확인하는 검사와 방향이 반대다. 테스트용 정해진 ID/시간/경로는 서비스의 실제 고정값이 아니다.
+
+**원본 함수 전체**
+
+```python
+    def test_older_raw_does_not_claim_rule_or_policy_version(self):
+        for schema in (1, 2):
+            with self.subTest(schema=schema):
+                event = eq.decode_record(record(priority=1, schema=schema))
+                self.assertIsNone(event['rule_version'])
+                self.assertIsNone(event['policy_version'])
+                self.assertEqual(event['rule_id'], None if schema == 1 else 0)
+```
+
+#### test_schema3_exempt_and_quarantine_raw_lane — [test_manage.py:330–344](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L330-L344)
+
+**정의 위치·목적**: schema3 exempt and quarantine raw lane의 정상·거부/오류 경로를 코드로 검증한다. 입력으로 준비한 fixture 또는 실제 시험용 경로를 사용한다.
+
+**매개변수/반환 및 실행 관계**: `def test_schema3_exempt_and_quarantine_raw_lane(self):`를 확인한다. `self`는 unittest 인스턴스이며, 인자가 있는 helper는 테스트의 setup/record 생성 시 전달받는다. 명시적 `return`이 없다면 `None`을 반환하고 성공 판단은 예외/단언문으로 한다. 본문에서 관찰되는 호출 이름: `test_schema3_exempt_and_quarantine_raw_lane`, `decode_record`, `record`, `assertEqual`, `write_bytes`, `save_health`, `index_batch`, `query`.
+
+**입력·상태 변경 지점(원본)**:
+- [L338](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L338) `(self.run / 'quarantine.raw').write_bytes(raw)`
+
+**성공 조건·실패 조건을 표현한 실제 검사식**:
+- [L334](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L334) `self.assertEqual(exempt['configured_overload_policy'], 'QUARANTINE_EXEMPT')`
+- [L335](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L335) `self.assertEqual(exempt['effective_policy'], 'QUARANTINE_EXEMPT')`
+- [L342](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L342) `self.assertEqual(eq.query(self.run, critical=True)['records'][0]['rule_id'], 7)`
+
+**검증 범위와 한계**: 이 함수는 위에 명시한 입력·성공 조건까지 검사한다. 가상 데이터/SQLite/원장 fixture의 통과는 커널 eBPF verifier, 실제 드라이브 전원 장애 또는 타 Linux 버전의 수집 무손실을 검증하지 못한다. `assertRaises`는 오류가 발생해야 통과하며, 정상 실행을 확인하는 검사와 방향이 반대다. 테스트용 정해진 ID/시간/경로는 서비스의 실제 고정값이 아니다.
+
+**원본 함수 전체**
+
+```python
+    def test_schema3_exempt_and_quarantine_raw_lane(self):
+        common = (1 << 24) | (1 << 28) | (7 << 16)
+        exempt = eq.decode_record(record(priority=2, schema=3,
+                                         quality=common | (2 << 13) | eq.Q_PROTECTED))
+        self.assertEqual(exempt['configured_overload_policy'], 'QUARANTINE_EXEMPT')
+        self.assertEqual(exempt['effective_policy'], 'QUARANTINE_EXEMPT')
+        raw = record(2, priority=2, schema=3,
+                     quality=common | (1 << 13) | eq.Q_QUARANTINED | eq.Q_PERIODIC)
+        (self.run / 'quarantine.raw').write_bytes(raw)
+        self.health['durable']['quarantine.raw'] = 240
+        self.save_health()
+        eq.index_batch(self.run)
+        self.assertEqual(eq.query(self.run, critical=True)['records'][0]['rule_id'], 7)
+```
+
+#### test_documented_advanced_examples_validate — [test_manage.py:345–351](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L345-L351)
+
+**정의 위치·목적**: documented advanced examples validate의 정상·거부/오류 경로를 코드로 검증한다. 입력으로 준비한 fixture 또는 실제 시험용 경로를 사용한다.
+
+**매개변수/반환 및 실행 관계**: `def test_documented_advanced_examples_validate(self):`를 확인한다. `self`는 unittest 인스턴스이며, 인자가 있는 helper는 테스트의 setup/record 생성 시 전달받는다. 명시적 `return`이 없다면 `None`을 반환하고 성공 판단은 예외/단언문으로 한다. 본문에서 관찰되는 호출 이름: `test_documented_advanced_examples_validate`, `sorted`, `glob`, `subTest`, `config`, `assertEqual`, `unpack`, `compile_rule_file`.
+
+**입력·상태 변경 지점(원본)**:
+- [L346](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L346) `for path in sorted((eq.ROOT / 'examples').glob('*.json')):`
+- [L348](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L348) `cfg = eq.config(path)`
+- [L349](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L349) `self.assertEqual(struct.unpack('<I', eq.compile_rule_file(cfg)[:4])[0],`
+
+**성공 조건·실패 조건을 표현한 실제 검사식**:
+- [L349](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L349) `self.assertEqual(struct.unpack('<I', eq.compile_rule_file(cfg)[:4])[0],`
+
+**검증 범위와 한계**: 이 함수는 위에 명시한 입력·성공 조건까지 검사한다. 가상 데이터/SQLite/원장 fixture의 통과는 커널 eBPF verifier, 실제 드라이브 전원 장애 또는 타 Linux 버전의 수집 무손실을 검증하지 못한다. `assertRaises`는 오류가 발생해야 통과하며, 정상 실행을 확인하는 검사와 방향이 반대다. 테스트용 정해진 ID/시간/경로는 서비스의 실제 고정값이 아니다.
+
+**원본 함수 전체**
+
+```python
+    def test_documented_advanced_examples_validate(self):
+        for path in sorted((eq.ROOT / 'examples').glob('*.json')):
+            with self.subTest(path=path.name):
+                cfg = eq.config(path)
+                self.assertEqual(struct.unpack('<I', eq.compile_rule_file(cfg)[:4])[0],
+                                 eq.RULE_FILE_MAGIC)
+```
+
+#### test_new_run_manifest_matches_schema3_collector_for_both_rule_formats — [test_manage.py:352–370](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L352-L370)
+
+**정의 위치·목적**: new run manifest matches schema3 collector for both rule formats의 정상·거부/오류 경로를 코드로 검증한다. 입력으로 준비한 fixture 또는 실제 시험용 경로를 사용한다.
+
+**매개변수/반환 및 실행 관계**: `def test_new_run_manifest_matches_schema3_collector_for_both_rule_formats(self):`를 확인한다. `self`는 unittest 인스턴스이며, 인자가 있는 helper는 테스트의 setup/record 생성 시 전달받는다. 명시적 `return`이 없다면 `None`을 반환하고 성공 판단은 예외/단언문으로 한다. 본문에서 관찰되는 호출 이름: `test_new_run_manifest_matches_schema3_collector_for_both_rule_formats`, `mkdir`, `advanced_config`, `config`, `with`, `object`, `in`, `subTest`, `create_run`, `read_json`, `assertEqual`, `exists`.
+
+**입력·상태 변경 지점(원본)**:
+- [L355](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L355) `advanced = eq.config(self.run / 'config.json')`
+- [L361](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L361) `for cfg, has_binary in ((self.cfg, False), (advanced, True)):`
+- [L363](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L363) `run = eq.create_run(cfg)`
+- [L364](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L364) `manifest = eq.read_json(run / 'manifest.json')`
+
+**성공 조건·실패 조건을 표현한 실제 검사식**:
+- [L365](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L365) `self.assertEqual((manifest['raw_schema'], manifest['rule_engine_schema_version'],`
+- [L367](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L367) `self.assertEqual((run / 'rules.bin').exists(), has_binary)`
+- [L368](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L368) `self.assertEqual('rules_bin_sha256' in manifest, has_binary)`
+
+**검증 범위와 한계**: 이 함수는 위에 명시한 입력·성공 조건까지 검사한다. 가상 데이터/SQLite/원장 fixture의 통과는 커널 eBPF verifier, 실제 드라이브 전원 장애 또는 타 Linux 버전의 수집 무손실을 검증하지 못한다. `assertRaises`는 오류가 발생해야 통과하며, 정상 실행을 확인하는 검사와 방향이 반대다. 테스트용 정해진 ID/시간/경로는 서비스의 실제 고정값이 아니다.
+
+**원본 함수 전체**
+
+```python
+    def test_new_run_manifest_matches_schema3_collector_for_both_rule_formats(self):
+        (self.run / 'runs').mkdir()
+        self.advanced_config()
+        advanced = eq.config(self.run / 'config.json')
+        with (patch.object(eq, 'DATA', self.run),
+              patch.object(eq, 'capability', return_value={'ready': True}),
+              patch.object(eq, 'current', return_value=None),
+              patch.object(eq, 'filesystem_free_bytes', return_value=1 << 40),
+              patch.object(eq, 'fingerprint', return_value='a' * 64)):
+            for cfg, has_binary in ((self.cfg, False), (advanced, True)):
+                with self.subTest(has_binary=has_binary):
+                    run = eq.create_run(cfg)
+                    manifest = eq.read_json(run / 'manifest.json')
+                    self.assertEqual((manifest['raw_schema'], manifest['rule_engine_schema_version'],
+                                      manifest['policy_version']), (3, 1, 1))
+                    self.assertEqual((run / 'rules.bin').exists(), has_binary)
+                    self.assertEqual('rules_bin_sha256' in manifest, has_binary)
+```
+
+#### test_quarantine_original_priority_and_index_lane — [test_manage.py:371–382](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L371-L382)
+
+**정의 위치·목적**: quarantine original priority and index lane의 정상·거부/오류 경로를 코드로 검증한다. 입력으로 준비한 fixture 또는 실제 시험용 경로를 사용한다.
+
+**매개변수/반환 및 실행 관계**: `def test_quarantine_original_priority_and_index_lane(self):`를 확인한다. `self`는 unittest 인스턴스이며, 인자가 있는 helper는 테스트의 setup/record 생성 시 전달받는다. 명시적 `return`이 없다면 `None`을 반환하고 성공 판단은 예외/단언문으로 한다. 본문에서 관찰되는 호출 이름: `test_quarantine_original_priority_and_index_lane`, `record`, `decode_record`, `assertEqual`, `write_bytes`, `save_health`, `index_batch`, `query`.
+
+**입력·상태 변경 지점(원본)**:
+- [L378](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L378) `(self.run / 'quarantine.raw').write_bytes(raw)`
+
+**성공 조건·실패 조건을 표현한 실제 검사식**:
+- [L375](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L375) `self.assertEqual(decoded['original_priority'], 2)`
+- [L376](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L376) `self.assertEqual(decoded['effective_policy'], 'QUARANTINE')`
+- [L377](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L377) `self.assertEqual(decoded['rule_id'], 7)`
+- [L381](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L381) `self.assertEqual(eq.query(self.run, critical=True)['records'][0]['effective_policy'], 'QUARANTINE')`
+
+**검증 범위와 한계**: 이 함수는 위에 명시한 입력·성공 조건까지 검사한다. 가상 데이터/SQLite/원장 fixture의 통과는 커널 eBPF verifier, 실제 드라이브 전원 장애 또는 타 Linux 버전의 수집 무손실을 검증하지 못한다. `assertRaises`는 오류가 발생해야 통과하며, 정상 실행을 확인하는 검사와 방향이 반대다. 테스트용 정해진 ID/시간/경로는 서비스의 실제 고정값이 아니다.
+
+**원본 함수 전체**
+
+```python
+    def test_quarantine_original_priority_and_index_lane(self):
+        flags = (7 << 16) | eq.Q_QUARANTINED | eq.Q_PERIODIC
+        raw = record(2, priority=2, schema=2, quality=flags)
+        decoded = eq.decode_record(raw)
+        self.assertEqual(decoded['original_priority'], 2)
+        self.assertEqual(decoded['effective_policy'], 'QUARANTINE')
+        self.assertEqual(decoded['rule_id'], 7)
+        (self.run / 'quarantine.raw').write_bytes(raw)
+        self.health['durable']['quarantine.raw'] = 240; self.save_health()
+        eq.index_batch(self.run)
+        self.assertEqual(eq.query(self.run, critical=True)['records'][0]['effective_policy'], 'QUARANTINE')
+```
+
+#### test_invalid_schema2_policy_combinations — [test_manage.py:383–389](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L383-L389)
+
+**정의 위치·목적**: invalid schema2 policy combinations의 정상·거부/오류 경로를 코드로 검증한다. 입력으로 준비한 fixture 또는 실제 시험용 경로를 사용한다.
+
+**매개변수/반환 및 실행 관계**: `def test_invalid_schema2_policy_combinations(self):`를 확인한다. `self`는 unittest 인스턴스이며, 인자가 있는 helper는 테스트의 setup/record 생성 시 전달받는다. 명시적 `return`이 없다면 `None`을 반환하고 성공 판단은 예외/단언문으로 한다. 본문에서 관찰되는 호출 이름: `test_invalid_schema2_policy_combinations`, `in`, `subTest`, `assertRaises`, `decode_record`, `record`.
+
+**입력·상태 변경 지점(원본)**:
+- 이 함수가 fixture 전역값·기본 객체를 그대로 사용하거나 순수하게 값을 계산한다.
+
+**성공 조건·실패 조건을 표현한 실제 검사식**:
+- [L387](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L387) `with self.subTest(quality=quality), self.assertRaises(ValueError):`
+
+**검증 범위와 한계**: 이 함수는 위에 명시한 입력·성공 조건까지 검사한다. 가상 데이터/SQLite/원장 fixture의 통과는 커널 eBPF verifier, 실제 드라이브 전원 장애 또는 타 Linux 버전의 수집 무손실을 검증하지 못한다. `assertRaises`는 오류가 발생해야 통과하며, 정상 실행을 확인하는 검사와 방향이 반대다. 테스트용 정해진 ID/시간/경로는 서비스의 실제 고정값이 아니다.
+
+**원본 함수 전체**
+
+```python
+    def test_invalid_schema2_policy_combinations(self):
+        for quality in ((1 << 16) | eq.Q_QUARANTINED,
+                        (1 << 16) | eq.Q_INITIAL,
+                        (1 << 16) | eq.Q_QUARANTINED | eq.Q_INITIAL | eq.Q_PROTECTED):
+            with self.subTest(quality=quality), self.assertRaises(ValueError):
+                eq.decode_record(record(priority=2, schema=2, quality=quality))
+```
+
+#### test_protected_tracking_failure_does_not_quarantine — [test_manage.py:390–395](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L390-L395)
+
+**정의 위치·목적**: protected tracking failure does not quarantine의 정상·거부/오류 경로를 코드로 검증한다. 입력으로 준비한 fixture 또는 실제 시험용 경로를 사용한다.
+
+**매개변수/반환 및 실행 관계**: `def test_protected_tracking_failure_does_not_quarantine(self):`를 확인한다. `self`는 unittest 인스턴스이며, 인자가 있는 helper는 테스트의 setup/record 생성 시 전달받는다. 명시적 `return`이 없다면 `None`을 반환하고 성공 판단은 예외/단언문으로 한다. 본문에서 관찰되는 호출 이름: `test_protected_tracking_failure_does_not_quarantine`, `decode_record`, `record`, `assertEqual`, `assertFalse`.
+
+**입력·상태 변경 지점(원본)**:
+- 이 함수가 fixture 전역값·기본 객체를 그대로 사용하거나 순수하게 값을 계산한다.
+
+**성공 조건·실패 조건을 표현한 실제 검사식**:
+- [L393](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L393) `self.assertEqual(event['effective_policy'], 'PROTECTED_CRITICAL')`
+- [L394](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L394) `self.assertFalse(event['stream_tracking_complete'])`
+
+**검증 범위와 한계**: 이 함수는 위에 명시한 입력·성공 조건까지 검사한다. 가상 데이터/SQLite/원장 fixture의 통과는 커널 eBPF verifier, 실제 드라이브 전원 장애 또는 타 Linux 버전의 수집 무손실을 검증하지 못한다. `assertRaises`는 오류가 발생해야 통과하며, 정상 실행을 확인하는 검사와 방향이 반대다. 테스트용 정해진 ID/시간/경로는 서비스의 실제 고정값이 아니다.
+
+**원본 함수 전체**
+
+```python
+    def test_protected_tracking_failure_does_not_quarantine(self):
+        event = eq.decode_record(record(priority=2, schema=2,
+                                 quality=(1 << 16) | eq.Q_PROTECTED | eq.Q_UNTRACKED))
+        self.assertEqual(event['effective_policy'], 'PROTECTED_CRITICAL')
+        self.assertFalse(event['stream_tracking_complete'])
+```
+
+#### test_recover_rejects_output_inside_source — [test_manage.py:396–403](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L396-L403)
+
+**정의 위치·목적**: recover rejects output inside source의 정상·거부/오류 경로를 코드로 검증한다. 입력으로 준비한 fixture 또는 실제 시험용 경로를 사용한다.
+
+**매개변수/반환 및 실행 관계**: `def test_recover_rejects_output_inside_source(self):`를 확인한다. `self`는 unittest 인스턴스이며, 인자가 있는 helper는 테스트의 setup/record 생성 시 전달받는다. 명시적 `return`이 없다면 `None`을 반환하고 성공 판단은 예외/단언문으로 한다. 본문에서 관찰되는 호출 이름: `test_recover_rejects_output_inside_source`, `patch`, `assertRaisesRegex`, `main`, `assertFalse`, `exists`.
+
+**입력·상태 변경 지점(원본)**:
+- [L399](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L399) `'--out', str(self.run / 'report.json')]):`
+- [L402](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L402) `self.assertFalse((self.run / 'report.json').exists())`
+
+**성공 조건·실패 조건을 표현한 실제 검사식**:
+- [L400](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L400) `with self.assertRaisesRegex(ValueError, 'outside'):`
+- [L402](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L402) `self.assertFalse((self.run / 'report.json').exists())`
+
+**검증 범위와 한계**: 이 함수는 위에 명시한 입력·성공 조건까지 검사한다. 가상 데이터/SQLite/원장 fixture의 통과는 커널 eBPF verifier, 실제 드라이브 전원 장애 또는 타 Linux 버전의 수집 무손실을 검증하지 못한다. `assertRaises`는 오류가 발생해야 통과하며, 정상 실행을 확인하는 검사와 방향이 반대다. 테스트용 정해진 ID/시간/경로는 서비스의 실제 고정값이 아니다.
+
+**원본 함수 전체**
+
+```python
+    def test_recover_rejects_output_inside_source(self):
+        # This exercises CLI placement without opening or repairing journal files.
+        with patch('sys.argv', ['manage.py', 'recover', '--run-dir', str(self.run),
+                                '--out', str(self.run / 'report.json')]):
+            with self.assertRaisesRegex(ValueError, 'outside'):
+                eq.main()
+        self.assertFalse((self.run / 'report.json').exists())
+```
+
+#### test_unknown_and_duplicate_config — [test_manage.py:404–410](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L404-L410)
+
+**정의 위치·목적**: unknown and duplicate config의 정상·거부/오류 경로를 코드로 검증한다. 입력으로 준비한 fixture 또는 실제 시험용 경로를 사용한다.
+
+**매개변수/반환 및 실행 관계**: `def test_unknown_and_duplicate_config(self):`를 확인한다. `self`는 unittest 인스턴스이며, 인자가 있는 helper는 테스트의 setup/record 생성 시 전달받는다. 명시적 `return`이 없다면 `None`을 반환하고 성공 판단은 예외/단언문으로 한다. 본문에서 관찰되는 호출 이름: `test_unknown_and_duplicate_config`, `atomic_json`, `assertRaises`, `config`, `write_text`, `assertRaisesRegex`.
+
+**입력·상태 변경 지점(원본)**:
+- [L405](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L405) `cfg = dict(self.cfg, unexpected=True)`
+- [L406](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L406) `eq.atomic_json(self.run / 'config.json', cfg)`
+- [L407](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L407) `with self.assertRaises(ValueError): eq.config(self.run / 'config.json')`
+- [L408](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L408) `(self.run / 'config.json').write_text('{"bulk_rate":1,"bulk_rate":2}')`
+- [L409](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L409) `with self.assertRaisesRegex(ValueError, '중복'): eq.config(self.run / 'config.json')`
+
+**성공 조건·실패 조건을 표현한 실제 검사식**:
+- [L407](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L407) `with self.assertRaises(ValueError): eq.config(self.run / 'config.json')`
+- [L409](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L409) `with self.assertRaisesRegex(ValueError, '중복'): eq.config(self.run / 'config.json')`
+
+**검증 범위와 한계**: 이 함수는 위에 명시한 입력·성공 조건까지 검사한다. 가상 데이터/SQLite/원장 fixture의 통과는 커널 eBPF verifier, 실제 드라이브 전원 장애 또는 타 Linux 버전의 수집 무손실을 검증하지 못한다. `assertRaises`는 오류가 발생해야 통과하며, 정상 실행을 확인하는 검사와 방향이 반대다. 테스트용 정해진 ID/시간/경로는 서비스의 실제 고정값이 아니다.
+
+**원본 함수 전체**
+
+```python
+    def test_unknown_and_duplicate_config(self):
+        cfg = dict(self.cfg, unexpected=True)
+        eq.atomic_json(self.run / 'config.json', cfg)
+        with self.assertRaises(ValueError): eq.config(self.run / 'config.json')
+        (self.run / 'config.json').write_text('{"bulk_rate":1,"bulk_rate":2}')
+        with self.assertRaisesRegex(ValueError, '중복'): eq.config(self.run / 'config.json')
+```
+
+#### test_process_identity — [test_manage.py:411–416](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L411-L416)
+
+**정의 위치·목적**: process identity의 정상·거부/오류 경로를 코드로 검증한다. 입력으로 준비한 fixture 또는 실제 시험용 경로를 사용한다.
+
+**매개변수/반환 및 실행 관계**: `def test_process_identity(self):`를 확인한다. `self`는 unittest 인스턴스이며, 인자가 있는 helper는 테스트의 setup/record 생성 시 전달받는다. 명시적 `return`이 없다면 `None`을 반환하고 성공 판단은 예외/단언문으로 한다. 본문에서 관찰되는 호출 이름: `test_process_identity`, `identity`, `assertTrue`, `alive`, `assertFalse`.
+
+**입력·상태 변경 지점(원본)**:
+- 이 함수가 fixture 전역값·기본 객체를 그대로 사용하거나 순수하게 값을 계산한다.
+
+**성공 조건·실패 조건을 표현한 실제 검사식**:
+- [L413](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L413) `self.assertTrue(eq.alive(own))`
+- [L414](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L414) `self.assertFalse(eq.alive(dict(own, start='wrong')))`
+- [L415](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L415) `self.assertFalse(eq.alive(dict(own, boot='wrong')))`
+
+**검증 범위와 한계**: 이 함수는 위에 명시한 입력·성공 조건까지 검사한다. 가상 데이터/SQLite/원장 fixture의 통과는 커널 eBPF verifier, 실제 드라이브 전원 장애 또는 타 Linux 버전의 수집 무손실을 검증하지 못한다. `assertRaises`는 오류가 발생해야 통과하며, 정상 실행을 확인하는 검사와 방향이 반대다. 테스트용 정해진 ID/시간/경로는 서비스의 실제 고정값이 아니다.
+
+**원본 함수 전체**
+
+```python
+    def test_process_identity(self):
+        own = eq.identity()
+        self.assertTrue(eq.alive(own))
+        self.assertFalse(eq.alive(dict(own, start='wrong')))
+        self.assertFalse(eq.alive(dict(own, boot='wrong')))
+```
+
+#### test_lock_contention — [test_manage.py:417–421](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L417-L421)
+
+**정의 위치·목적**: lock contention의 정상·거부/오류 경로를 코드로 검증한다. 입력으로 준비한 fixture 또는 실제 시험용 경로를 사용한다.
+
+**매개변수/반환 및 실행 관계**: `def test_lock_contention(self):`를 확인한다. `self`는 unittest 인스턴스이며, 인자가 있는 helper는 테스트의 setup/record 생성 시 전달받는다. 명시적 `return`이 없다면 `None`을 반환하고 성공 판단은 예외/단언문으로 한다. 본문에서 관찰되는 호출 이름: `test_lock_contention`, `lock`, `assertRaises`.
+
+**입력·상태 변경 지점(원본)**:
+- 이 함수가 fixture 전역값·기본 객체를 그대로 사용하거나 순수하게 값을 계산한다.
+
+**성공 조건·실패 조건을 표현한 실제 검사식**:
+- [L419](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L419) `with self.assertRaises(RuntimeError):`
+
+**검증 범위와 한계**: 이 함수는 위에 명시한 입력·성공 조건까지 검사한다. 가상 데이터/SQLite/원장 fixture의 통과는 커널 eBPF verifier, 실제 드라이브 전원 장애 또는 타 Linux 버전의 수집 무손실을 검증하지 못한다. `assertRaises`는 오류가 발생해야 통과하며, 정상 실행을 확인하는 검사와 방향이 반대다. 테스트용 정해진 ID/시간/경로는 서비스의 실제 고정값이 아니다.
+
+**원본 함수 전체**
+
+```python
+    def test_lock_contention(self):
+        with eq.lock(self.run / 'lock'):
+            with self.assertRaises(RuntimeError):
+                with eq.lock(self.run / 'lock'): pass
+```
+
+#### test_stale_health — [test_manage.py:422–426](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L422-L426)
+
+**정의 위치·목적**: stale health의 정상·거부/오류 경로를 코드로 검증한다. 입력으로 준비한 fixture 또는 실제 시험용 경로를 사용한다.
+
+**매개변수/반환 및 실행 관계**: `def test_stale_health(self):`를 확인한다. `self`는 unittest 인스턴스이며, 인자가 있는 helper는 테스트의 setup/record 생성 시 전달받는다. 명시적 `return`이 없다면 `None`을 반환하고 성공 판단은 예외/단언문으로 한다. 본문에서 관찰되는 호출 이름: `test_stale_health`, `atomic_json`, `identity`, `update`, `save_health`, `assertEqual`, `status`.
+
+**입력·상태 변경 지점(원본)**:
+- [L423](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L423) `eq.atomic_json(self.run / 'service.json', dict(supervisor=eq.identity(), collector=eq.identity()))`
+
+**성공 조건·실패 조건을 표현한 실제 검사식**:
+- [L425](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L425) `self.assertEqual(eq.status(self.run)['state'], 'STALE_HEARTBEAT')`
+
+**검증 범위와 한계**: 이 함수는 위에 명시한 입력·성공 조건까지 검사한다. 가상 데이터/SQLite/원장 fixture의 통과는 커널 eBPF verifier, 실제 드라이브 전원 장애 또는 타 Linux 버전의 수집 무손실을 검증하지 못한다. `assertRaises`는 오류가 발생해야 통과하며, 정상 실행을 확인하는 검사와 방향이 반대다. 테스트용 정해진 ID/시간/경로는 서비스의 실제 고정값이 아니다.
+
+**원본 함수 전체**
+
+```python
+    def test_stale_health(self):
+        eq.atomic_json(self.run / 'service.json', dict(supervisor=eq.identity(), collector=eq.identity()))
+        self.health.update(state='RUNNING', monotonic_ms=0); self.save_health()
+        self.assertEqual(eq.status(self.run)['state'], 'STALE_HEARTBEAT')
+```
+
+#### test_storage_usage_counts_sqlite_sidecars_and_exports — [test_manage.py:427–443](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L427-L443)
+
+**정의 위치·목적**: storage usage counts sqlite sidecars and exports의 정상·거부/오류 경로를 코드로 검증한다. 입력으로 준비한 fixture 또는 실제 시험용 경로를 사용한다.
+
+**매개변수/반환 및 실행 관계**: `def test_storage_usage_counts_sqlite_sidecars_and_exports(self):`를 확인한다. `self`는 unittest 인스턴스이며, 인자가 있는 helper는 테스트의 setup/record 생성 시 전달받는다. 명시적 `return`이 없다면 `None`을 반환하고 성공 판단은 예외/단언문으로 한다. 본문에서 관찰되는 호출 이름: `test_storage_usage_counts_sqlite_sidecars_and_exports`, `write_bytes`, `mkdir`, `storage_usage`, `assertEqual`, `assertGreaterEqual`, `assertTrue`, `assertFalse`.
+
+**입력·상태 변경 지점(원본)**:
+- [L428](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L428) `(self.run / 'index.sqlite-wal').write_bytes(b'w' * 32)`
+- [L429](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L429) `(self.run / 'index.sqlite-journal').write_bytes(b'j' * 48)`
+- [L430](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L430) `(self.run / 'evidence.meta').write_bytes(b'm' * 16)`
+- [L433](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L433) `(export / 'snapshot.json').write_bytes(b'e' * 64)`
+
+**성공 조건·실패 조건을 표현한 실제 검사식**:
+- [L436](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L436) `self.assertEqual(80, categories['sqlite_sidecars_temp']['logical_bytes'])`
+- [L437](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L437) `self.assertEqual(64, categories['export_derived']['logical_bytes'])`
+- [L438](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L438) `self.assertGreaterEqual(categories['metadata_control']['logical_bytes'], 16)`
+- [L439](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L439) `self.assertTrue(usage['allocation_total_complete'])`
+- [L440](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L440) `self.assertFalse(usage['critical_reserve_physical'])`
+- [L441](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L441) `self.assertTrue(usage['external_writers_can_exhaust_filesystem'])`
+- [L442](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L442) `self.assertFalse(eq.storage_usage(self.run, max_entries=2)['allocation_total_complete'])`
+
+**검증 범위와 한계**: 이 함수는 위에 명시한 입력·성공 조건까지 검사한다. 가상 데이터/SQLite/원장 fixture의 통과는 커널 eBPF verifier, 실제 드라이브 전원 장애 또는 타 Linux 버전의 수집 무손실을 검증하지 못한다. `assertRaises`는 오류가 발생해야 통과하며, 정상 실행을 확인하는 검사와 방향이 반대다. 테스트용 정해진 ID/시간/경로는 서비스의 실제 고정값이 아니다.
+
+**원본 함수 전체**
+
+```python
+    def test_storage_usage_counts_sqlite_sidecars_and_exports(self):
+        (self.run / 'index.sqlite-wal').write_bytes(b'w' * 32)
+        (self.run / 'index.sqlite-journal').write_bytes(b'j' * 48)
+        (self.run / 'evidence.meta').write_bytes(b'm' * 16)
+        export = self.run / 'export'
+        export.mkdir()
+        (export / 'snapshot.json').write_bytes(b'e' * 64)
+        usage = eq.storage_usage(self.run)
+        categories = usage['categories']
+        self.assertEqual(80, categories['sqlite_sidecars_temp']['logical_bytes'])
+        self.assertEqual(64, categories['export_derived']['logical_bytes'])
+        self.assertGreaterEqual(categories['metadata_control']['logical_bytes'], 16)
+        self.assertTrue(usage['allocation_total_complete'])
+        self.assertFalse(usage['critical_reserve_physical'])
+        self.assertTrue(usage['external_writers_can_exhaust_filesystem'])
+        self.assertFalse(eq.storage_usage(self.run, max_entries=2)['allocation_total_complete'])
+```
+
+#### test_storage_pressure_pauses_index_with_hysteresis — [test_manage.py:444–458](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L444-L458)
+
+**정의 위치·목적**: storage pressure pauses index with hysteresis의 정상·거부/오류 경로를 코드로 검증한다. 입력으로 준비한 fixture 또는 실제 시험용 경로를 사용한다.
+
+**매개변수/반환 및 실행 관계**: `def test_storage_pressure_pauses_index_with_hysteresis(self):`를 확인한다. `self`는 unittest 인스턴스이며, 인자가 있는 helper는 테스트의 setup/record 생성 시 전달받는다. 명시적 `return`이 없다면 `None`을 반환하고 성공 판단은 예외/단언문으로 한다. 본문에서 관찰되는 호출 이름: `test_storage_pressure_pauses_index_with_hysteresis`, `object`, `assertEqual`, `index_batch`, `assertFalse`, `exists`, `read_json`, `rows`.
+
+**입력·상태 변경 지점(원본)**:
+- [L445](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L445) `threshold = self.cfg['minimum_free_mib'] * 1024**2`
+- [L449](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L449) `self.assertEqual(eq.read_json(self.run / 'index-health.json')['state'],`
+- [L457](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L457) `self.assertEqual(eq.read_json(self.run / 'index-health.json')['state'], 'INDEX_COMPLETE')`
+
+**성공 조건·실패 조건을 표현한 실제 검사식**:
+- [L447](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L447) `self.assertEqual(eq.index_batch(self.run), 0)`
+- [L448](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L448) `self.assertFalse((self.run / 'index.sqlite').exists())`
+- [L449](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L449) `self.assertEqual(eq.read_json(self.run / 'index-health.json')['state'],`
+- [L452](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L452) `self.assertEqual(eq.index_batch(self.run), 0)`
+- [L453](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L453) `self.assertFalse((self.run / 'index.sqlite').exists())`
+- [L455](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L455) `self.assertEqual(eq.index_batch(self.run), 1)`
+- [L456](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L456) `self.assertEqual(self.rows(), 1)`
+- [L457](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L457) `self.assertEqual(eq.read_json(self.run / 'index-health.json')['state'], 'INDEX_COMPLETE')`
+
+**검증 범위와 한계**: 이 함수는 위에 명시한 입력·성공 조건까지 검사한다. 가상 데이터/SQLite/원장 fixture의 통과는 커널 eBPF verifier, 실제 드라이브 전원 장애 또는 타 Linux 버전의 수집 무손실을 검증하지 못한다. `assertRaises`는 오류가 발생해야 통과하며, 정상 실행을 확인하는 검사와 방향이 반대다. 테스트용 정해진 ID/시간/경로는 서비스의 실제 고정값이 아니다.
+
+**원본 함수 전체**
+
+```python
+    def test_storage_pressure_pauses_index_with_hysteresis(self):
+        threshold = self.cfg['minimum_free_mib'] * 1024**2
+        with patch.object(eq, 'filesystem_free_bytes', return_value=threshold - 1):
+            self.assertEqual(eq.index_batch(self.run), 0)
+        self.assertFalse((self.run / 'index.sqlite').exists())
+        self.assertEqual(eq.read_json(self.run / 'index-health.json')['state'],
+                         'INDEX_PAUSED_STORAGE_PRESSURE')
+        with patch.object(eq, 'filesystem_free_bytes', return_value=threshold + 4 * 1024**2):
+            self.assertEqual(eq.index_batch(self.run), 0)
+        self.assertFalse((self.run / 'index.sqlite').exists())
+        with patch.object(eq, 'filesystem_free_bytes', return_value=threshold + 8 * 1024**2):
+            self.assertEqual(eq.index_batch(self.run), 1)
+        self.assertEqual(self.rows(), 1)
+        self.assertEqual(eq.read_json(self.run / 'index-health.json')['state'], 'INDEX_COMPLETE')
+```
+
+#### test_enospc_stderr_overrides_stale_running_health — [test_manage.py:459–468](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L459-L468)
+
+**정의 위치·목적**: enospc stderr overrides stale running health의 정상·거부/오류 경로를 코드로 검증한다. 입력으로 준비한 fixture 또는 실제 시험용 경로를 사용한다.
+
+**매개변수/반환 및 실행 관계**: `def test_enospc_stderr_overrides_stale_running_health(self):`를 확인한다. `self`는 unittest 인스턴스이며, 인자가 있는 helper는 테스트의 setup/record 생성 시 전달받는다. 명시적 `return`이 없다면 `None`을 반환하고 성공 판단은 예외/단언문으로 한다. 본문에서 관찰되는 호출 이름: `test_enospc_stderr_overrides_stale_running_health`, `update`, `save_health`, `write_text`, `device`, `status`, `assertEqual`.
+
+**입력·상태 변경 지점(원본)**:
+- [L462](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L462) `(self.run / 'collector.log').write_text('collector failed: No space left on device (28)\n')`
+
+**성공 조건·실패 조건을 표현한 실제 검사식**:
+- [L464](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L464) `self.assertEqual(result['state'], 'FAILED_STORAGE_ENOSPC')`
+- [L465](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L465) `self.assertEqual(result['failure_evidence']['evidence_sources'],`
+
+**검증 범위와 한계**: 이 함수는 위에 명시한 입력·성공 조건까지 검사한다. 가상 데이터/SQLite/원장 fixture의 통과는 커널 eBPF verifier, 실제 드라이브 전원 장애 또는 타 Linux 버전의 수집 무손실을 검증하지 못한다. `assertRaises`는 오류가 발생해야 통과하며, 정상 실행을 확인하는 검사와 방향이 반대다. 테스트용 정해진 ID/시간/경로는 서비스의 실제 고정값이 아니다.
+
+**원본 함수 전체**
+
+```python
+    def test_enospc_stderr_overrides_stale_running_health(self):
+        self.health.update(state='RUNNING', monotonic_ms=0)
+        self.save_health()
+        (self.run / 'collector.log').write_text('collector failed: No space left on device (28)\n')
+        result = eq.status(self.run)
+        self.assertEqual(result['state'], 'FAILED_STORAGE_ENOSPC')
+        self.assertEqual(result['failure_evidence']['evidence_sources'],
+                         ['COLLECTOR_STDERR_ERRNO_28'])
+```
+
+#### test_validate_config_when_active_run_is_root_owned — [test_manage.py:470–480](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L470-L480)
+
+**정의 위치·목적**: validate config when active run is root owned의 정상·거부/오류 경로를 코드로 검증한다. 입력으로 준비한 fixture 또는 실제 시험용 경로를 사용한다.
+
+**매개변수/반환 및 실행 관계**: `def test_validate_config_when_active_run_is_root_owned(self):`를 확인한다. `self`는 unittest 인스턴스이며, 인자가 있는 helper는 테스트의 setup/record 생성 시 전달받는다. 명시적 `return`이 없다면 `None`을 반환하고 성공 판단은 예외/단언문으로 한다. 본문에서 관찰되는 호출 이름: `test_validate_config_when_active_run_is_root_owned`, `StringIO`, `with`, `patch`, `object`, `PermissionError`, `redirect_stdout`, `main`, `loads`, `getvalue`, `assertTrue`, `assertEqual`.
+
+**입력·상태 변경 지점(원본)**:
+- [L473](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L473) `str(eq.ROOT / 'examples' / 'A-nonroot-etc-write.json')]),`
+- [L477](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L477) `result = json.loads(output.getvalue())`
+
+**성공 조건·실패 조건을 표현한 실제 검사식**:
+- [L478](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L478) `self.assertTrue(result['valid'])`
+- [L479](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L479) `self.assertEqual(result['active_run_access'], 'PERMISSION_DENIED')`
+
+**검증 범위와 한계**: 이 함수는 위에 명시한 입력·성공 조건까지 검사한다. 가상 데이터/SQLite/원장 fixture의 통과는 커널 eBPF verifier, 실제 드라이브 전원 장애 또는 타 Linux 버전의 수집 무손실을 검증하지 못한다. `assertRaises`는 오류가 발생해야 통과하며, 정상 실행을 확인하는 검사와 방향이 반대다. 테스트용 정해진 ID/시간/경로는 서비스의 실제 고정값이 아니다.
+
+**원본 함수 전체**
+
+```python
+    def test_validate_config_when_active_run_is_root_owned(self):
+        output = io.StringIO()
+        with (patch('sys.argv', ['manage.py', 'validate', '--config',
+                                 str(eq.ROOT / 'examples' / 'A-nonroot-etc-write.json')]),
+              patch.object(eq, 'current', side_effect=PermissionError('root owned')),
+              contextlib.redirect_stdout(output)):
+            eq.main()
+        result = json.loads(output.getvalue())
+        self.assertTrue(result['valid'])
+        self.assertEqual(result['active_run_access'], 'PERMISSION_DENIED')
+```
+
+#### test_relative_override_is_based_on_source_directory — [test_manage.py:481–485](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L481-L485)
+
+**정의 위치·목적**: relative override is based on source directory의 정상·거부/오류 경로를 코드로 검증한다. 입력으로 준비한 fixture 또는 실제 시험용 경로를 사용한다.
+
+**매개변수/반환 및 실행 관계**: `def test_relative_override_is_based_on_source_directory(self):`를 확인한다. `self`는 unittest 인스턴스이며, 인자가 있는 helper는 테스트의 setup/record 생성 시 전달받는다. 명시적 `return`이 없다면 `None`을 반환하고 성공 판단은 예외/단언문으로 한다. 본문에서 관찰되는 호출 이름: `test_relative_override_is_based_on_source_directory`, `assertEqual`, `setting_path`.
+
+**입력·상태 변경 지점(원본)**:
+- [L482](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L482) `with patch.dict(os.environ, {'MGLOGWH_DATA_DIR': 'local-state'}):`
+
+**성공 조건·실패 조건을 표현한 실제 검사식**:
+- [L483](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L483) `self.assertEqual(eq.setting_path('MGLOGWH_DATA_DIR', '/var/lib/mglogwh'),`
+
+**검증 범위와 한계**: 이 함수는 위에 명시한 입력·성공 조건까지 검사한다. 가상 데이터/SQLite/원장 fixture의 통과는 커널 eBPF verifier, 실제 드라이브 전원 장애 또는 타 Linux 버전의 수집 무손실을 검증하지 못한다. `assertRaises`는 오류가 발생해야 통과하며, 정상 실행을 확인하는 검사와 방향이 반대다. 테스트용 정해진 ID/시간/경로는 서비스의 실제 고정값이 아니다.
+
+**원본 함수 전체**
+
+```python
+    def test_relative_override_is_based_on_source_directory(self):
+        with patch.dict(os.environ, {'MGLOGWH_DATA_DIR': 'local-state'}):
+            self.assertEqual(eq.setting_path('MGLOGWH_DATA_DIR', '/var/lib/mglogwh'),
+                             eq.ROOT / 'local-state')
+```
+
+#### test_read_only_commands_do_not_create_data_or_build — [test_manage.py:486–504](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L486-L504)
+
+**정의 위치·목적**: read only commands do not create data or build의 정상·거부/오류 경로를 코드로 검증한다. 입력으로 준비한 fixture 또는 실제 시험용 경로를 사용한다.
+
+**매개변수/반환 및 실행 관계**: `def test_read_only_commands_do_not_create_data_or_build(self):`를 확인한다. `self`는 unittest 인스턴스이며, 인자가 있는 helper는 테스트의 setup/record 생성 시 전달받는다. 명시적 `return`이 없다면 `None`을 반환하고 성공 판단은 예외/단언문으로 한다. 본문에서 관찰되는 호출 이름: `test_read_only_commands_do_not_create_data_or_build`, `TemporaryDirectory`, `Path`, `with`, `object`, `in`, `subTest`, `patch`, `redirect_stdout`, `StringIO`, `main`, `assertFalse`, `exists`, `assertRaises`, `assert_not_called`.
+
+**입력·상태 변경 지점(원본)**:
+- [L487](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L487) `with tempfile.TemporaryDirectory(prefix='eq-readonly-') as folder:`
+- [L488](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L488) `data = Path(folder) / 'absent-state'`
+- [L491](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L491) `patch.object(eq.subprocess, 'run') as build):`
+- [L495](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L495) `str(eq.ROOT / 'config.json')]),`
+
+**성공 조건·실패 조건을 표현한 실제 검사식**:
+- [L498](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L498) `self.assertFalse(data.exists())`
+- [L500](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L500) `self.assertRaises(ValueError)):`
+- [L502](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L502) `self.assertFalse(data.exists())`
+
+**검증 범위와 한계**: 이 함수는 위에 명시한 입력·성공 조건까지 검사한다. 가상 데이터/SQLite/원장 fixture의 통과는 커널 eBPF verifier, 실제 드라이브 전원 장애 또는 타 Linux 버전의 수집 무손실을 검증하지 못한다. `assertRaises`는 오류가 발생해야 통과하며, 정상 실행을 확인하는 검사와 방향이 반대다. 테스트용 정해진 ID/시간/경로는 서비스의 실제 고정값이 아니다.
+
+**원본 함수 전체**
+
+```python
+    def test_read_only_commands_do_not_create_data_or_build(self):
+        with tempfile.TemporaryDirectory(prefix='eq-readonly-') as folder:
+            data = Path(folder) / 'absent-state'
+            with (patch.object(eq, 'DATA', data),
+                  patch.object(eq, 'capability', return_value={'ready': True}),
+                  patch.object(eq.subprocess, 'run') as build):
+                for action in ('version', 'capability', 'validate', 'prepare', 'status'):
+                    with (self.subTest(action=action),
+                          patch('sys.argv', ['manage.py', action, '--config',
+                                             str(eq.ROOT / 'config.json')]),
+                          contextlib.redirect_stdout(io.StringIO())):
+                        eq.main()
+                    self.assertFalse(data.exists())
+                with (patch('sys.argv', ['manage.py', 'raw-search', '--match-path', '/tmp/file']),
+                      self.assertRaises(ValueError)):
+                    eq.main()
+                self.assertFalse(data.exists())
+                build.assert_not_called()
+```
+
+#### test_atomic_json_does_not_follow_predictable_temp_symlink — [test_manage.py:505–516](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L505-L516)
+
+**정의 위치·목적**: atomic json does not follow predictable temp symlink의 정상·거부/오류 경로를 코드로 검증한다. 입력으로 준비한 fixture 또는 실제 시험용 경로를 사용한다.
+
+**매개변수/반환 및 실행 관계**: `def test_atomic_json_does_not_follow_predictable_temp_symlink(self):`를 확인한다. `self`는 unittest 인스턴스이며, 인자가 있는 helper는 테스트의 setup/record 생성 시 전달받는다. 명시적 `return`이 없다면 `None`을 반환하고 성공 판단은 예외/단언문으로 한다. 본문에서 관찰되는 호출 이름: `test_atomic_json_does_not_follow_predictable_temp_symlink`, `skipTest`, `TemporaryDirectory`, `Path`, `write_text`, `symlink_to`, `atomic_json`, `assertEqual`, `read_text`, `loads`.
+
+**입력·상태 변경 지점(원본)**:
+- [L506](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L506) `if os.name != 'posix':`
+- [L508](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L508) `with tempfile.TemporaryDirectory(prefix='eq-atomic-') as folder:`
+- [L509](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L509) `parent = Path(folder)`
+- [L511](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L511) `victim.write_text('keep')`
+- [L512](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L512) `(parent / 'value.json.tmp').symlink_to(victim)`
+- [L513](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L513) `eq.atomic_json(parent / 'value.json', {'ok': True})`
+- [L515](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L515) `self.assertEqual(json.loads((parent / 'value.json').read_text()), {'ok': True})`
+
+**성공 조건·실패 조건을 표현한 실제 검사식**:
+- [L514](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L514) `self.assertEqual(victim.read_text(), 'keep')`
+- [L515](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L515) `self.assertEqual(json.loads((parent / 'value.json').read_text()), {'ok': True})`
+
+**검증 범위와 한계**: 이 함수는 위에 명시한 입력·성공 조건까지 검사한다. 가상 데이터/SQLite/원장 fixture의 통과는 커널 eBPF verifier, 실제 드라이브 전원 장애 또는 타 Linux 버전의 수집 무손실을 검증하지 못한다. `assertRaises`는 오류가 발생해야 통과하며, 정상 실행을 확인하는 검사와 방향이 반대다. 테스트용 정해진 ID/시간/경로는 서비스의 실제 고정값이 아니다.
+
+**원본 함수 전체**
+
+```python
+    def test_atomic_json_does_not_follow_predictable_temp_symlink(self):
+        if os.name != 'posix':
+            self.skipTest('Linux symlink behavior')
+        with tempfile.TemporaryDirectory(prefix='eq-atomic-') as folder:
+            parent = Path(folder)
+            victim = parent / 'victim'
+            victim.write_text('keep')
+            (parent / 'value.json.tmp').symlink_to(victim)
+            eq.atomic_json(parent / 'value.json', {'ok': True})
+            self.assertEqual(victim.read_text(), 'keep')
+            self.assertEqual(json.loads((parent / 'value.json').read_text()), {'ok': True})
+```
+
+#### test_data_directory_must_be_private_and_not_a_symlink — [test_manage.py:517–533](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L517-L533)
+
+**정의 위치·목적**: data directory must be private and not a symlink의 정상·거부/오류 경로를 코드로 검증한다. 입력으로 준비한 fixture 또는 실제 시험용 경로를 사용한다.
+
+**매개변수/반환 및 실행 관계**: `def test_data_directory_must_be_private_and_not_a_symlink(self):`를 확인한다. `self`는 unittest 인스턴스이며, 인자가 있는 helper는 테스트의 setup/record 생성 시 전달받는다. 명시적 `return`이 없다면 `None`을 반환하고 성공 판단은 예외/단언문으로 한다. 본문에서 관찰되는 호출 이름: `test_data_directory_must_be_private_and_not_a_symlink`, `geteuid`, `skipTest`, `TemporaryDirectory`, `Path`, `object`, `ensure_data_dir`, `assertEqual`, `stat`, `chmod`, `assertRaisesRegex`, `symlink_to`.
+
+**입력·상태 변경 지점(원본)**:
+- [L518](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L518) `if os.name != 'posix' or os.geteuid() == 0:`
+- [L520](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L520) `with tempfile.TemporaryDirectory(prefix='eq-state-') as folder:`
+- [L521](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L521) `parent = Path(folder)`
+
+**성공 조건·실패 조건을 표현한 실제 검사식**:
+- [L525](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L525) `self.assertEqual(state.stat().st_mode & 0o777, 0o700)`
+- [L527](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L527) `with self.assertRaisesRegex(RuntimeError, '0700'):`
+- [L531](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L531) `with self.assertRaisesRegex(RuntimeError, '디렉터리'):`
+
+**검증 범위와 한계**: 이 함수는 위에 명시한 입력·성공 조건까지 검사한다. 가상 데이터/SQLite/원장 fixture의 통과는 커널 eBPF verifier, 실제 드라이브 전원 장애 또는 타 Linux 버전의 수집 무손실을 검증하지 못한다. `assertRaises`는 오류가 발생해야 통과하며, 정상 실행을 확인하는 검사와 방향이 반대다. 테스트용 정해진 ID/시간/경로는 서비스의 실제 고정값이 아니다.
+
+**원본 함수 전체**
+
+```python
+    def test_data_directory_must_be_private_and_not_a_symlink(self):
+        if os.name != 'posix' or os.geteuid() == 0:
+            self.skipTest('unprivileged Linux directory check')
+        with tempfile.TemporaryDirectory(prefix='eq-state-') as folder:
+            parent = Path(folder)
+            state = parent / 'state'
+            with patch.object(eq, 'DATA', state):
+                eq.ensure_data_dir()
+                self.assertEqual(state.stat().st_mode & 0o777, 0o700)
+                state.chmod(0o755)
+                with self.assertRaisesRegex(RuntimeError, '0700'):
+                    eq.ensure_data_dir()
+            with patch.object(eq, 'DATA', parent / 'link'):
+                (parent / 'link').symlink_to(state, target_is_directory=True)
+                with self.assertRaisesRegex(RuntimeError, '디렉터리'):
+                    eq.ensure_data_dir()
+```
+
+#### test_root_rejects_untrusted_data_parent — [test_manage.py:534–541](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L534-L541)
+
+**정의 위치·목적**: root rejects untrusted data parent의 정상·거부/오류 경로를 코드로 검증한다. 입력으로 준비한 fixture 또는 실제 시험용 경로를 사용한다.
+
+**매개변수/반환 및 실행 관계**: `def test_root_rejects_untrusted_data_parent(self):`를 확인한다. `self`는 unittest 인스턴스이며, 인자가 있는 helper는 테스트의 setup/record 생성 시 전달받는다. 명시적 `return`이 없다면 `None`을 반환하고 성공 판단은 예외/단언문으로 한다. 본문에서 관찰되는 호출 이름: `test_root_rejects_untrusted_data_parent`, `geteuid`, `skipTest`, `TemporaryDirectory`, `object`, `Path`, `assertRaisesRegex`, `ensure_data_dir`.
+
+**입력·상태 변경 지점(원본)**:
+- [L535](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L535) `if os.name != 'posix' or os.geteuid() != 0:`
+- [L537](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L537) `with tempfile.TemporaryDirectory(prefix='eq-state-') as folder:`
+- [L538](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L538) `with patch.object(eq, 'DATA', Path(folder) / 'state'):`
+
+**성공 조건·실패 조건을 표현한 실제 검사식**:
+- [L539](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L539) `with self.assertRaisesRegex(RuntimeError, '상위'):`
+
+**검증 범위와 한계**: 이 함수는 위에 명시한 입력·성공 조건까지 검사한다. 가상 데이터/SQLite/원장 fixture의 통과는 커널 eBPF verifier, 실제 드라이브 전원 장애 또는 타 Linux 버전의 수집 무손실을 검증하지 못한다. `assertRaises`는 오류가 발생해야 통과하며, 정상 실행을 확인하는 검사와 방향이 반대다. 테스트용 정해진 ID/시간/경로는 서비스의 실제 고정값이 아니다.
+
+**원본 함수 전체**
+
+```python
+    def test_root_rejects_untrusted_data_parent(self):
+        if os.name != 'posix' or os.geteuid() != 0:
+            self.skipTest('root-only Linux parent check')
+        with tempfile.TemporaryDirectory(prefix='eq-state-') as folder:
+            with patch.object(eq, 'DATA', Path(folder) / 'state'):
+                with self.assertRaisesRegex(RuntimeError, '상위'):
+                    eq.ensure_data_dir()
+```
+
+#### test_query_encodes_sqlite_uri_metacharacters — [test_manage.py:542–553](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L542-L553)
+
+**정의 위치·목적**: query encodes sqlite uri metacharacters의 정상·거부/오류 경로를 코드로 검증한다. 입력으로 준비한 fixture 또는 실제 시험용 경로를 사용한다.
+
+**매개변수/반환 및 실행 관계**: `def test_query_encodes_sqlite_uri_metacharacters(self):`를 확인한다. `self`는 unittest 인스턴스이며, 인자가 있는 helper는 테스트의 setup/record 생성 시 전달받는다. 명시적 `return`이 없다면 `None`을 반환하고 성공 판단은 예외/단언문으로 한다. 본문에서 관찰되는 호출 이름: `test_query_encodes_sqlite_uri_metacharacters`, `skipTest`, `TemporaryDirectory`, `Path`, `mkdir`, `connect`, `execute`, `events`, `cursor`, `VALUES`, `record`, `assertEqual`, `query`.
+
+**입력·상태 변경 지점(원본)**:
+- [L543](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L543) `if os.name != 'posix':`
+- [L545](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L545) `with tempfile.TemporaryDirectory(prefix='eq-uri-') as folder:`
+- [L546](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L546) `run = Path(folder) / 'space # question?'`
+
+**성공 조건·실패 조건을 표현한 실제 검사식**:
+- [L552](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L552) `self.assertEqual(eq.query(run)['records'][0]['path'], '/tmp/file')`
+
+**검증 범위와 한계**: 이 함수는 위에 명시한 입력·성공 조건까지 검사한다. 가상 데이터/SQLite/원장 fixture의 통과는 커널 eBPF verifier, 실제 드라이브 전원 장애 또는 타 Linux 버전의 수집 무손실을 검증하지 못한다. `assertRaises`는 오류가 발생해야 통과하며, 정상 실행을 확인하는 검사와 방향이 반대다. 테스트용 정해진 ID/시간/경로는 서비스의 실제 고정값이 아니다.
+
+**원본 함수 전체**
+
+```python
+    def test_query_encodes_sqlite_uri_metacharacters(self):
+        if os.name != 'posix':
+            self.skipTest('Linux path with a question mark')
+        with tempfile.TemporaryDirectory(prefix='eq-uri-') as folder:
+            run = Path(folder) / 'space # question?'
+            run.mkdir()
+            with sqlite3.connect(run / 'index.sqlite') as db:
+                db.execute('CREATE TABLE events(payload BLOB, priority INTEGER, monotonic_ns INTEGER)')
+                db.execute('CREATE TABLE cursor(lane TEXT, offset INTEGER)')
+                db.execute('INSERT INTO events VALUES (?,?,?)', (record(), 1, 10))
+            self.assertEqual(eq.query(run)['records'][0]['path'], '/tmp/file')
+```
+
+#### test_foreground_run_releases_control_but_keeps_collector_lock — [test_manage.py:554–573](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L554-L573)
+
+**정의 위치·목적**: foreground run releases control but keeps collector lock의 정상·거부/오류 경로를 코드로 검증한다. 입력으로 준비한 fixture 또는 실제 시험용 경로를 사용한다.
+
+**매개변수/반환 및 실행 관계**: `def test_foreground_run_releases_control_but_keeps_collector_lock(self):`를 확인한다. `self`는 unittest 인스턴스이며, 인자가 있는 helper는 테스트의 setup/record 생성 시 전달받는다. 명시적 `return`이 없다면 `None`을 반환하고 성공 판단은 예외/단언문으로 한다. 본문에서 관찰되는 호출 이름: `test_foreground_run_releases_control_but_keeps_collector_lock`, `tracked_lock`, `append`, `with`, `patch`, `object`, `Path`, `main`, `assertEqual`.
+
+**입력·상태 변경 지점(원본)**:
+- [L567](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L567) `patch.object(eq, 'create_run', return_value=Path('/tmp/fake-run')),`
+
+**성공 조건·실패 조건을 표현한 실제 검사식**:
+- [L570](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L570) `self.assertEqual(events, ['enter control.lock', 'enter collector.lock',`
+
+**검증 범위와 한계**: 이 함수는 위에 명시한 입력·성공 조건까지 검사한다. 가상 데이터/SQLite/원장 fixture의 통과는 커널 eBPF verifier, 실제 드라이브 전원 장애 또는 타 Linux 버전의 수집 무손실을 검증하지 못한다. `assertRaises`는 오류가 발생해야 통과하며, 정상 실행을 확인하는 검사와 방향이 반대다. 테스트용 정해진 ID/시간/경로는 서비스의 실제 고정값이 아니다.
+
+**원본 함수 전체**
+
+```python
+    def test_foreground_run_releases_control_but_keeps_collector_lock(self):
+        events = []
+        @contextlib.contextmanager
+        def tracked_lock(path):
+            events.append('enter ' + path.name)
+            try:
+                yield
+            finally:
+                events.append('exit ' + path.name)
+        with (patch('sys.argv', ['manage.py', 'run']),
+              patch.object(eq, 'config', return_value={}),
+              patch.object(eq, 'ensure_data_dir'),
+              patch.object(eq, 'lock', tracked_lock),
+              patch.object(eq, 'create_run', return_value=Path('/tmp/fake-run')),
+              patch.object(eq, 'serve', side_effect=lambda *args, **kwargs: events.append('serve'))):
+            eq.main()
+        self.assertEqual(events, ['enter control.lock', 'enter collector.lock',
+                                  'exit control.lock', 'serve', 'exit collector.lock'])
+```
+
+#### tracked_lock — [test_manage.py:557–562](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_manage.py#L557-L562)
+
+**정의 위치·목적**: 테스트 fixture의 입력·출력을 구성한다. 입력으로 준비한 fixture 또는 실제 시험용 경로를 사용한다.
+
+**매개변수/반환 및 실행 관계**: `def tracked_lock(path):`를 확인한다. `self`는 unittest 인스턴스이며, 인자가 있는 helper는 테스트의 setup/record 생성 시 전달받는다. 명시적 `return`이 없다면 `None`을 반환하고 성공 판단은 예외/단언문으로 한다. 본문에서 관찰되는 호출 이름: `tracked_lock`, `append`.
+
+**입력·상태 변경 지점(원본)**:
+- 이 함수가 fixture 전역값·기본 객체를 그대로 사용하거나 순수하게 값을 계산한다.
+
+**성공 조건·실패 조건을 표현한 실제 검사식**:
+- 직접 `assert`하지 않는 fixture helper다. 이를 호출하는 개별 `test_*` 메서드의 검사식을 봐야 한다.
+
+**검증 범위와 한계**: 이 함수는 위에 명시한 입력·성공 조건까지 검사한다. 가상 데이터/SQLite/원장 fixture의 통과는 커널 eBPF verifier, 실제 드라이브 전원 장애 또는 타 Linux 버전의 수집 무손실을 검증하지 못한다. `assertRaises`는 오류가 발생해야 통과하며, 정상 실행을 확인하는 검사와 방향이 반대다. 테스트용 정해진 ID/시간/경로는 서비스의 실제 고정값이 아니다.
+
+**원본 함수 전체**
+
+```python
+        def tracked_lock(path):
+            events.append('enter ' + path.name)
+            try:
+                yield
+            finally:
+                events.append('exit ' + path.name)
+```
+
+## test_ledger.py — 복구 원장 commit fence·CRC·손실 의미론·격리 복구
+
+[원본 전체](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py); 추출한 메서드·함수 64개. 다음 각 테스트 함수는 **코드 전체**와 검증 표현식을 같이 싣는다.
+
+
+#### setUp — [test_ledger.py:18–35](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L18-L35)
+
+**정의 위치·목적**: 각 unit test 앞에서 fixture 저장소·기본 자료를 준비한다. 입력으로 준비한 fixture 또는 실제 시험용 경로를 사용한다.
+
+**매개변수/반환 및 실행 관계**: `def setUp(self):`를 확인한다. `self`는 unittest 인스턴스이며, 인자가 있는 helper는 테스트의 setup/record 생성 시 전달받는다. 명시적 `return`이 없다면 `None`을 반환하고 성공 판단은 예외/단언문으로 한다. 본문에서 관찰되는 호출 이름: `setUp`, `TemporaryDirectory`, `Path`, `uuid4`, `mkdir`, `dumps`, `encode`, `sha256`, `hexdigest`, `write_json`, `read_bytes`, `write_bytes`.
+
+**입력·상태 변경 지점(원본)**:
+- [L19](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L19) `self.temp = tempfile.TemporaryDirectory()`
+- [L20](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L20) `self.root = Path(self.temp.name)`
+- [L24](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L24) `canonical = json.dumps(config, sort_keys=True, separators=(',', ':')).encode()`
+- [L27](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L27) `self.write_json('config.json', config)`
+- [L28](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L28) `self.write_json('manifest.json', manifest)`
+- [L31](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L31) `manifest_sha256=hashlib.sha256((self.run / 'manifest.json').read_bytes()).hexdigest())`
+- [L33](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L33) `(self.run / 'critical.raw').write_bytes(b'')`
+- [L34](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L34) `(self.run / 'general.raw').write_bytes(b'')`
+
+**성공 조건·실패 조건을 표현한 실제 검사식**:
+- 직접 `assert`하지 않는 fixture helper다. 이를 호출하는 개별 `test_*` 메서드의 검사식을 봐야 한다.
+
+**검증 범위와 한계**: 이 함수는 위에 명시한 입력·성공 조건까지 검사한다. 가상 데이터/SQLite/원장 fixture의 통과는 커널 eBPF verifier, 실제 드라이브 전원 장애 또는 타 Linux 버전의 수집 무손실을 검증하지 못한다. `assertRaises`는 오류가 발생해야 통과하며, 정상 실행을 확인하는 검사와 방향이 반대다. 테스트용 정해진 ID/시간/경로는 서비스의 실제 고정값이 아니다.
+
+**원본 함수 전체**
+
+```python
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.root = Path(self.temp.name)
+        self.run = self.root / str(uuid.uuid4())
+        self.run.mkdir()
+        config = dict(protected_path='/tmp/protected')
+        canonical = json.dumps(config, sort_keys=True, separators=(',', ':')).encode()
+        manifest = dict(schema=1, run_id=self.run.name, boot_id=str(uuid.uuid4()),
+                        config_sha256=hashlib.sha256(canonical).hexdigest())
+        self.write_json('config.json', config)
+        self.write_json('manifest.json', manifest)
+        self.lineage = dict(run_id=self.run.name, boot_id=manifest['boot_id'],
+                            config_sha256=manifest['config_sha256'],
+                            manifest_sha256=hashlib.sha256((self.run / 'manifest.json').read_bytes()).hexdigest())
+        self.frames = []
+        (self.run / 'critical.raw').write_bytes(b'')
+        (self.run / 'general.raw').write_bytes(b'')
+```
+
+#### tearDown — [test_ledger.py:36–38](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L36-L38)
+
+**정의 위치·목적**: 각 unit test 뒤에 임시 파일과 상태를 정리한다. 입력으로 준비한 fixture 또는 실제 시험용 경로를 사용한다.
+
+**매개변수/반환 및 실행 관계**: `def tearDown(self):`를 확인한다. `self`는 unittest 인스턴스이며, 인자가 있는 helper는 테스트의 setup/record 생성 시 전달받는다. 명시적 `return`이 없다면 `None`을 반환하고 성공 판단은 예외/단언문으로 한다. 본문에서 관찰되는 호출 이름: `tearDown`, `cleanup`.
+
+**입력·상태 변경 지점(원본)**:
+- 이 함수가 fixture 전역값·기본 객체를 그대로 사용하거나 순수하게 값을 계산한다.
+
+**성공 조건·실패 조건을 표현한 실제 검사식**:
+- 직접 `assert`하지 않는 fixture helper다. 이를 호출하는 개별 `test_*` 메서드의 검사식을 봐야 한다.
+
+**검증 범위와 한계**: 이 함수는 위에 명시한 입력·성공 조건까지 검사한다. 가상 데이터/SQLite/원장 fixture의 통과는 커널 eBPF verifier, 실제 드라이브 전원 장애 또는 타 Linux 버전의 수집 무손실을 검증하지 못한다. `assertRaises`는 오류가 발생해야 통과하며, 정상 실행을 확인하는 검사와 방향이 반대다. 테스트용 정해진 ID/시간/경로는 서비스의 실제 고정값이 아니다.
+
+**원본 함수 전체**
+
+```python
+    def tearDown(self):
+        self.temp.cleanup()
+```
+
+#### write_json — [test_ledger.py:39–41](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L39-L41)
+
+**정의 위치·목적**: 테스트용 설정/원장 JSON fixture를 쓴다. 입력으로 준비한 fixture 또는 실제 시험용 경로를 사용한다.
+
+**매개변수/반환 및 실행 관계**: `def write_json(self, name, value):`를 확인한다. `self`는 unittest 인스턴스이며, 인자가 있는 helper는 테스트의 setup/record 생성 시 전달받는다. 명시적 `return`이 없다면 `None`을 반환하고 성공 판단은 예외/단언문으로 한다. 본문에서 관찰되는 호출 이름: `write_json`, `write_text`, `dumps`.
+
+**입력·상태 변경 지점(원본)**:
+- [L40](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L40) `(self.run / name).write_text(json.dumps(value), encoding='utf-8')`
+
+**성공 조건·실패 조건을 표현한 실제 검사식**:
+- 직접 `assert`하지 않는 fixture helper다. 이를 호출하는 개별 `test_*` 메서드의 검사식을 봐야 한다.
+
+**검증 범위와 한계**: 이 함수는 위에 명시한 입력·성공 조건까지 검사한다. 가상 데이터/SQLite/원장 fixture의 통과는 커널 eBPF verifier, 실제 드라이브 전원 장애 또는 타 Linux 버전의 수집 무손실을 검증하지 못한다. `assertRaises`는 오류가 발생해야 통과하며, 정상 실행을 확인하는 검사와 방향이 반대다. 테스트용 정해진 ID/시간/경로는 서비스의 실제 고정값이 아니다.
+
+**원본 함수 전체**
+
+```python
+    def write_json(self, name, value):
+        (self.run / name).write_text(json.dumps(value), encoding='utf-8')
+```
+
+#### append — [test_ledger.py:42–48](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L42-L48)
+
+**정의 위치·목적**: 원장에 임의 프레임을 추가하는 fixture helper다. 입력으로 준비한 fixture 또는 실제 시험용 경로를 사용한다.
+
+**매개변수/반환 및 실행 관계**: `def append(self, record_type, **value):`를 확인한다. `self`는 unittest 인스턴스이며, 인자가 있는 helper는 테스트의 setup/record 생성 시 전달받는다. 명시적 `return`이 없다면 `None`을 반환하고 성공 판단은 예외/단언문으로 한다. 본문에서 관찰되는 호출 이름: `append`, `dumps`, `encode`, `pack`, `crc32`.
+
+**입력·상태 변경 지점(원본)**:
+- [L45](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L45) `raw = json.dumps(value, separators=(',', ':')).encode()`
+
+**성공 조건·실패 조건을 표현한 실제 검사식**:
+- 직접 `assert`하지 않는 fixture helper다. 이를 호출하는 개별 `test_*` 메서드의 검사식을 봐야 한다.
+
+**검증 범위와 한계**: 이 함수는 위에 명시한 입력·성공 조건까지 검사한다. 가상 데이터/SQLite/원장 fixture의 통과는 커널 eBPF verifier, 실제 드라이브 전원 장애 또는 타 Linux 버전의 수집 무손실을 검증하지 못한다. `assertRaises`는 오류가 발생해야 통과하며, 정상 실행을 확인하는 검사와 방향이 반대다. 테스트용 정해진 ID/시간/경로는 서비스의 실제 고정값이 아니다.
+
+**원본 함수 전체**
+
+```python
+    def append(self, record_type, **value):
+        value = dict(schema=1, **self.lineage, journal_seq=len(self.frames)+1,
+                     record_type=record_type, **value)
+        raw = json.dumps(value, separators=(',', ':')).encode()
+        self.frames.append(ledger.FRAME.pack(len(raw), zlib.crc32(raw)) + raw)
+        return value
+```
+
+#### checkpoint — [test_ledger.py:49–59](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L49-L59)
+
+**정의 위치·목적**: 테스트 fixture의 입력·출력을 구성한다. 입력으로 준비한 fixture 또는 실제 시험용 경로를 사용한다.
+
+**매개변수/반환 및 실행 관계**: `def checkpoint(self, *, sequence=3, critical=0, general=0, seal=False, **values):`를 확인한다. `self`는 unittest 인스턴스이며, 인자가 있는 helper는 테스트의 setup/record 생성 시 전달받는다. 명시적 `return`이 없다면 `None`을 반환하고 성공 판단은 예외/단언문으로 한다. 본문에서 관찰되는 호출 이름: `checkpoint`, `update`, `append`.
+
+**입력·상태 변경 지점(원본)**:
+- [L58](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L58) `return self.append('seal' if seal else 'checkpoint', **value)`
+
+**성공 조건·실패 조건을 표현한 실제 검사식**:
+- 직접 `assert`하지 않는 fixture helper다. 이를 호출하는 개별 `test_*` 메서드의 검사식을 봐야 한다.
+
+**검증 범위와 한계**: 이 함수는 위에 명시한 입력·성공 조건까지 검사한다. 가상 데이터/SQLite/원장 fixture의 통과는 커널 eBPF verifier, 실제 드라이브 전원 장애 또는 타 Linux 버전의 수집 무손실을 검증하지 못한다. `assertRaises`는 오류가 발생해야 통과하며, 정상 실행을 확인하는 검사와 방향이 반대다. 테스트용 정해진 ID/시간/경로는 서비스의 실제 고정값이 아니다.
+
+**원본 함수 전체**
+
+```python
+    def checkpoint(self, *, sequence=3, critical=0, general=0, seal=False, **values):
+        value = dict(durable_offsets=dict(critical=critical, general=general),
+                     tenants=[dict(cgroup_id=9001, sequence=sequence, budget_suppress=900)],
+                     faults=[0, 0, 0, 0], summary_kind='AGGREGATE_ONLY',
+                     metadata_overflow=0, metadata_dropped=0,
+                     exact_loss_available=True, sequence_snapshot_complete=True)
+        if seal:
+            value['state'] = 'STOPPED'
+        value.update(values)
+        return self.append('seal' if seal else 'checkpoint', **value)
+```
+
+#### loss — [test_ledger.py:60–64](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L60-L64)
+
+**정의 위치·목적**: 테스트 fixture의 입력·출력을 구성한다. 입력으로 준비한 fixture 또는 실제 시험용 경로를 사용한다.
+
+**매개변수/반환 및 실행 관계**: `def loss(self, seq=2, **values):`를 확인한다. `self`는 unittest 인스턴스이며, 인자가 있는 helper는 테스트의 setup/record 생성 시 전달받는다. 명시적 `return`이 없다면 `None`을 반환하고 성공 판단은 예외/단언문으로 한다. 본문에서 관찰되는 호출 이름: `loss`, `update`, `append`.
+
+**입력·상태 변경 지점(원본)**:
+- [L63](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L63) `return self.append('loss', **value)`
+
+**성공 조건·실패 조건을 표현한 실제 검사식**:
+- 직접 `assert`하지 않는 fixture helper다. 이를 호출하는 개별 `test_*` 메서드의 검사식을 봐야 한다.
+
+**검증 범위와 한계**: 이 함수는 위에 명시한 입력·성공 조건까지 검사한다. 가상 데이터/SQLite/원장 fixture의 통과는 커널 eBPF verifier, 실제 드라이브 전원 장애 또는 타 Linux 버전의 수집 무손실을 검증하지 못한다. `assertRaises`는 오류가 발생해야 통과하며, 정상 실행을 확인하는 검사와 방향이 반대다. 테스트용 정해진 ID/시간/경로는 서비스의 실제 고정값이 아니다.
+
+**원본 함수 전체**
+
+```python
+    def loss(self, seq=2, **values):
+        value = dict(cgroup_id=9001, seq=seq, lane='critical', reason='QUEUE_OVERFLOW', monotonic_ns=123)
+        value.update(values)
+        return self.append('loss', **value)
+```
+
+#### loss_witness — [test_ledger.py:65–71](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L65-L71)
+
+**정의 위치·목적**: 테스트 fixture의 입력·출력을 구성한다. 입력으로 준비한 fixture 또는 실제 시험용 경로를 사용한다.
+
+**매개변수/반환 및 실행 관계**: `def loss_witness(self):`를 확인한다. `self`는 unittest 인스턴스이며, 인자가 있는 helper는 테스트의 setup/record 생성 시 전달받는다. 명시적 `return`이 없다면 `None`을 반환하고 성공 판단은 예외/단언문으로 한다. 본문에서 관찰되는 호출 이름: `loss_witness`, `hex`.
+
+**입력·상태 변경 지점(원본)**:
+- 이 함수가 fixture 전역값·기본 객체를 그대로 사용하거나 순수하게 값을 계산한다.
+
+**성공 조건·실패 조건을 표현한 실제 검사식**:
+- 직접 `assert`하지 않는 fixture helper다. 이를 호출하는 개별 `test_*` 메서드의 검사식을 봐야 한다.
+
+**검증 범위와 한계**: 이 함수는 위에 명시한 입력·성공 조건까지 검사한다. 가상 데이터/SQLite/원장 fixture의 통과는 커널 eBPF verifier, 실제 드라이브 전원 장애 또는 타 Linux 버전의 수집 무손실을 검증하지 못한다. `assertRaises`는 오류가 발생해야 통과하며, 정상 실행을 확인하는 검사와 방향이 반대다. 테스트용 정해진 ID/시간/경로는 서비스의 실제 고정값이 아니다.
+
+**원본 함수 전체**
+
+```python
+    def loss_witness(self):
+        return dict(version=1, source='USERSPACE_RING_CALLBACK', event_schema=2,
+                    kind=2, priority=2, quality=1 << 16, rule_id=1,
+                    pid=7, tid=7, uid=1000, process_start_ns=20, result=3,
+                    op_flags=0, captured_len=len(b'/tmp/protected'),
+                    path_hex=b'/tmp/protected'.hex())
+```
+
+#### commit — [test_ledger.py:72–77](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L72-L77)
+
+**정의 위치·목적**: journal commit fence 경계 fixture를 생성한다. 입력으로 준비한 fixture 또는 실제 시험용 경로를 사용한다.
+
+**매개변수/반환 및 실행 관계**: `def commit(self, suffix=b'', count=None):`를 확인한다. `self`는 unittest 인스턴스이며, 인자가 있는 helper는 테스트의 setup/record 생성 시 전달받는다. 명시적 `return`이 없다면 `None`을 반환하고 성공 판단은 예외/단언문으로 한다. 본문에서 관찰되는 호출 이름: `commit`, `join`, `write_bytes`, `write_json`.
+
+**입력·상태 변경 지점(원본)**:
+- [L74](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L74) `(self.run / 'evidence.meta').write_bytes(prefix + suffix)`
+- [L75](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L75) `self.write_json('evidence.meta.commit', dict(schema=1, **self.lineage,`
+
+**성공 조건·실패 조건을 표현한 실제 검사식**:
+- 직접 `assert`하지 않는 fixture helper다. 이를 호출하는 개별 `test_*` 메서드의 검사식을 봐야 한다.
+
+**검증 범위와 한계**: 이 함수는 위에 명시한 입력·성공 조건까지 검사한다. 가상 데이터/SQLite/원장 fixture의 통과는 커널 eBPF verifier, 실제 드라이브 전원 장애 또는 타 Linux 버전의 수집 무손실을 검증하지 못한다. `assertRaises`는 오류가 발생해야 통과하며, 정상 실행을 확인하는 검사와 방향이 반대다. 테스트용 정해진 ID/시간/경로는 서비스의 실제 고정값이 아니다.
+
+**원본 함수 전체**
+
+```python
+    def commit(self, suffix=b'', count=None):
+        prefix = b''.join(self.frames if count is None else self.frames[:count])
+        (self.run / 'evidence.meta').write_bytes(prefix + suffix)
+        self.write_json('evidence.meta.commit', dict(schema=1, **self.lineage,
+                         offset=len(prefix), journal_seq=len(self.frames) if count is None else count))
+```
+
+#### raw — [test_ledger.py:78–82](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L78-L82)
+
+**정의 위치·목적**: 테스트 raw event record를 구성한다. 입력으로 준비한 fixture 또는 실제 시험용 경로를 사용한다.
+
+**매개변수/반환 및 실행 관계**: `def raw(self, seq=1, cgroup=9001, comm=b'fixture', path=b'/tmp/protected', schema=1, quality=0, timestamp=100):`를 확인한다. `self`는 unittest 인스턴스이며, 인자가 있는 helper는 테스트의 setup/record 생성 시 전달받는다. 명시적 `return`이 없다면 `None`을 반환하고 성공 판단은 예외/단언문으로 한다. 본문에서 관찰되는 호출 이름: `raw`, `pack`, `crc32`.
+
+**입력·상태 변경 지점(원본)**:
+- [L81](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L81) `return payload + struct.pack('<II', zlib.crc32(payload), 0)`
+
+**성공 조건·실패 조건을 표현한 실제 검사식**:
+- 직접 `assert`하지 않는 fixture helper다. 이를 호출하는 개별 `test_*` 메서드의 검사식을 봐야 한다.
+
+**검증 범위와 한계**: 이 함수는 위에 명시한 입력·성공 조건까지 검사한다. 가상 데이터/SQLite/원장 fixture의 통과는 커널 eBPF verifier, 실제 드라이브 전원 장애 또는 타 Linux 버전의 수집 무손실을 검증하지 못한다. `assertRaises`는 오류가 발생해야 통과하며, 정상 실행을 확인하는 검사와 방향이 반대다. 테스트용 정해진 ID/시간/경로는 서비스의 실제 고정값이 아니다.
+
+**원본 함수 전체**
+
+```python
+    def raw(self, seq=1, cgroup=9001, comm=b'fixture', path=b'/tmp/protected', schema=1, quality=0, timestamp=100):
+        payload = ledger.EVENT.pack(timestamp, cgroup, seq, 20, 3, 0x31514F45, schema, 2, 2,
+                                    7, 7, 1000, 1, 0, 0, len(path), quality, comm, path)
+        return payload + struct.pack('<II', zlib.crc32(payload), 0)
+```
+
+#### advanced_lineage — [test_ledger.py:83–98](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L83-L98)
+
+**정의 위치·목적**: 테스트 fixture의 입력·출력을 구성한다. 입력으로 준비한 fixture 또는 실제 시험용 경로를 사용한다.
+
+**매개변수/반환 및 실행 관계**: `def advanced_lineage(self):`를 확인한다. `self`는 unittest 인스턴스이며, 인자가 있는 helper는 테스트의 setup/record 생성 시 전달받는다. 명시적 `return`이 없다면 `None`을 반환하고 성공 판단은 예외/단언문으로 한다. 본문에서 관찰되는 호출 이름: `advanced_lineage`, `write_json`, `write_bytes`, `loads`, `read_text`, `update`, `sha256`, `hexdigest`, `dumps`, `encode`, `read_bytes`.
+
+**입력·상태 변경 지점(원본)**:
+- [L86](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L86) `self.write_json('config.json', config)`
+- [L88](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L88) `(self.run / 'rules.bin').write_bytes(binary)`
+- [L89](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L89) `manifest = json.loads((self.run / 'manifest.json').read_text())`
+- [L92](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L92) `config_sha256=hashlib.sha256(json.dumps(config, sort_keys=True,`
+- [L94](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L94) `self.write_json('manifest.json', manifest)`
+- [L96](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L96) `manifest_sha256=hashlib.sha256((self.run / 'manifest.json').read_bytes()).hexdigest())`
+
+**성공 조건·실패 조건을 표현한 실제 검사식**:
+- 직접 `assert`하지 않는 fixture helper다. 이를 호출하는 개별 `test_*` 메서드의 검사식을 봐야 한다.
+
+**검증 범위와 한계**: 이 함수는 위에 명시한 입력·성공 조건까지 검사한다. 가상 데이터/SQLite/원장 fixture의 통과는 커널 eBPF verifier, 실제 드라이브 전원 장애 또는 타 Linux 버전의 수집 무손실을 검증하지 못한다. `assertRaises`는 오류가 발생해야 통과하며, 정상 실행을 확인하는 검사와 방향이 반대다. 테스트용 정해진 ID/시간/경로는 서비스의 실제 고정값이 아니다.
+
+**원본 함수 전체**
+
+```python
+    def advanced_lineage(self):
+        config = dict(event_rules=[dict(id=7, priority='CRITICAL',
+                                        overload_policy='NORMAL_COLLECTION')])
+        self.write_json('config.json', config)
+        binary = b'bounded-test-rule-program'
+        (self.run / 'rules.bin').write_bytes(binary)
+        manifest = json.loads((self.run / 'manifest.json').read_text())
+        manifest.update(raw_schema=3, rule_engine_schema_version=1, policy_version=1,
+                        rules_bin_sha256=hashlib.sha256(binary).hexdigest(),
+                        config_sha256=hashlib.sha256(json.dumps(config, sort_keys=True,
+                            separators=(',', ':')).encode()).hexdigest())
+        self.write_json('manifest.json', manifest)
+        self.lineage.update(config_sha256=manifest['config_sha256'],
+                            manifest_sha256=hashlib.sha256((self.run / 'manifest.json').read_bytes()).hexdigest())
+```
+
+#### advanced_stats — [test_ledger.py:99–107](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L99-L107)
+
+**정의 위치·목적**: 테스트 fixture의 입력·출력을 구성한다. 입력으로 준비한 fixture 또는 실제 시험용 경로를 사용한다.
+
+**매개변수/반환 및 실행 관계**: `def advanced_stats(self, durable=1):`를 확인한다. `self`는 unittest 인스턴스이며, 인자가 있는 helper는 테스트의 setup/record 생성 시 전달받는다. 명시적 `return`이 없다면 `None`을 반환하고 성공 판단은 예외/단언문으로 한다. 본문에서 관찰되는 호출 이름: `advanced_stats`.
+
+**입력·상태 변경 지점(원본)**:
+- 이 함수가 fixture 전역값·기본 객체를 그대로 사용하거나 순수하게 값을 계산한다.
+
+**성공 조건·실패 조건을 표현한 실제 검사식**:
+- 직접 `assert`하지 않는 fixture helper다. 이를 호출하는 개별 `test_*` 메서드의 검사식을 봐야 한다.
+
+**검증 범위와 한계**: 이 함수는 위에 명시한 입력·성공 조건까지 검사한다. 가상 데이터/SQLite/원장 fixture의 통과는 커널 eBPF verifier, 실제 드라이브 전원 장애 또는 타 Linux 버전의 수집 무손실을 검증하지 못한다. `assertRaises`는 오류가 발생해야 통과하며, 정상 실행을 확인하는 검사와 방향이 반대다. 테스트용 정해진 ID/시간/경로는 서비스의 실제 고정값이 아니다.
+
+**원본 함수 전체**
+
+```python
+    def advanced_stats(self, durable=1):
+        return dict(rule_id=7, priority=2, configured_policy=0, precedence=0,
+                    evaluated=1, matched=1, unknown=0, selected=1, ring_submitted=1,
+                    quarantine_summarized=0, ring_failed=0, bulk_budget_suppressed=0,
+                    bulk_budget_contention=0, collector_observed=[1, 0, 0],
+                    collector_appended=[1, 0, 0], collector_durable=[durable, 0, 0],
+                    collector_queue_rejected=[0, 0, 0], collector_quota_rejected=[0, 0, 0])
+```
+
+#### test_schema3_committed_rule_statistics_reconcile_with_raw — [test_ledger.py:108–124](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L108-L124)
+
+**정의 위치·목적**: schema3 committed rule statistics reconcile with raw의 정상·거부/오류 경로를 코드로 검증한다. 입력으로 준비한 fixture 또는 실제 시험용 경로를 사용한다.
+
+**매개변수/반환 및 실행 관계**: `def test_schema3_committed_rule_statistics_reconcile_with_raw(self):`를 확인한다. `self`는 unittest 인스턴스이며, 인자가 있는 helper는 테스트의 setup/record 생성 시 전달받는다. 명시적 `return`이 없다면 `None`을 반환하고 성공 판단은 예외/단언문으로 한다. 본문에서 관찰되는 호출 이름: `test_schema3_committed_rule_statistics_reconcile_with_raw`, `advanced_lineage`, `raw`, `write_bytes`, `checkpoint`, `advanced_stats`, `commit`, `report`, `assertEqual`, `assertTrue`, `assertFalse`.
+
+**입력·상태 변경 지점(원본)**:
+- [L110](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L110) `raw = self.raw(schema=3, quality=(1 << 24) | (1 << 28) | (7 << 16))`
+- [L111](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L111) `(self.run / 'critical.raw').write_bytes(raw)`
+- [L112](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L112) `self.checkpoint(sequence=1, critical=len(raw), seal=True,`
+- [L116](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L116) `self.commit()`
+
+**성공 조건·실패 조건을 표현한 실제 검사식**:
+- [L118](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L118) `self.assertEqual('RECOVERED', value['status'])`
+- [L120](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L120) `self.assertEqual(row['raw_durable_count'], 1)`
+- [L121](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L121) `self.assertTrue(row['collector_durable_matches_raw'])`
+- [L122](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L122) `self.assertTrue(row['complete_to_durable'])`
+- [L123](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L123) `self.assertFalse(row['per_rule_loss_attribution_complete'])`
+
+**검증 범위와 한계**: 이 함수는 위에 명시한 입력·성공 조건까지 검사한다. 가상 데이터/SQLite/원장 fixture의 통과는 커널 eBPF verifier, 실제 드라이브 전원 장애 또는 타 Linux 버전의 수집 무손실을 검증하지 못한다. `assertRaises`는 오류가 발생해야 통과하며, 정상 실행을 확인하는 검사와 방향이 반대다. 테스트용 정해진 ID/시간/경로는 서비스의 실제 고정값이 아니다.
+
+**원본 함수 전체**
+
+```python
+    def test_schema3_committed_rule_statistics_reconcile_with_raw(self):
+        self.advanced_lineage()
+        raw = self.raw(schema=3, quality=(1 << 24) | (1 << 28) | (7 << 16))
+        (self.run / 'critical.raw').write_bytes(raw)
+        self.checkpoint(sequence=1, critical=len(raw), seal=True,
+                        rule_stats=[self.advanced_stats()],
+                        rule_stats_snapshot_complete=True,
+                        rule_stats_scope='AGGREGATE_SELECTED_ATTEMPTS_AND_DURABLE_WRITES')
+        self.commit()
+        value = self.report()
+        self.assertEqual('RECOVERED', value['status'])
+        row = value['rule_evidence']['rules'][0]
+        self.assertEqual(row['raw_durable_count'], 1)
+        self.assertTrue(row['collector_durable_matches_raw'])
+        self.assertTrue(row['complete_to_durable'])
+        self.assertFalse(row['per_rule_loss_attribution_complete'])
+```
+
+#### test_schema3_unavailable_kernel_stats_keep_committed_raw_recoverable — [test_ledger.py:125–149](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L125-L149)
+
+**정의 위치·목적**: schema3 unavailable kernel stats keep committed raw recoverable의 정상·거부/오류 경로를 코드로 검증한다. 입력으로 준비한 fixture 또는 실제 시험용 경로를 사용한다.
+
+**매개변수/반환 및 실행 관계**: `def test_schema3_unavailable_kernel_stats_keep_committed_raw_recoverable(self):`를 확인한다. `self`는 unittest 인스턴스이며, 인자가 있는 helper는 테스트의 setup/record 생성 시 전달받는다. 명시적 `return`이 없다면 `None`을 반환하고 성공 판단은 예외/단언문으로 한다. 본문에서 관찰되는 호출 이름: `test_schema3_unavailable_kernel_stats_keep_committed_raw_recoverable`, `advanced_lineage`, `raw`, `write_bytes`, `advanced_stats`, `in`, `checkpoint`, `commit`, `report`, `assertEqual`, `assertTrue`, `assertFalse`, `assertIn`.
+
+**입력·상태 변경 지점(원본)**:
+- [L127](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L127) `raw = self.raw(schema=3, quality=(1 << 24) | (1 << 28) | (7 << 16))`
+- [L128](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L128) `(self.run / 'critical.raw').write_bytes(raw)`
+- [L135](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L135) `self.checkpoint(sequence=1, critical=len(raw), seal=True,`
+- [L138](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L138) `self.commit()`
+
+**성공 조건·실패 조건을 표현한 실제 검사식**:
+- [L140](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L140) `self.assertEqual('RECOVERED', report['status'])`
+- [L141](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L141) `self.assertEqual(1, report['durable_records'])`
+- [L143](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L143) `self.assertEqual(1, row['raw_durable_count'])`
+- [L144](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L144) `self.assertTrue(row['collector_durable_matches_raw'])`
+- [L145](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L145) `self.assertFalse(row['complete_to_durable'])`
+- [L146](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L146) `self.assertFalse(row['kernel_counters_available'])`
+- [L147](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L147) `self.assertIn('RULE_STATS_SNAPSHOT_INCOMPLETE', report['warnings'][0])`
+- [L148](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L148) `self.assertFalse(report['rule_evidence']['snapshot_complete'])`
+
+**검증 범위와 한계**: 이 함수는 위에 명시한 입력·성공 조건까지 검사한다. 가상 데이터/SQLite/원장 fixture의 통과는 커널 eBPF verifier, 실제 드라이브 전원 장애 또는 타 Linux 버전의 수집 무손실을 검증하지 못한다. `assertRaises`는 오류가 발생해야 통과하며, 정상 실행을 확인하는 검사와 방향이 반대다. 테스트용 정해진 ID/시간/경로는 서비스의 실제 고정값이 아니다.
+
+**원본 함수 전체**
+
+```python
+    def test_schema3_unavailable_kernel_stats_keep_committed_raw_recoverable(self):
+        self.advanced_lineage()
+        raw = self.raw(schema=3, quality=(1 << 24) | (1 << 28) | (7 << 16))
+        (self.run / 'critical.raw').write_bytes(raw)
+        stats = self.advanced_stats()
+        stats['stats_available'] = False
+        for key in ('evaluated', 'matched', 'unknown', 'selected', 'ring_submitted',
+                    'quarantine_summarized', 'ring_failed', 'bulk_budget_suppressed',
+                    'bulk_budget_contention'):
+            stats[key] = None
+        self.checkpoint(sequence=1, critical=len(raw), seal=True,
+                        rule_stats=[stats], rule_stats_snapshot_complete=False,
+                        rule_stats_scope='AGGREGATE_SELECTED_ATTEMPTS_AND_DURABLE_WRITES')
+        self.commit()
+        report = self.report()
+        self.assertEqual('RECOVERED', report['status'])
+        self.assertEqual(1, report['durable_records'])
+        row = report['rule_evidence']['rules'][0]
+        self.assertEqual(1, row['raw_durable_count'])
+        self.assertTrue(row['collector_durable_matches_raw'])
+        self.assertFalse(row['complete_to_durable'])
+        self.assertFalse(row['kernel_counters_available'])
+        self.assertIn('RULE_STATS_SNAPSHOT_INCOMPLETE', report['warnings'][0])
+        self.assertFalse(report['rule_evidence']['snapshot_complete'])
+```
+
+#### test_schema3_unavailable_kernel_stats_cannot_claim_complete_snapshot — [test_ledger.py:150–166](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L150-L166)
+
+**정의 위치·목적**: schema3 unavailable kernel stats cannot claim complete snapshot의 정상·거부/오류 경로를 코드로 검증한다. 입력으로 준비한 fixture 또는 실제 시험용 경로를 사용한다.
+
+**매개변수/반환 및 실행 관계**: `def test_schema3_unavailable_kernel_stats_cannot_claim_complete_snapshot(self):`를 확인한다. `self`는 unittest 인스턴스이며, 인자가 있는 helper는 테스트의 setup/record 생성 시 전달받는다. 명시적 `return`이 없다면 `None`을 반환하고 성공 판단은 예외/단언문으로 한다. 본문에서 관찰되는 호출 이름: `test_schema3_unavailable_kernel_stats_cannot_claim_complete_snapshot`, `advanced_lineage`, `advanced_stats`, `in`, `checkpoint`, `commit`, `report`, `assertEqual`, `assertIn`.
+
+**입력·상태 변경 지점(원본)**:
+- [L158](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L158) `self.checkpoint(sequence=0, seal=True, rule_stats=[stats],`
+- [L161](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L161) `self.commit()`
+
+**성공 조건·실패 조건을 표현한 실제 검사식**:
+- [L163](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L163) `self.assertEqual('INVALID', report['status'])`
+- [L164](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L164) `self.assertIn('contradicts complete snapshot', report['errors'][0])`
+
+**검증 범위와 한계**: 이 함수는 위에 명시한 입력·성공 조건까지 검사한다. 가상 데이터/SQLite/원장 fixture의 통과는 커널 eBPF verifier, 실제 드라이브 전원 장애 또는 타 Linux 버전의 수집 무손실을 검증하지 못한다. `assertRaises`는 오류가 발생해야 통과하며, 정상 실행을 확인하는 검사와 방향이 반대다. 테스트용 정해진 ID/시간/경로는 서비스의 실제 고정값이 아니다.
+
+**원본 함수 전체**
+
+```python
+    def test_schema3_unavailable_kernel_stats_cannot_claim_complete_snapshot(self):
+        self.advanced_lineage()
+        stats = self.advanced_stats(durable=0)
+        stats['stats_available'] = False
+        for key in ('evaluated', 'matched', 'unknown', 'selected', 'ring_submitted',
+                    'quarantine_summarized', 'ring_failed', 'bulk_budget_suppressed',
+                    'bulk_budget_contention'):
+            stats[key] = None
+        self.checkpoint(sequence=0, seal=True, rule_stats=[stats],
+                        rule_stats_snapshot_complete=True,
+                        rule_stats_scope='AGGREGATE_SELECTED_ATTEMPTS_AND_DURABLE_WRITES')
+        self.commit()
+        report = self.report()
+        self.assertEqual('INVALID', report['status'])
+        self.assertIn('contradicts complete snapshot', report['errors'][0])
+```
+
+#### test_schema3_rule_file_tamper_invalidates_lineage — [test_ledger.py:167–176](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L167-L176)
+
+**정의 위치·목적**: schema3 rule file tamper invalidates lineage의 정상·거부/오류 경로를 코드로 검증한다. 입력으로 준비한 fixture 또는 실제 시험용 경로를 사용한다.
+
+**매개변수/반환 및 실행 관계**: `def test_schema3_rule_file_tamper_invalidates_lineage(self):`를 확인한다. `self`는 unittest 인스턴스이며, 인자가 있는 helper는 테스트의 setup/record 생성 시 전달받는다. 명시적 `return`이 없다면 `None`을 반환하고 성공 판단은 예외/단언문으로 한다. 본문에서 관찰되는 호출 이름: `test_schema3_rule_file_tamper_invalidates_lineage`, `advanced_lineage`, `checkpoint`, `commit`, `write_bytes`, `report`, `assertEqual`, `assertNotIn`.
+
+**입력·상태 변경 지점(원본)**:
+- [L169](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L169) `self.checkpoint(sequence=0, seal=True)`
+- [L170](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L170) `self.commit()`
+- [L171](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L171) `(self.run / 'rules.bin').write_bytes(b'tampered')`
+
+**성공 조건·실패 조건을 표현한 실제 검사식**:
+- [L173](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L173) `self.assertEqual('INVALID', value['status'])`
+- [L174](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L174) `self.assertNotIn('rule_evidence', value)`
+
+**검증 범위와 한계**: 이 함수는 위에 명시한 입력·성공 조건까지 검사한다. 가상 데이터/SQLite/원장 fixture의 통과는 커널 eBPF verifier, 실제 드라이브 전원 장애 또는 타 Linux 버전의 수집 무손실을 검증하지 못한다. `assertRaises`는 오류가 발생해야 통과하며, 정상 실행을 확인하는 검사와 방향이 반대다. 테스트용 정해진 ID/시간/경로는 서비스의 실제 고정값이 아니다.
+
+**원본 함수 전체**
+
+```python
+    def test_schema3_rule_file_tamper_invalidates_lineage(self):
+        self.advanced_lineage()
+        self.checkpoint(sequence=0, seal=True)
+        self.commit()
+        (self.run / 'rules.bin').write_bytes(b'tampered')
+        value = self.report()
+        self.assertEqual('INVALID', value['status'])
+        self.assertNotIn('rule_evidence', value)
+```
+
+#### test_schema3_statistics_mismatch_is_explicitly_incomplete — [test_ledger.py:177–189](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L177-L189)
+
+**정의 위치·목적**: schema3 statistics mismatch is explicitly incomplete의 정상·거부/오류 경로를 코드로 검증한다. 입력으로 준비한 fixture 또는 실제 시험용 경로를 사용한다.
+
+**매개변수/반환 및 실행 관계**: `def test_schema3_statistics_mismatch_is_explicitly_incomplete(self):`를 확인한다. `self`는 unittest 인스턴스이며, 인자가 있는 helper는 테스트의 setup/record 생성 시 전달받는다. 명시적 `return`이 없다면 `None`을 반환하고 성공 판단은 예외/단언문으로 한다. 본문에서 관찰되는 호출 이름: `test_schema3_statistics_mismatch_is_explicitly_incomplete`, `advanced_lineage`, `raw`, `write_bytes`, `checkpoint`, `advanced_stats`, `commit`, `report`, `assertFalse`.
+
+**입력·상태 변경 지점(원본)**:
+- [L179](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L179) `raw = self.raw(schema=3, quality=(1 << 24) | (1 << 28) | (7 << 16))`
+- [L180](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L180) `(self.run / 'critical.raw').write_bytes(raw)`
+- [L181](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L181) `self.checkpoint(sequence=1, critical=len(raw), seal=True,`
+- [L185](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L185) `self.commit()`
+
+**성공 조건·실패 조건을 표현한 실제 검사식**:
+- [L187](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L187) `self.assertFalse(row['collector_durable_matches_raw'])`
+- [L188](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L188) `self.assertFalse(row['complete_to_durable'])`
+
+**검증 범위와 한계**: 이 함수는 위에 명시한 입력·성공 조건까지 검사한다. 가상 데이터/SQLite/원장 fixture의 통과는 커널 eBPF verifier, 실제 드라이브 전원 장애 또는 타 Linux 버전의 수집 무손실을 검증하지 못한다. `assertRaises`는 오류가 발생해야 통과하며, 정상 실행을 확인하는 검사와 방향이 반대다. 테스트용 정해진 ID/시간/경로는 서비스의 실제 고정값이 아니다.
+
+**원본 함수 전체**
+
+```python
+    def test_schema3_statistics_mismatch_is_explicitly_incomplete(self):
+        self.advanced_lineage()
+        raw = self.raw(schema=3, quality=(1 << 24) | (1 << 28) | (7 << 16))
+        (self.run / 'critical.raw').write_bytes(raw)
+        self.checkpoint(sequence=1, critical=len(raw), seal=True,
+                        rule_stats=[self.advanced_stats(durable=0)],
+                        rule_stats_snapshot_complete=True,
+                        rule_stats_scope='AGGREGATE_SELECTED_ATTEMPTS_AND_DURABLE_WRITES')
+        self.commit()
+        row = self.report()['rule_evidence']['rules'][0]
+        self.assertFalse(row['collector_durable_matches_raw'])
+        self.assertFalse(row['complete_to_durable'])
+```
+
+#### test_schema3_stats_policy_must_match_config — [test_ledger.py:190–201](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L190-L201)
+
+**정의 위치·목적**: schema3 stats policy must match config의 정상·거부/오류 경로를 코드로 검증한다. 입력으로 준비한 fixture 또는 실제 시험용 경로를 사용한다.
+
+**매개변수/반환 및 실행 관계**: `def test_schema3_stats_policy_must_match_config(self):`를 확인한다. `self`는 unittest 인스턴스이며, 인자가 있는 helper는 테스트의 setup/record 생성 시 전달받는다. 명시적 `return`이 없다면 `None`을 반환하고 성공 판단은 예외/단언문으로 한다. 본문에서 관찰되는 호출 이름: `test_schema3_stats_policy_must_match_config`, `advanced_lineage`, `advanced_stats`, `checkpoint`, `commit`, `report`, `assertEqual`, `assertIn`.
+
+**입력·상태 변경 지점(원본)**:
+- [L194](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L194) `self.checkpoint(sequence=0, seal=True, rule_stats=[stats],`
+- [L197](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L197) `self.commit()`
+
+**성공 조건·실패 조건을 표현한 실제 검사식**:
+- [L199](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L199) `self.assertEqual(report['status'], 'INVALID')`
+- [L200](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L200) `self.assertIn('rule_stats/config policy mismatch', report['errors'][0])`
+
+**검증 범위와 한계**: 이 함수는 위에 명시한 입력·성공 조건까지 검사한다. 가상 데이터/SQLite/원장 fixture의 통과는 커널 eBPF verifier, 실제 드라이브 전원 장애 또는 타 Linux 버전의 수집 무손실을 검증하지 못한다. `assertRaises`는 오류가 발생해야 통과하며, 정상 실행을 확인하는 검사와 방향이 반대다. 테스트용 정해진 ID/시간/경로는 서비스의 실제 고정값이 아니다.
+
+**원본 함수 전체**
+
+```python
+    def test_schema3_stats_policy_must_match_config(self):
+        self.advanced_lineage()
+        stats = self.advanced_stats()
+        stats['configured_policy'] = 2
+        self.checkpoint(sequence=0, seal=True, rule_stats=[stats],
+                        rule_stats_snapshot_complete=True,
+                        rule_stats_scope='AGGREGATE_SELECTED_ATTEMPTS_AND_DURABLE_WRITES')
+        self.commit()
+        report = self.report()
+        self.assertEqual(report['status'], 'INVALID')
+        self.assertIn('rule_stats/config policy mismatch', report['errors'][0])
+```
+
+#### test_schema3_legacy_rule_has_no_compiled_file — [test_ledger.py:202–220](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L202-L220)
+
+**정의 위치·목적**: schema3 legacy rule has no compiled file의 정상·거부/오류 경로를 코드로 검증한다. 입력으로 준비한 fixture 또는 실제 시험용 경로를 사용한다.
+
+**매개변수/반환 및 실행 관계**: `def test_schema3_legacy_rule_has_no_compiled_file(self):`를 확인한다. `self`는 unittest 인스턴스이며, 인자가 있는 helper는 테스트의 setup/record 생성 시 전달받는다. 명시적 `return`이 없다면 `None`을 반환하고 성공 판단은 예외/단언문으로 한다. 본문에서 관찰되는 호출 이름: `test_schema3_legacy_rule_has_no_compiled_file`, `write_json`, `loads`, `read_text`, `update`, `sha256`, `dumps`, `encode`, `hexdigest`, `read_bytes`, `raw`, `write_bytes`, `checkpoint`, `commit`, `report`, `assertEqual`.
+
+**입력·상태 변경 지점(원본)**:
+- [L205](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L205) `self.write_json('config.json', config)`
+- [L206](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L206) `manifest = json.loads((self.run / 'manifest.json').read_text())`
+- [L208](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L208) `config_sha256=hashlib.sha256(json.dumps(config, sort_keys=True,`
+- [L210](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L210) `self.write_json('manifest.json', manifest)`
+- [L212](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L212) `manifest_sha256=hashlib.sha256((self.run / 'manifest.json').read_bytes()).hexdigest())`
+- [L213](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L213) `raw = self.raw(schema=3, quality=(1 << 24) | (1 << 28) | (1 << 16) | (1 << 13))`
+- [L214](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L214) `(self.run / 'critical.raw').write_bytes(raw)`
+- [L215](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L215) `self.checkpoint(sequence=1, critical=len(raw), seal=True)`
+- [L216](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L216) `self.commit()`
+
+**성공 조건·실패 조건을 표현한 실제 검사식**:
+- [L218](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L218) `self.assertEqual(report['status'], 'RECOVERED')`
+- [L219](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L219) `self.assertEqual(report['rule_evidence']['rules'][0]['raw_durable_count'], 1)`
+
+**검증 범위와 한계**: 이 함수는 위에 명시한 입력·성공 조건까지 검사한다. 가상 데이터/SQLite/원장 fixture의 통과는 커널 eBPF verifier, 실제 드라이브 전원 장애 또는 타 Linux 버전의 수집 무손실을 검증하지 못한다. `assertRaises`는 오류가 발생해야 통과하며, 정상 실행을 확인하는 검사와 방향이 반대다. 테스트용 정해진 ID/시간/경로는 서비스의 실제 고정값이 아니다.
+
+**원본 함수 전체**
+
+```python
+    def test_schema3_legacy_rule_has_no_compiled_file(self):
+        config = dict(critical_rules=[dict(id=1, event_type='openat',
+                                          path='/tmp/protected', protected=False)])
+        self.write_json('config.json', config)
+        manifest = json.loads((self.run / 'manifest.json').read_text())
+        manifest.update(raw_schema=3, rule_engine_schema_version=1, policy_version=1,
+                        config_sha256=hashlib.sha256(json.dumps(config, sort_keys=True,
+                            separators=(',', ':')).encode()).hexdigest())
+        self.write_json('manifest.json', manifest)
+        self.lineage.update(config_sha256=manifest['config_sha256'],
+                            manifest_sha256=hashlib.sha256((self.run / 'manifest.json').read_bytes()).hexdigest())
+        raw = self.raw(schema=3, quality=(1 << 24) | (1 << 28) | (1 << 16) | (1 << 13))
+        (self.run / 'critical.raw').write_bytes(raw)
+        self.checkpoint(sequence=1, critical=len(raw), seal=True)
+        self.commit()
+        report = self.report()
+        self.assertEqual(report['status'], 'RECOVERED')
+        self.assertEqual(report['rule_evidence']['rules'][0]['raw_durable_count'], 1)
+```
+
+#### test_schema3_userspace_loss_witness_is_accepted — [test_ledger.py:221–234](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L221-L234)
+
+**정의 위치·목적**: schema3 userspace loss witness is accepted의 정상·거부/오류 경로를 코드로 검증한다. 입력으로 준비한 fixture 또는 실제 시험용 경로를 사용한다.
+
+**매개변수/반환 및 실행 관계**: `def test_schema3_userspace_loss_witness_is_accepted(self):`를 확인한다. `self`는 unittest 인스턴스이며, 인자가 있는 helper는 테스트의 setup/record 생성 시 전달받는다. 명시적 `return`이 없다면 `None`을 반환하고 성공 판단은 예외/단언문으로 한다. 본문에서 관찰되는 호출 이름: `test_schema3_userspace_loss_witness_is_accepted`, `advanced_lineage`, `loss_witness`, `update`, `loss`, `checkpoint`, `commit`, `report`, `assertEqual`.
+
+**입력·상태 변경 지점(원본)**:
+- [L227](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L227) `self.checkpoint(sequence=2, seal=True)`
+- [L228](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L228) `self.commit()`
+
+**성공 조건·실패 조건을 표현한 실제 검사식**:
+- [L230](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L230) `self.assertEqual(report['status'], 'RECOVERED')`
+- [L232](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L232) `self.assertEqual(entry['witness']['event_schema'], 3)`
+
+**검증 범위와 한계**: 이 함수는 위에 명시한 입력·성공 조건까지 검사한다. 가상 데이터/SQLite/원장 fixture의 통과는 커널 eBPF verifier, 실제 드라이브 전원 장애 또는 타 Linux 버전의 수집 무손실을 검증하지 못한다. `assertRaises`는 오류가 발생해야 통과하며, 정상 실행을 확인하는 검사와 방향이 반대다. 테스트용 정해진 ID/시간/경로는 서비스의 실제 고정값이 아니다.
+
+**원본 함수 전체**
+
+```python
+    def test_schema3_userspace_loss_witness_is_accepted(self):
+        self.advanced_lineage()
+        witness = self.loss_witness()
+        witness.update(event_schema=3, rule_id=7,
+                       quality=(1 << 24) | (1 << 28) | (7 << 16))
+        self.loss(seq=2, witness=witness)
+        self.checkpoint(sequence=2, seal=True)
+        self.commit()
+        report = self.report()
+        self.assertEqual(report['status'], 'RECOVERED')
+        entry = report['exact_userspace_loss_witnesses']['entries'][0]
+        self.assertEqual(entry['witness']['event_schema'], 3)
+```
+
+#### report — [test_ledger.py:235–237](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L235-L237)
+
+**정의 위치·목적**: 테스트 fixture의 입력·출력을 구성한다. 입력으로 준비한 fixture 또는 실제 시험용 경로를 사용한다.
+
+**매개변수/반환 및 실행 관계**: `def report(self):`를 확인한다. `self`는 unittest 인스턴스이며, 인자가 있는 helper는 테스트의 setup/record 생성 시 전달받는다. 명시적 `return`이 없다면 `None`을 반환하고 성공 판단은 예외/단언문으로 한다. 본문에서 관찰되는 호출 이름: `report`, `recover`.
+
+**입력·상태 변경 지점(원본)**:
+- 이 함수가 fixture 전역값·기본 객체를 그대로 사용하거나 순수하게 값을 계산한다.
+
+**성공 조건·실패 조건을 표현한 실제 검사식**:
+- 직접 `assert`하지 않는 fixture helper다. 이를 호출하는 개별 `test_*` 메서드의 검사식을 봐야 한다.
+
+**검증 범위와 한계**: 이 함수는 위에 명시한 입력·성공 조건까지 검사한다. 가상 데이터/SQLite/원장 fixture의 통과는 커널 eBPF verifier, 실제 드라이브 전원 장애 또는 타 Linux 버전의 수집 무손실을 검증하지 못한다. `assertRaises`는 오류가 발생해야 통과하며, 정상 실행을 확인하는 검사와 방향이 반대다. 테스트용 정해진 ID/시간/경로는 서비스의 실제 고정값이 아니다.
+
+**원본 함수 전체**
+
+```python
+    def report(self):
+        return ledger.recover(self.run)
+```
+
+#### test_legacy_no_ledger_is_explicitly_unsupported — [test_ledger.py:238–240](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L238-L240)
+
+**정의 위치·목적**: legacy no ledger is explicitly unsupported의 정상·거부/오류 경로를 코드로 검증한다. 입력으로 준비한 fixture 또는 실제 시험용 경로를 사용한다.
+
+**매개변수/반환 및 실행 관계**: `def test_legacy_no_ledger_is_explicitly_unsupported(self):`를 확인한다. `self`는 unittest 인스턴스이며, 인자가 있는 helper는 테스트의 setup/record 생성 시 전달받는다. 명시적 `return`이 없다면 `None`을 반환하고 성공 판단은 예외/단언문으로 한다. 본문에서 관찰되는 호출 이름: `test_legacy_no_ledger_is_explicitly_unsupported`, `assertEqual`, `report`.
+
+**입력·상태 변경 지점(원본)**:
+- 이 함수가 fixture 전역값·기본 객체를 그대로 사용하거나 순수하게 값을 계산한다.
+
+**성공 조건·실패 조건을 표현한 실제 검사식**:
+- [L239](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L239) `self.assertEqual('LEGACY_UNSUPPORTED', self.report()['status'])`
+
+**검증 범위와 한계**: 이 함수는 위에 명시한 입력·성공 조건까지 검사한다. 가상 데이터/SQLite/원장 fixture의 통과는 커널 eBPF verifier, 실제 드라이브 전원 장애 또는 타 Linux 버전의 수집 무손실을 검증하지 못한다. `assertRaises`는 오류가 발생해야 통과하며, 정상 실행을 확인하는 검사와 방향이 반대다. 테스트용 정해진 ID/시간/경로는 서비스의 실제 고정값이 아니다.
+
+**원본 함수 전체**
+
+```python
+    def test_legacy_no_ledger_is_explicitly_unsupported(self):
+        self.assertEqual('LEGACY_UNSUPPORTED', self.report()['status'])
+```
+
+#### test_missing_fence_never_promotes_even_valid_journal — [test_ledger.py:241–248](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L241-L248)
+
+**정의 위치·목적**: missing fence never promotes even valid journal의 정상·거부/오류 경로를 코드로 검증한다. 입력으로 준비한 fixture 또는 실제 시험용 경로를 사용한다.
+
+**매개변수/반환 및 실행 관계**: `def test_missing_fence_never_promotes_even_valid_journal(self):`를 확인한다. `self`는 unittest 인스턴스이며, 인자가 있는 helper는 테스트의 setup/record 생성 시 전달받는다. 명시적 `return`이 없다면 `None`을 반환하고 성공 판단은 예외/단언문으로 한다. 본문에서 관찰되는 호출 이름: `test_missing_fence_never_promotes_even_valid_journal`, `checkpoint`, `write_bytes`, `join`, `report`, `assertEqual`, `assertFalse`.
+
+**입력·상태 변경 지점(원본)**:
+- [L242](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L242) `self.checkpoint(seal=True)`
+- [L243](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L243) `(self.run / 'evidence.meta').write_bytes(b''.join(self.frames))`
+
+**성공 조건·실패 조건을 표현한 실제 검사식**:
+- [L245](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L245) `self.assertEqual('UNCOMMITTED', value['status'])`
+- [L246](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L246) `self.assertEqual(0, value['journal']['committed_bytes'])`
+- [L247](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L247) `self.assertFalse(value['absence_set_complete'])`
+
+**검증 범위와 한계**: 이 함수는 위에 명시한 입력·성공 조건까지 검사한다. 가상 데이터/SQLite/원장 fixture의 통과는 커널 eBPF verifier, 실제 드라이브 전원 장애 또는 타 Linux 버전의 수집 무손실을 검증하지 못한다. `assertRaises`는 오류가 발생해야 통과하며, 정상 실행을 확인하는 검사와 방향이 반대다. 테스트용 정해진 ID/시간/경로는 서비스의 실제 고정값이 아니다.
+
+**원본 함수 전체**
+
+```python
+    def test_missing_fence_never_promotes_even_valid_journal(self):
+        self.checkpoint(seal=True)
+        (self.run / 'evidence.meta').write_bytes(b''.join(self.frames))
+        value = self.report()
+        self.assertEqual('UNCOMMITTED', value['status'])
+        self.assertEqual(0, value['journal']['committed_bytes'])
+        self.assertFalse(value['absence_set_complete'])
+```
+
+#### test_empty_startup_fence_has_no_recovered_raw_boundary — [test_ledger.py:249–256](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L249-L256)
+
+**정의 위치·목적**: empty startup fence has no recovered raw boundary의 정상·거부/오류 경로를 코드로 검증한다. 입력으로 준비한 fixture 또는 실제 시험용 경로를 사용한다.
+
+**매개변수/반환 및 실행 관계**: `def test_empty_startup_fence_has_no_recovered_raw_boundary(self):`를 확인한다. `self`는 unittest 인스턴스이며, 인자가 있는 helper는 테스트의 setup/record 생성 시 전달받는다. 명시적 `return`이 없다면 `None`을 반환하고 성공 판단은 예외/단언문으로 한다. 본문에서 관찰되는 호출 이름: `test_empty_startup_fence_has_no_recovered_raw_boundary`, `commit`, `report`, `assertEqual`, `assertFalse`.
+
+**입력·상태 변경 지점(원본)**:
+- [L250](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L250) `self.commit()`
+
+**성공 조건·실패 조건을 표현한 실제 검사식**:
+- [L252](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L252) `self.assertEqual('UNCOMMITTED', value['status'])`
+- [L253](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L253) `self.assertFalse(value['raw_recovery_supported'])`
+- [L254](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L254) `self.assertFalse(value['absence_set_complete'])`
+- [L255](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L255) `self.assertEqual(0, value['durable_unique_events'])`
+
+**검증 범위와 한계**: 이 함수는 위에 명시한 입력·성공 조건까지 검사한다. 가상 데이터/SQLite/원장 fixture의 통과는 커널 eBPF verifier, 실제 드라이브 전원 장애 또는 타 Linux 버전의 수집 무손실을 검증하지 못한다. `assertRaises`는 오류가 발생해야 통과하며, 정상 실행을 확인하는 검사와 방향이 반대다. 테스트용 정해진 ID/시간/경로는 서비스의 실제 고정값이 아니다.
+
+**원본 함수 전체**
+
+```python
+    def test_empty_startup_fence_has_no_recovered_raw_boundary(self):
+        self.commit()
+        value = self.report()
+        self.assertEqual('UNCOMMITTED', value['status'])
+        self.assertFalse(value['raw_recovery_supported'])
+        self.assertFalse(value['absence_set_complete'])
+        self.assertEqual(0, value['durable_unique_events'])
+```
+
+#### test_committed_loss_without_checkpoint_remains_exact_partial_recovery — [test_ledger.py:257–266](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L257-L266)
+
+**정의 위치·목적**: committed loss without checkpoint remains exact partial recovery의 정상·거부/오류 경로를 코드로 검증한다. 입력으로 준비한 fixture 또는 실제 시험용 경로를 사용한다.
+
+**매개변수/반환 및 실행 관계**: `def test_committed_loss_without_checkpoint_remains_exact_partial_recovery(self):`를 확인한다. `self`는 unittest 인스턴스이며, 인자가 있는 helper는 테스트의 setup/record 생성 시 전달받는다. 명시적 `return`이 없다면 `None`을 반환하고 성공 판단은 예외/단언문으로 한다. 본문에서 관찰되는 호출 이름: `test_committed_loss_without_checkpoint_remains_exact_partial_recovery`, `loss`, `commit`, `report`, `assertEqual`, `assertFalse`, `assertIsNone`.
+
+**입력·상태 변경 지점(원본)**:
+- [L259](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L259) `self.commit()`
+
+**성공 조건·실패 조건을 표현한 실제 검사식**:
+- [L261](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L261) `self.assertEqual('PARTIAL_RECOVERY', value['status'])`
+- [L262](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L262) `self.assertFalse(value['raw_recovery_supported'])`
+- [L263](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L263) `self.assertEqual(1, value['exact_userspace_loss_count'])`
+- [L264](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L264) `self.assertEqual('COMMITTED_JOURNAL_FENCE', value['exact_userspace_loss_durability'])`
+- [L265](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L265) `self.assertIsNone(value['unknown_future']['count'])`
+
+**검증 범위와 한계**: 이 함수는 위에 명시한 입력·성공 조건까지 검사한다. 가상 데이터/SQLite/원장 fixture의 통과는 커널 eBPF verifier, 실제 드라이브 전원 장애 또는 타 Linux 버전의 수집 무손실을 검증하지 못한다. `assertRaises`는 오류가 발생해야 통과하며, 정상 실행을 확인하는 검사와 방향이 반대다. 테스트용 정해진 ID/시간/경로는 서비스의 실제 고정값이 아니다.
+
+**원본 함수 전체**
+
+```python
+    def test_committed_loss_without_checkpoint_remains_exact_partial_recovery(self):
+        self.loss()
+        self.commit()
+        value = self.report()
+        self.assertEqual('PARTIAL_RECOVERY', value['status'])
+        self.assertFalse(value['raw_recovery_supported'])
+        self.assertEqual(1, value['exact_userspace_loss_count'])
+        self.assertEqual('COMMITTED_JOURNAL_FENCE', value['exact_userspace_loss_durability'])
+        self.assertIsNone(value['unknown_future']['count'])
+```
+
+#### test_committed_loss_after_last_checkpoint_is_exact_not_bounded_raw — [test_ledger.py:267–277](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L267-L277)
+
+**정의 위치·목적**: committed loss after last checkpoint is exact not bounded raw의 정상·거부/오류 경로를 코드로 검증한다. 입력으로 준비한 fixture 또는 실제 시험용 경로를 사용한다.
+
+**매개변수/반환 및 실행 관계**: `def test_committed_loss_after_last_checkpoint_is_exact_not_bounded_raw(self):`를 확인한다. `self`는 unittest 인스턴스이며, 인자가 있는 helper는 테스트의 setup/record 생성 시 전달받는다. 명시적 `return`이 없다면 `None`을 반환하고 성공 판단은 예외/단언문으로 한다. 본문에서 관찰되는 호출 이름: `test_committed_loss_after_last_checkpoint_is_exact_not_bounded_raw`, `checkpoint`, `loss`, `commit`, `report`, `assertEqual`, `assertNotIn`.
+
+**입력·상태 변경 지점(원본)**:
+- [L268](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L268) `self.checkpoint(sequence=1)`
+- [L270](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L270) `self.commit()`
+
+**성공 조건·실패 조건을 표현한 실제 검사식**:
+- [L272](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L272) `self.assertEqual('RECOVERED', value['status'])`
+- [L273](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L273) `self.assertEqual(1, value['exact_userspace_loss_count'])`
+- [L274](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L274) `self.assertEqual(900, value['exact_userspace_losses'][0]['ranges'][0]['start'])`
+- [L275](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L275) `self.assertEqual(1, value['tenant_evidence'][0]['checkpoint_sequence'])`
+- [L276](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L276) `self.assertNotIn('final_absence', value['tenant_evidence'][0])`
+
+**검증 범위와 한계**: 이 함수는 위에 명시한 입력·성공 조건까지 검사한다. 가상 데이터/SQLite/원장 fixture의 통과는 커널 eBPF verifier, 실제 드라이브 전원 장애 또는 타 Linux 버전의 수집 무손실을 검증하지 못한다. `assertRaises`는 오류가 발생해야 통과하며, 정상 실행을 확인하는 검사와 방향이 반대다. 테스트용 정해진 ID/시간/경로는 서비스의 실제 고정값이 아니다.
+
+**원본 함수 전체**
+
+```python
+    def test_committed_loss_after_last_checkpoint_is_exact_not_bounded_raw(self):
+        self.checkpoint(sequence=1)
+        self.loss(seq=900)
+        self.commit()
+        value = self.report()
+        self.assertEqual('RECOVERED', value['status'])
+        self.assertEqual(1, value['exact_userspace_loss_count'])
+        self.assertEqual(900, value['exact_userspace_losses'][0]['ranges'][0]['start'])
+        self.assertEqual(1, value['tenant_evidence'][0]['checkpoint_sequence'])
+        self.assertNotIn('final_absence', value['tenant_evidence'][0])
+```
+
+#### test_non_utf8_names_do_not_affect_sensor_id_recovery — [test_ledger.py:278–286](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L278-L286)
+
+**정의 위치·목적**: non utf8 names do not affect sensor id recovery의 정상·거부/오류 경로를 코드로 검증한다. 입력으로 준비한 fixture 또는 실제 시험용 경로를 사용한다.
+
+**매개변수/반환 및 실행 관계**: `def test_non_utf8_names_do_not_affect_sensor_id_recovery(self):`를 확인한다. `self`는 unittest 인스턴스이며, 인자가 있는 helper는 테스트의 setup/record 생성 시 전달받는다. 명시적 `return`이 없다면 `None`을 반환하고 성공 판단은 예외/단언문으로 한다. 본문에서 관찰되는 호출 이름: `test_non_utf8_names_do_not_affect_sensor_id_recovery`, `write_bytes`, `raw`, `checkpoint`, `commit`, `report`, `assertEqual`.
+
+**입력·상태 변경 지점(원본)**:
+- [L279](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L279) `(self.run / 'critical.raw').write_bytes(self.raw(comm=b'\xffprocess', path=b'/tmp/\xffprotected'))`
+- [L280](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L280) `self.checkpoint(sequence=1, critical=ledger.RECORD_SIZE, seal=True)`
+- [L281](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L281) `self.commit()`
+
+**성공 조건·실패 조건을 표현한 실제 검사식**:
+- [L283](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L283) `self.assertEqual('RECOVERED', value['status'])`
+- [L284](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L284) `self.assertEqual(1, value['durable_unique_events'])`
+- [L285](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L285) `self.assertEqual(0, value['tenant_evidence'][0]['final_absence']['count'])`
+
+**검증 범위와 한계**: 이 함수는 위에 명시한 입력·성공 조건까지 검사한다. 가상 데이터/SQLite/원장 fixture의 통과는 커널 eBPF verifier, 실제 드라이브 전원 장애 또는 타 Linux 버전의 수집 무손실을 검증하지 못한다. `assertRaises`는 오류가 발생해야 통과하며, 정상 실행을 확인하는 검사와 방향이 반대다. 테스트용 정해진 ID/시간/경로는 서비스의 실제 고정값이 아니다.
+
+**원본 함수 전체**
+
+```python
+    def test_non_utf8_names_do_not_affect_sensor_id_recovery(self):
+        (self.run / 'critical.raw').write_bytes(self.raw(comm=b'\xffprocess', path=b'/tmp/\xffprotected'))
+        self.checkpoint(sequence=1, critical=ledger.RECORD_SIZE, seal=True)
+        self.commit()
+        value = self.report()
+        self.assertEqual('RECOVERED', value['status'])
+        self.assertEqual(1, value['durable_unique_events'])
+        self.assertEqual(0, value['tenant_evidence'][0]['final_absence']['count'])
+```
+
+#### episode — [test_ledger.py:287–294](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L287-L294)
+
+**정의 위치·목적**: 테스트 fixture의 입력·출력을 구성한다. 입력으로 준비한 fixture 또는 실제 시험용 경로를 사용한다.
+
+**매개변수/반환 및 실행 관계**: `def episode(self, **values):`를 확인한다. `self`는 unittest 인스턴스이며, 인자가 있는 helper는 테스트의 setup/record 생성 시 전달받는다. 명시적 `return`이 없다면 `None`을 반환하고 성공 판단은 예외/단언문으로 한다. 본문에서 관찰되는 호출 이름: `episode`, `update`.
+
+**입력·상태 변경 지점(원본)**:
+- 이 함수가 fixture 전역값·기본 객체를 그대로 사용하거나 순수하게 값을 계산한다.
+
+**성공 조건·실패 조건을 표현한 실제 검사식**:
+- 직접 `assert`하지 않는 fixture helper다. 이를 호출하는 개별 `test_*` 메서드의 검사식을 봐야 한다.
+
+**검증 범위와 한계**: 이 함수는 위에 명시한 입력·성공 조건까지 검사한다. 가상 데이터/SQLite/원장 fixture의 통과는 커널 eBPF verifier, 실제 드라이브 전원 장애 또는 타 Linux 버전의 수집 무손실을 검증하지 못한다. `assertRaises`는 오류가 발생해야 통과하며, 정상 실행을 확인하는 검사와 방향이 반대다. 테스트용 정해진 ID/시간/경로는 서비스의 실제 고정값이 아니다.
+
+**원본 함수 전체**
+
+```python
+    def episode(self, **values):
+        value = dict(episode_id=2, start_ns=100, end_ns=0, first_sequence=2,last_sequence=5,
+            last_event_ns=400,seen=4,full_selected=1,sample_selected=1,summarized=2,
+            full_submitted=1,sample_submitted=1,ring_failed=0,tracking_complete=1,
+            tracking_failed_start=0,tracking_failed_end=0,unique_pid_lower_bound=1,unique_uid_lower_bound=1)
+        value.update(values)
+        return value
+```
+
+#### stream — [test_ledger.py:295–305](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L295-L305)
+
+**정의 위치·목적**: 테스트 fixture의 입력·출력을 구성한다. 입력으로 준비한 fixture 또는 실제 시험용 경로를 사용한다.
+
+**매개변수/반환 및 실행 관계**: `def stream(self, **values):`를 확인한다. `self`는 unittest 인스턴스이며, 인자가 있는 helper는 테스트의 setup/record 생성 시 전달받는다. 명시적 `return`이 없다면 `None`을 반환하고 성공 판단은 예외/단언문으로 한다. 본문에서 관찰되는 호출 이름: `stream`, `episode`, `update`.
+
+**입력·상태 변경 지점(원본)**:
+- 이 함수가 fixture 전역값·기본 객체를 그대로 사용하거나 순수하게 값을 계산한다.
+
+**성공 조건·실패 조건을 표현한 실제 검사식**:
+- 직접 `assert`하지 않는 fixture helper다. 이를 호출하는 개별 `test_*` 메서드의 검사식을 봐야 한다.
+
+**검증 범위와 한계**: 이 함수는 위에 명시한 입력·성공 조건까지 검사한다. 가상 데이터/SQLite/원장 fixture의 통과는 커널 eBPF verifier, 실제 드라이브 전원 장애 또는 타 Linux 버전의 수집 무손실을 검증하지 못한다. `assertRaises`는 오류가 발생해야 통과하며, 정상 실행을 확인하는 검사와 방향이 반대다. 테스트용 정해진 ID/시간/경로는 서비스의 실제 고정값이 아니다.
+
+**원본 함수 전체**
+
+```python
+    def stream(self, **values):
+        value = dict(cgroup_id=9001,rule_id=1,kind=2,seen=5,tracking_failed=0,protected_seen=0,
+            engine=dict(q_seen=4,full_selected=1,sample_selected=1,summarized=2,
+                        full_submitted=1,sample_submitted=1,ring_failed=0,current_rate_eps=4000,
+                        peak_rate_eps=5000,current=self.episode(),last=self.episode(episode_id=0,first_sequence=0,last_sequence=0)),
+            collector=dict(normal_appended=1,normal_durable=1,full_appended=1,full_durable=1,
+                           sample_appended=1,sample_durable=1,queue_rejected_full=0,queue_rejected_sample=0,
+                           storage_rejected_full=0,storage_rejected_sample=0))
+        value.update(values)
+        return value
+```
+
+#### control — [test_ledger.py:306–315](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L306-L315)
+
+**정의 위치·목적**: 테스트 fixture의 입력·출력을 구성한다. 입력으로 준비한 fixture 또는 실제 시험용 경로를 사용한다.
+
+**매개변수/반환 및 실행 관계**: `def control(self, transition='quarantine_enter', episode=None, **values):`를 확인한다. `self`는 unittest 인스턴스이며, 인자가 있는 helper는 테스트의 setup/record 생성 시 전달받는다. 명시적 `return`이 없다면 `None`을 반환하고 성공 판단은 예외/단언문으로 한다. 본문에서 관찰되는 호출 이름: `control`, `episode`, `update`, `append`.
+
+**입력·상태 변경 지점(원본)**:
+- [L314](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L314) `return self.append(transition, **value)`
+
+**성공 조건·실패 조건을 표현한 실제 검사식**:
+- 직접 `assert`하지 않는 fixture helper다. 이를 호출하는 개별 `test_*` 메서드의 검사식을 봐야 한다.
+
+**검증 범위와 한계**: 이 함수는 위에 명시한 입력·성공 조건까지 검사한다. 가상 데이터/SQLite/원장 fixture의 통과는 커널 eBPF verifier, 실제 드라이브 전원 장애 또는 타 Linux 버전의 수집 무손실을 검증하지 못한다. `assertRaises`는 오류가 발생해야 통과하며, 정상 실행을 확인하는 검사와 방향이 반대다. 테스트용 정해진 ID/시간/경로는 서비스의 실제 고정값이 아니다.
+
+**원본 함수 전체**
+
+```python
+    def control(self, transition='quarantine_enter', episode=None, **values):
+        episode = episode or self.episode(last_sequence=2,last_event_ns=100,seen=1,full_selected=1,
+                                         sample_selected=0,summarized=0,sample_submitted=0)
+        value = dict(cgroup_id=9001,rule_id=1,kind=2,episode_id=episode['episode_id'],
+            first_seq=episode['first_sequence'],last_seq=episode['last_sequence'],seq=2,
+            monotonic_ns=100,threshold_eps=10000,observed_eps=15000,duration_ms=3000,
+            reason='HIGH_RATE' if transition=='quarantine_enter' else 'LOW_RATE',episode=episode)
+        value.update(values)
+        return self.append(transition, **value)
+```
+
+#### quarantine_checkpoint — [test_ledger.py:316–323](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L316-L323)
+
+**정의 위치·목적**: 테스트 fixture의 입력·출력을 구성한다. 입력으로 준비한 fixture 또는 실제 시험용 경로를 사용한다.
+
+**매개변수/반환 및 실행 관계**: `def quarantine_checkpoint(self, **values):`를 확인한다. `self`는 unittest 인스턴스이며, 인자가 있는 helper는 테스트의 setup/record 생성 시 전달받는다. 명시적 `return`이 없다면 `None`을 반환하고 성공 판단은 예외/단언문으로 한다. 본문에서 관찰되는 호출 이름: `quarantine_checkpoint`, `stream`, `update`, `checkpoint`.
+
+**입력·상태 변경 지점(원본)**:
+- [L322](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L322) `return self.checkpoint(**value)`
+
+**성공 조건·실패 조건을 표현한 실제 검사식**:
+- 직접 `assert`하지 않는 fixture helper다. 이를 호출하는 개별 `test_*` 메서드의 검사식을 봐야 한다.
+
+**검증 범위와 한계**: 이 함수는 위에 명시한 입력·성공 조건까지 검사한다. 가상 데이터/SQLite/원장 fixture의 통과는 커널 eBPF verifier, 실제 드라이브 전원 장애 또는 타 Linux 버전의 수집 무손실을 검증하지 못한다. `assertRaises`는 오류가 발생해야 통과하며, 정상 실행을 확인하는 검사와 방향이 반대다. 테스트용 정해진 ID/시간/경로는 서비스의 실제 고정값이 아니다.
+
+**원본 함수 전체**
+
+```python
+    def quarantine_checkpoint(self, **values):
+        value = dict(sequence=5,seal=True,durable_offsets=dict(critical=ledger.RECORD_SIZE,general=0,
+                         quarantine=2*ledger.RECORD_SIZE),streams=[self.stream()],
+                         stream_snapshot_complete=True,stream_storage_complete=True,
+                         quarantine_global=dict(stream_map_full=0,untracked_seen=0,untracked_protected=0))
+        value.update(values)
+        return self.checkpoint(**value)
+```
+
+#### quarantine_files — [test_ledger.py:324–328](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L324-L328)
+
+**정의 위치·목적**: 테스트 fixture의 입력·출력을 구성한다. 입력으로 준비한 fixture 또는 실제 시험용 경로를 사용한다.
+
+**매개변수/반환 및 실행 관계**: `def quarantine_files(self):`를 확인한다. `self`는 unittest 인스턴스이며, 인자가 있는 helper는 테스트의 setup/record 생성 시 전달받는다. 명시적 `return`이 없다면 `None`을 반환하고 성공 판단은 예외/단언문으로 한다. 본문에서 관찰되는 호출 이름: `quarantine_files`, `write_bytes`, `raw`.
+
+**입력·상태 변경 지점(원본)**:
+- [L325](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L325) `(self.run / 'critical.raw').write_bytes(self.raw(seq=1,schema=2,quality=1<<16))`
+- [L326](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L326) `(self.run / 'quarantine.raw').write_bytes(self.raw(seq=2,schema=2,quality=(1<<16)|ledger.Q_QUARANTINE|ledger.Q_INITIAL)+`
+- [L327](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L327) `self.raw(seq=4,schema=2,quality=(1<<16)|ledger.Q_QUARANTINE|ledger.Q_PERIODIC))`
+
+**성공 조건·실패 조건을 표현한 실제 검사식**:
+- 직접 `assert`하지 않는 fixture helper다. 이를 호출하는 개별 `test_*` 메서드의 검사식을 봐야 한다.
+
+**검증 범위와 한계**: 이 함수는 위에 명시한 입력·성공 조건까지 검사한다. 가상 데이터/SQLite/원장 fixture의 통과는 커널 eBPF verifier, 실제 드라이브 전원 장애 또는 타 Linux 버전의 수집 무손실을 검증하지 못한다. `assertRaises`는 오류가 발생해야 통과하며, 정상 실행을 확인하는 검사와 방향이 반대다. 테스트용 정해진 ID/시간/경로는 서비스의 실제 고정값이 아니다.
+
+**원본 함수 전체**
+
+```python
+    def quarantine_files(self):
+        (self.run / 'critical.raw').write_bytes(self.raw(seq=1,schema=2,quality=1<<16))
+        (self.run / 'quarantine.raw').write_bytes(self.raw(seq=2,schema=2,quality=(1<<16)|ledger.Q_QUARANTINE|ledger.Q_INITIAL)+
+            self.raw(seq=4,schema=2,quality=(1<<16)|ledger.Q_QUARANTINE|ledger.Q_PERIODIC))
+```
+
+#### test_quarantine_lane_preserves_durable_union_and_scoped_counts — [test_ledger.py:329–344](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L329-L344)
+
+**정의 위치·목적**: quarantine lane preserves durable union and scoped counts의 정상·거부/오류 경로를 코드로 검증한다. 입력으로 준비한 fixture 또는 실제 시험용 경로를 사용한다.
+
+**매개변수/반환 및 실행 관계**: `def test_quarantine_lane_preserves_durable_union_and_scoped_counts(self):`를 확인한다. `self`는 unittest 인스턴스이며, 인자가 있는 helper는 테스트의 setup/record 생성 시 전달받는다. 명시적 `return`이 없다면 `None`을 반환하고 성공 판단은 예외/단언문으로 한다. 본문에서 관찰되는 호출 이름: `test_quarantine_lane_preserves_durable_union_and_scoped_counts`, `quarantine_files`, `control`, `quarantine_checkpoint`, `commit`, `report`, `assertEqual`, `assertTrue`, `all`.
+
+**입력·상태 변경 지점(원본)**:
+- [L333](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L333) `self.commit()`
+
+**성공 조건·실패 조건을 표현한 실제 검사식**:
+- [L335](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L335) `self.assertEqual('RECOVERED', value['status'])`
+- [L336](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L336) `self.assertEqual(3, value['durable_unique_events'])`
+- [L337](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L337) `self.assertEqual(2, value['tenant_evidence'][0]['final_absence']['count'])`
+- [L339](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L339) `self.assertEqual((1,1,2),(q['full_saved_total'],q['sampled_total'],q['quarantine_not_stored_total']))`
+- [L340](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L340) `self.assertEqual(5,q['critical_seen_total'])`
+- [L341](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L341) `self.assertEqual(2,q['episodes'][0]['reconciliation']['not_durable'])`
+- [L342](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L342) `self.assertEqual('CRITICAL_QUARANTINE',q['episodes'][0]['reconciliation']['summary_reason'])`
+- [L343](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L343) `self.assertTrue(all(row['reason']=='UNKNOWN' for row in value['tenant_evidence'][0]['final_absence']['ranges']))`
+
+**검증 범위와 한계**: 이 함수는 위에 명시한 입력·성공 조건까지 검사한다. 가상 데이터/SQLite/원장 fixture의 통과는 커널 eBPF verifier, 실제 드라이브 전원 장애 또는 타 Linux 버전의 수집 무손실을 검증하지 못한다. `assertRaises`는 오류가 발생해야 통과하며, 정상 실행을 확인하는 검사와 방향이 반대다. 테스트용 정해진 ID/시간/경로는 서비스의 실제 고정값이 아니다.
+
+**원본 함수 전체**
+
+```python
+    def test_quarantine_lane_preserves_durable_union_and_scoped_counts(self):
+        self.quarantine_files()
+        self.control()
+        self.quarantine_checkpoint()
+        self.commit()
+        value = self.report()
+        self.assertEqual('RECOVERED', value['status'])
+        self.assertEqual(3, value['durable_unique_events'])
+        self.assertEqual(2, value['tenant_evidence'][0]['final_absence']['count'])
+        q = value['critical_quarantine']
+        self.assertEqual((1,1,2),(q['full_saved_total'],q['sampled_total'],q['quarantine_not_stored_total']))
+        self.assertEqual(5,q['critical_seen_total'])
+        self.assertEqual(2,q['episodes'][0]['reconciliation']['not_durable'])
+        self.assertEqual('CRITICAL_QUARANTINE',q['episodes'][0]['reconciliation']['summary_reason'])
+        self.assertTrue(all(row['reason']=='UNKNOWN' for row in value['tenant_evidence'][0]['final_absence']['ranges']))
+```
+
+#### test_quarantine_missing_control_keeps_episode_metrics_incomplete — [test_ledger.py:345–353](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L345-L353)
+
+**정의 위치·목적**: quarantine missing control keeps episode metrics incomplete의 정상·거부/오류 경로를 코드로 검증한다. 입력으로 준비한 fixture 또는 실제 시험용 경로를 사용한다.
+
+**매개변수/반환 및 실행 관계**: `def test_quarantine_missing_control_keeps_episode_metrics_incomplete(self):`를 확인한다. `self`는 unittest 인스턴스이며, 인자가 있는 helper는 테스트의 setup/record 생성 시 전달받는다. 명시적 `return`이 없다면 `None`을 반환하고 성공 판단은 예외/단언문으로 한다. 본문에서 관찰되는 호출 이름: `test_quarantine_missing_control_keeps_episode_metrics_incomplete`, `quarantine_files`, `quarantine_checkpoint`, `commit`, `report`, `assertFalse`, `assertIsNone`.
+
+**입력·상태 변경 지점(원본)**:
+- [L348](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L348) `self.commit()`
+
+**성공 조건·실패 조건을 표현한 실제 검사식**:
+- [L350](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L350) `self.assertFalse(episode['controls_complete'])`
+- [L351](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L351) `self.assertIsNone(episode['actual_durable'])`
+- [L352](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L352) `self.assertIsNone(episode['reconciliation']['not_durable'])`
+
+**검증 범위와 한계**: 이 함수는 위에 명시한 입력·성공 조건까지 검사한다. 가상 데이터/SQLite/원장 fixture의 통과는 커널 eBPF verifier, 실제 드라이브 전원 장애 또는 타 Linux 버전의 수집 무손실을 검증하지 못한다. `assertRaises`는 오류가 발생해야 통과하며, 정상 실행을 확인하는 검사와 방향이 반대다. 테스트용 정해진 ID/시간/경로는 서비스의 실제 고정값이 아니다.
+
+**원본 함수 전체**
+
+```python
+    def test_quarantine_missing_control_keeps_episode_metrics_incomplete(self):
+        self.quarantine_files()
+        self.quarantine_checkpoint()
+        self.commit()
+        episode = self.report()['critical_quarantine']['episodes'][0]
+        self.assertFalse(episode['controls_complete'])
+        self.assertIsNone(episode['actual_durable'])
+        self.assertIsNone(episode['reconciliation']['not_durable'])
+```
+
+#### test_live_quarantine_difference_is_not_confirmed_loss — [test_ledger.py:354–362](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L354-L362)
+
+**정의 위치·목적**: live quarantine difference is not confirmed loss의 정상·거부/오류 경로를 코드로 검증한다. 입력으로 준비한 fixture 또는 실제 시험용 경로를 사용한다.
+
+**매개변수/반환 및 실행 관계**: `def test_live_quarantine_difference_is_not_confirmed_loss(self):`를 확인한다. `self`는 unittest 인스턴스이며, 인자가 있는 helper는 테스트의 setup/record 생성 시 전달받는다. 명시적 `return`이 없다면 `None`을 반환하고 성공 판단은 예외/단언문으로 한다. 본문에서 관찰되는 호출 이름: `test_live_quarantine_difference_is_not_confirmed_loss`, `quarantine_files`, `control`, `quarantine_checkpoint`, `commit`, `report`, `assertIsNone`, `assertEqual`.
+
+**입력·상태 변경 지점(원본)**:
+- [L358](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L358) `self.commit()`
+
+**성공 조건·실패 조건을 표현한 실제 검사식**:
+- [L360](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L360) `self.assertIsNone(value['quarantine_not_stored_total'])`
+- [L361](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L361) `self.assertEqual(2,value['quarantine_pending_or_not_stored_total'])`
+
+**검증 범위와 한계**: 이 함수는 위에 명시한 입력·성공 조건까지 검사한다. 가상 데이터/SQLite/원장 fixture의 통과는 커널 eBPF verifier, 실제 드라이브 전원 장애 또는 타 Linux 버전의 수집 무손실을 검증하지 못한다. `assertRaises`는 오류가 발생해야 통과하며, 정상 실행을 확인하는 검사와 방향이 반대다. 테스트용 정해진 ID/시간/경로는 서비스의 실제 고정값이 아니다.
+
+**원본 함수 전체**
+
+```python
+    def test_live_quarantine_difference_is_not_confirmed_loss(self):
+        self.quarantine_files()
+        self.control()
+        self.quarantine_checkpoint(seal=False)
+        self.commit()
+        value = self.report()['critical_quarantine']
+        self.assertIsNone(value['quarantine_not_stored_total'])
+        self.assertEqual(2,value['quarantine_pending_or_not_stored_total'])
+```
+
+#### test_quarantine_transition_conflicts_and_wrong_lane_flags_are_invalid — [test_ledger.py:363–375](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L363-L375)
+
+**정의 위치·목적**: quarantine transition conflicts and wrong lane flags are invalid의 정상·거부/오류 경로를 코드로 검증한다. 입력으로 준비한 fixture 또는 실제 시험용 경로를 사용한다.
+
+**매개변수/반환 및 실행 관계**: `def test_quarantine_transition_conflicts_and_wrong_lane_flags_are_invalid(self):`를 확인한다. `self`는 unittest 인스턴스이며, 인자가 있는 helper는 테스트의 setup/record 생성 시 전달받는다. 명시적 `return`이 없다면 `None`을 반환하고 성공 판단은 예외/단언문으로 한다. 본문에서 관찰되는 호출 이름: `test_quarantine_transition_conflicts_and_wrong_lane_flags_are_invalid`, `control`, `quarantine_checkpoint`, `commit`, `assertIn`, `report`, `quarantine_files`, `write_bytes`, `raw`.
+
+**입력·상태 변경 지점(원본)**:
+- [L367](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L367) `self.commit()`
+- [L371](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L371) `(self.run/'quarantine.raw').write_bytes(self.raw(seq=2,schema=2,quality=1<<16))`
+- [L373](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L373) `self.commit()`
+
+**성공 조건·실패 조건을 표현한 실제 검사식**:
+- [L368](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L368) `self.assertIn('conflicting quarantine',self.report()['errors'][0])`
+- [L374](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L374) `self.assertIn('quarantine policy/lane',self.report()['errors'][0])`
+
+**검증 범위와 한계**: 이 함수는 위에 명시한 입력·성공 조건까지 검사한다. 가상 데이터/SQLite/원장 fixture의 통과는 커널 eBPF verifier, 실제 드라이브 전원 장애 또는 타 Linux 버전의 수집 무손실을 검증하지 못한다. `assertRaises`는 오류가 발생해야 통과하며, 정상 실행을 확인하는 검사와 방향이 반대다. 테스트용 정해진 ID/시간/경로는 서비스의 실제 고정값이 아니다.
+
+**원본 함수 전체**
+
+```python
+    def test_quarantine_transition_conflicts_and_wrong_lane_flags_are_invalid(self):
+        self.control()
+        self.control(observed_eps=20000)
+        self.quarantine_checkpoint()
+        self.commit()
+        self.assertIn('conflicting quarantine',self.report()['errors'][0])
+        self.frames=[]
+        self.quarantine_files()
+        (self.run/'quarantine.raw').write_bytes(self.raw(seq=2,schema=2,quality=1<<16))
+        self.quarantine_checkpoint(durable_offsets=dict(critical=ledger.RECORD_SIZE,general=0,quarantine=ledger.RECORD_SIZE))
+        self.commit()
+        self.assertIn('quarantine policy/lane',self.report()['errors'][0])
+```
+
+#### test_quarantine_unknown_policy_bits_and_lane_set_change_are_invalid — [test_ledger.py:376–388](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L376-L388)
+
+**정의 위치·목적**: quarantine unknown policy bits and lane set change are invalid의 정상·거부/오류 경로를 코드로 검증한다. 입력으로 준비한 fixture 또는 실제 시험용 경로를 사용한다.
+
+**매개변수/반환 및 실행 관계**: `def test_quarantine_unknown_policy_bits_and_lane_set_change_are_invalid(self):`를 확인한다. `self`는 unittest 인스턴스이며, 인자가 있는 helper는 테스트의 setup/record 생성 시 전달받는다. 명시적 `return`이 없다면 `None`을 반환하고 성공 판단은 예외/단언문으로 한다. 본문에서 관찰되는 호출 이름: `test_quarantine_unknown_policy_bits_and_lane_set_change_are_invalid`, `quarantine_files`, `write_bytes`, `raw`, `quarantine_checkpoint`, `commit`, `assertIn`, `report`, `checkpoint`.
+
+**입력·상태 변경 지점(원본)**:
+- [L378](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L378) `(self.run/'quarantine.raw').write_bytes(self.raw(seq=2,schema=2,`
+- [L381](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L381) `self.commit()`
+- [L384](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L384) `self.checkpoint()`
+- [L386](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L386) `self.commit()`
+
+**성공 조건·실패 조건을 표현한 실제 검사식**:
+- [L382](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L382) `self.assertIn('unknown raw policy',self.report()['errors'][0])`
+- [L387](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L387) `self.assertIn('lane set changed',self.report()['errors'][0])`
+
+**검증 범위와 한계**: 이 함수는 위에 명시한 입력·성공 조건까지 검사한다. 가상 데이터/SQLite/원장 fixture의 통과는 커널 eBPF verifier, 실제 드라이브 전원 장애 또는 타 Linux 버전의 수집 무손실을 검증하지 못한다. `assertRaises`는 오류가 발생해야 통과하며, 정상 실행을 확인하는 검사와 방향이 반대다. 테스트용 정해진 ID/시간/경로는 서비스의 실제 고정값이 아니다.
+
+**원본 함수 전체**
+
+```python
+    def test_quarantine_unknown_policy_bits_and_lane_set_change_are_invalid(self):
+        self.quarantine_files()
+        (self.run/'quarantine.raw').write_bytes(self.raw(seq=2,schema=2,
+             quality=(1<<16)|ledger.Q_QUARANTINE|ledger.Q_INITIAL|(1<<7)))
+        self.quarantine_checkpoint(durable_offsets=dict(critical=ledger.RECORD_SIZE,general=0,quarantine=ledger.RECORD_SIZE))
+        self.commit()
+        self.assertIn('unknown raw policy',self.report()['errors'][0])
+        self.frames=[]
+        self.checkpoint()
+        self.quarantine_checkpoint()
+        self.commit()
+        self.assertIn('lane set changed',self.report()['errors'][0])
+```
+
+#### test_quarantine_episode_membership_uses_time_not_out_of_order_sequence — [test_ledger.py:389–407](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L389-L407)
+
+**정의 위치·목적**: quarantine episode membership uses time not out of order sequence의 정상·거부/오류 경로를 코드로 검증한다. 입력으로 준비한 fixture 또는 실제 시험용 경로를 사용한다.
+
+**매개변수/반환 및 실행 관계**: `def test_quarantine_episode_membership_uses_time_not_out_of_order_sequence(self):`를 확인한다. `self`는 unittest 인스턴스이며, 인자가 있는 helper는 테스트의 setup/record 생성 시 전달받는다. 명시적 `return`이 없다면 `None`을 반환하고 성공 판단은 예외/단언문으로 한다. 본문에서 관찰되는 호출 이름: `test_quarantine_episode_membership_uses_time_not_out_of_order_sequence`, `episode`, `stream`, `write_bytes`, `raw`, `control`, `quarantine_checkpoint`, `commit`, `report`, `assertEqual`.
+
+**입력·상태 변경 지점(원본)**:
+- [L395](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L395) `(self.run/'critical.raw').write_bytes(b'')`
+- [L396](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L396) `(self.run/'quarantine.raw').write_bytes(self.raw(seq=101,schema=2,timestamp=100,`
+- [L397](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L397) `quality=(1<<16)|ledger.Q_QUARANTINE|ledger.Q_INITIAL)+self.raw(seq=100,schema=2,timestamp=200,`
+- [L402](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L402) `self.commit()`
+
+**성공 조건·실패 조건을 표현한 실제 검사식**:
+- [L404](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L404) `self.assertEqual('RECOVERED',value['status'])`
+- [L406](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L406) `self.assertEqual((1,1),(actual['owned_initial_full'],actual['owned_periodic_sample']))`
+
+**검증 범위와 한계**: 이 함수는 위에 명시한 입력·성공 조건까지 검사한다. 가상 데이터/SQLite/원장 fixture의 통과는 커널 eBPF verifier, 실제 드라이브 전원 장애 또는 타 Linux 버전의 수집 무손실을 검증하지 못한다. `assertRaises`는 오류가 발생해야 통과하며, 정상 실행을 확인하는 검사와 방향이 반대다. 테스트용 정해진 ID/시간/경로는 서비스의 실제 고정값이 아니다.
+
+**원본 함수 전체**
+
+```python
+    def test_quarantine_episode_membership_uses_time_not_out_of_order_sequence(self):
+        episode=self.episode(episode_id=101,first_sequence=101,last_sequence=100,start_ns=100,last_event_ns=200,
+                             seen=2,full_selected=1,sample_selected=1,summarized=0)
+        stream=self.stream(seen=2,engine=dict(q_seen=2,full_selected=1,sample_selected=1,summarized=0,
+                    full_submitted=1,sample_submitted=1,ring_failed=0,current=episode,
+                    last=self.episode(episode_id=0,first_sequence=0,last_sequence=0)))
+        (self.run/'critical.raw').write_bytes(b'')
+        (self.run/'quarantine.raw').write_bytes(self.raw(seq=101,schema=2,timestamp=100,
+            quality=(1<<16)|ledger.Q_QUARANTINE|ledger.Q_INITIAL)+self.raw(seq=100,schema=2,timestamp=200,
+            quality=(1<<16)|ledger.Q_QUARANTINE|ledger.Q_PERIODIC))
+        self.control(episode=episode,seq=101)
+        self.quarantine_checkpoint(sequence=101,streams=[stream],
+            durable_offsets=dict(critical=0,general=0,quarantine=2*ledger.RECORD_SIZE))
+        self.commit()
+        value=self.report()
+        self.assertEqual('RECOVERED',value['status'])
+        actual=value['critical_quarantine']['episodes'][0]['actual_durable']
+        self.assertEqual((1,1),(actual['owned_initial_full'],actual['owned_periodic_sample']))
+```
+
+#### test_protected_untracked_fallback_stays_critical_and_tracking_degrades_q_counts — [test_ledger.py:408–422](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L408-L422)
+
+**정의 위치·목적**: protected untracked fallback stays critical and tracking degrades q counts의 정상·거부/오류 경로를 코드로 검증한다. 입력으로 준비한 fixture 또는 실제 시험용 경로를 사용한다.
+
+**매개변수/반환 및 실행 관계**: `def test_protected_untracked_fallback_stays_critical_and_tracking_degrades_q_counts(self):`를 확인한다. `self`는 unittest 인스턴스이며, 인자가 있는 helper는 테스트의 setup/record 생성 시 전달받는다. 명시적 `return`이 없다면 `None`을 반환하고 성공 판단은 예외/단언문으로 한다. 본문에서 관찰되는 호출 이름: `test_protected_untracked_fallback_stays_critical_and_tracking_degrades_q_counts`, `write_bytes`, `raw`, `quarantine_checkpoint`, `commit`, `report`, `assertEqual`, `assertIsNone`.
+
+**입력·상태 변경 지점(원본)**:
+- [L409](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L409) `(self.run/'critical.raw').write_bytes(self.raw(seq=1,schema=2,`
+- [L411](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L411) `(self.run/'quarantine.raw').write_bytes(b'')`
+- [L416](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L416) `self.commit()`
+
+**성공 조건·실패 조건을 표현한 실제 검사식**:
+- [L418](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L418) `self.assertEqual('RECOVERED',value['status'])`
+- [L419](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L419) `self.assertEqual(1,value['durable_unique_events'])`
+- [L420](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L420) `self.assertEqual(1,value['critical_quarantine']['protected_seen_total'])`
+- [L421](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L421) `self.assertIsNone(value['critical_quarantine']['quarantine_not_stored_total'])`
+
+**검증 범위와 한계**: 이 함수는 위에 명시한 입력·성공 조건까지 검사한다. 가상 데이터/SQLite/원장 fixture의 통과는 커널 eBPF verifier, 실제 드라이브 전원 장애 또는 타 Linux 버전의 수집 무손실을 검증하지 못한다. `assertRaises`는 오류가 발생해야 통과하며, 정상 실행을 확인하는 검사와 방향이 반대다. 테스트용 정해진 ID/시간/경로는 서비스의 실제 고정값이 아니다.
+
+**원본 함수 전체**
+
+```python
+    def test_protected_untracked_fallback_stays_critical_and_tracking_degrades_q_counts(self):
+        (self.run/'critical.raw').write_bytes(self.raw(seq=1,schema=2,
+                                  quality=(1<<16)|ledger.Q_PROTECTED|ledger.Q_UNTRACKED))
+        (self.run/'quarantine.raw').write_bytes(b'')
+        self.quarantine_checkpoint(sequence=1,streams=[],quarantine_tracking_complete=False,
+            quarantine_global=dict(critical_events_total=1,protected_events_total=1,quarantined_events_total=0,
+                                   stream_map_full=1,untracked_seen=1,untracked_protected=1),
+            durable_offsets=dict(critical=ledger.RECORD_SIZE,general=0,quarantine=0))
+        self.commit()
+        value=self.report()
+        self.assertEqual('RECOVERED',value['status'])
+        self.assertEqual(1,value['durable_unique_events'])
+        self.assertEqual(1,value['critical_quarantine']['protected_seen_total'])
+        self.assertIsNone(value['critical_quarantine']['quarantine_not_stored_total'])
+```
+
+#### test_quarantine_exit_uses_policy_time_and_retains_closed_metadata — [test_ledger.py:423–442](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L423-L442)
+
+**정의 위치·목적**: quarantine exit uses policy time and retains closed metadata의 정상·거부/오류 경로를 코드로 검증한다. 입력으로 준비한 fixture 또는 실제 시험용 경로를 사용한다.
+
+**매개변수/반환 및 실행 관계**: `def test_quarantine_exit_uses_policy_time_and_retains_closed_metadata(self):`를 확인한다. `self`는 unittest 인스턴스이며, 인자가 있는 helper는 테스트의 setup/record 생성 시 전달받는다. 명시적 `return`이 없다면 `None`을 반환하고 성공 판단은 예외/단언문으로 한다. 본문에서 관찰되는 호출 이름: `test_quarantine_exit_uses_policy_time_and_retains_closed_metadata`, `quarantine_files`, `control`, `episode`, `stream`, `quarantine_checkpoint`, `commit`, `report`, `assertEqual`, `assertTrue`.
+
+**입력·상태 변경 지점(원본)**:
+- [L434](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L434) `self.commit()`
+
+**성공 조건·실패 조건을 표현한 실제 검사식**:
+- [L436](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L436) `self.assertEqual('RECOVERED',report['status'])`
+- [L438](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L438) `self.assertEqual('last',closed['role'])`
+- [L439](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L439) `self.assertTrue(closed['controls_complete'])`
+- [L440](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L440) `self.assertEqual('LOW_RATE',closed['exit_transition']['reason'])`
+- [L441](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L441) `self.assertEqual('CRITICAL_RATE_RECOVERED',closed['exit_transition']['trigger_reason'])`
+
+**검증 범위와 한계**: 이 함수는 위에 명시한 입력·성공 조건까지 검사한다. 가상 데이터/SQLite/원장 fixture의 통과는 커널 eBPF verifier, 실제 드라이브 전원 장애 또는 타 Linux 버전의 수집 무손실을 검증하지 못한다. `assertRaises`는 오류가 발생해야 통과하며, 정상 실행을 확인하는 검사와 방향이 반대다. 테스트용 정해진 ID/시간/경로는 서비스의 실제 고정값이 아니다.
+
+**원본 함수 전체**
+
+```python
+    def test_quarantine_exit_uses_policy_time_and_retains_closed_metadata(self):
+        self.quarantine_files()
+        self.control()
+        episode=self.episode(end_ns=500)
+        self.control('quarantine_exit',episode=episode,seq=1,monotonic_ns=500,
+            threshold_eps=2000,observed_eps=1000,duration_ms=10000,
+            original_priority='CRITICAL',effective_policy='CRITICAL',trigger_reason='CRITICAL_RATE_RECOVERED')
+        stream=self.stream(engine=dict(q_seen=4,full_selected=1,sample_selected=1,summarized=2,
+            full_submitted=1,sample_submitted=1,ring_failed=0,
+            current=self.episode(episode_id=0,first_sequence=0,last_sequence=0),last=episode))
+        self.quarantine_checkpoint(streams=[stream])
+        self.commit()
+        report=self.report()
+        self.assertEqual('RECOVERED',report['status'])
+        closed=report['critical_quarantine']['episodes'][0]
+        self.assertEqual('last',closed['role'])
+        self.assertTrue(closed['controls_complete'])
+        self.assertEqual('LOW_RATE',closed['exit_transition']['reason'])
+        self.assertEqual('CRITICAL_RATE_RECOVERED',closed['exit_transition']['trigger_reason'])
+```
+
+#### test_quarantine_metric_aliases_and_transition_policy_are_preserved — [test_ledger.py:443–456](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L443-L456)
+
+**정의 위치·목적**: quarantine metric aliases and transition policy are preserved의 정상·거부/오류 경로를 코드로 검증한다. 입력으로 준비한 fixture 또는 실제 시험용 경로를 사용한다.
+
+**매개변수/반환 및 실행 관계**: `def test_quarantine_metric_aliases_and_transition_policy_are_preserved(self):`를 확인한다. `self`는 unittest 인스턴스이며, 인자가 있는 helper는 테스트의 setup/record 생성 시 전달받는다. 명시적 `return`이 없다면 `None`을 반환하고 성공 판단은 예외/단언문으로 한다. 본문에서 관찰되는 호출 이름: `test_quarantine_metric_aliases_and_transition_policy_are_preserved`, `quarantine_files`, `control`, `quarantine_checkpoint`, `commit`, `report`, `assertEqual`.
+
+**입력·상태 변경 지점(원본)**:
+- [L449](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L449) `self.commit()`
+
+**성공 조건·실패 조건을 표현한 실제 검사식**:
+- [L451](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L451) `self.assertEqual(5000,value['declared_metric_aliases']['peak_critical_rate'])`
+- [L452](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L452) `self.assertEqual('TRANSITIONS',value['quarantine_by_reason_scope'])`
+- [L454](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L454) `self.assertEqual(('CRITICAL','QUARANTINE','CRITICAL_RATE_EXCEEDED'),`
+
+**검증 범위와 한계**: 이 함수는 위에 명시한 입력·성공 조건까지 검사한다. 가상 데이터/SQLite/원장 fixture의 통과는 커널 eBPF verifier, 실제 드라이브 전원 장애 또는 타 Linux 버전의 수집 무손실을 검증하지 못한다. `assertRaises`는 오류가 발생해야 통과하며, 정상 실행을 확인하는 검사와 방향이 반대다. 테스트용 정해진 ID/시간/경로는 서비스의 실제 고정값이 아니다.
+
+**원본 함수 전체**
+
+```python
+    def test_quarantine_metric_aliases_and_transition_policy_are_preserved(self):
+        self.quarantine_files()
+        self.control(original_priority='CRITICAL',effective_policy='QUARANTINE',trigger_reason='CRITICAL_RATE_EXCEEDED')
+        self.quarantine_checkpoint(active_quarantined_streams=1,critical_events_total=5,quarantined_events_total=4,
+            peak_critical_rate=5000,peak_critical_rate_scope='MAX_TRACKED_STREAM_ONE_SECOND_EPS',
+            quarantine_by_reason=dict(CRITICAL_RATE_EXCEEDED=1,CRITICAL_RATE_RECOVERED=0),quarantine_by_reason_scope='TRANSITIONS')
+        self.commit()
+        value=self.report()['critical_quarantine']
+        self.assertEqual(5000,value['declared_metric_aliases']['peak_critical_rate'])
+        self.assertEqual('TRANSITIONS',value['quarantine_by_reason_scope'])
+        enter=value['episodes'][0]['enter_transition']
+        self.assertEqual(('CRITICAL','QUARANTINE','CRITICAL_RATE_EXCEEDED'),
+                         (enter['original_priority'],enter['effective_policy'],enter['trigger_reason']))
+```
+
+#### test_quarantine_policy_and_reason_metric_scope_mismatch_are_invalid — [test_ledger.py:457–466](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L457-L466)
+
+**정의 위치·목적**: quarantine policy and reason metric scope mismatch are invalid의 정상·거부/오류 경로를 코드로 검증한다. 입력으로 준비한 fixture 또는 실제 시험용 경로를 사용한다.
+
+**매개변수/반환 및 실행 관계**: `def test_quarantine_policy_and_reason_metric_scope_mismatch_are_invalid(self):`를 확인한다. `self`는 unittest 인스턴스이며, 인자가 있는 helper는 테스트의 setup/record 생성 시 전달받는다. 명시적 `return`이 없다면 `None`을 반환하고 성공 판단은 예외/단언문으로 한다. 본문에서 관찰되는 호출 이름: `test_quarantine_policy_and_reason_metric_scope_mismatch_are_invalid`, `control`, `commit`, `assertIn`, `report`, `quarantine_checkpoint`.
+
+**입력·상태 변경 지점(원본)**:
+- [L459](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L459) `self.commit()`
+- [L464](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L464) `self.commit()`
+
+**성공 조건·실패 조건을 표현한 실제 검사식**:
+- [L460](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L460) `self.assertIn('policy mismatch',self.report()['errors'][0])`
+- [L465](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L465) `self.assertIn('transition scope',self.report()['errors'][0])`
+
+**검증 범위와 한계**: 이 함수는 위에 명시한 입력·성공 조건까지 검사한다. 가상 데이터/SQLite/원장 fixture의 통과는 커널 eBPF verifier, 실제 드라이브 전원 장애 또는 타 Linux 버전의 수집 무손실을 검증하지 못한다. `assertRaises`는 오류가 발생해야 통과하며, 정상 실행을 확인하는 검사와 방향이 반대다. 테스트용 정해진 ID/시간/경로는 서비스의 실제 고정값이 아니다.
+
+**원본 함수 전체**
+
+```python
+    def test_quarantine_policy_and_reason_metric_scope_mismatch_are_invalid(self):
+        self.control(original_priority='BULK',effective_policy='QUARANTINE',trigger_reason='CRITICAL_RATE_EXCEEDED')
+        self.commit()
+        self.assertIn('policy mismatch',self.report()['errors'][0])
+        self.frames=[]
+        self.quarantine_checkpoint(quarantine_by_reason=dict(CRITICAL_RATE_EXCEEDED=1,CRITICAL_RATE_RECOVERED=0),
+                                   quarantine_by_reason_scope='EVENTS')
+        self.commit()
+        self.assertIn('transition scope',self.report()['errors'][0])
+```
+
+#### test_torn_uncommitted_suffix_is_preserved_and_ignored — [test_ledger.py:467–480](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L467-L480)
+
+**정의 위치·목적**: torn uncommitted suffix is preserved and ignored의 정상·거부/오류 경로를 코드로 검증한다. 입력으로 준비한 fixture 또는 실제 시험용 경로를 사용한다.
+
+**매개변수/반환 및 실행 관계**: `def test_torn_uncommitted_suffix_is_preserved_and_ignored(self):`를 확인한다. `self`는 unittest 인스턴스이며, 인자가 있는 helper는 테스트의 setup/record 생성 시 전달받는다. 명시적 `return`이 없다면 `None`을 반환하고 성공 판단은 예외/단언문으로 한다. 본문에서 관찰되는 호출 이름: `test_torn_uncommitted_suffix_is_preserved_and_ignored`, `checkpoint`, `write_bytes`, `raw`, `pack`, `commit`, `read_bytes`, `iterdir`, `report`, `assertEqual`, `assertFalse`, `assertIsNone`.
+
+**입력·상태 변경 지점(원본)**:
+- [L468](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L468) `self.checkpoint(critical=ledger.RECORD_SIZE)`
+- [L469](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L469) `(self.run / 'critical.raw').write_bytes(self.raw() + self.raw(seq=2) + b'torn')`
+- [L470](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L470) `suffix = ledger.FRAME.pack(9000, 0) + b'torn-json'`
+- [L471](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L471) `self.commit(suffix=suffix)`
+
+**성공 조건·실패 조건을 표현한 실제 검사식**:
+- [L474](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L474) `self.assertEqual('RECOVERED', value['status'])`
+- [L475](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L475) `self.assertEqual(1, value['durable_unique_events'])`
+- [L476](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L476) `self.assertEqual(len(suffix), value['journal']['uncommitted_bytes'])`
+- [L477](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L477) `self.assertFalse(value['clean_seal'])`
+- [L478](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L478) `self.assertIsNone(value['unknown_future']['count'])`
+- [L479](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L479) `self.assertEqual(before, {path.name:path.read_bytes() for path in self.run.iterdir()})`
+
+**검증 범위와 한계**: 이 함수는 위에 명시한 입력·성공 조건까지 검사한다. 가상 데이터/SQLite/원장 fixture의 통과는 커널 eBPF verifier, 실제 드라이브 전원 장애 또는 타 Linux 버전의 수집 무손실을 검증하지 못한다. `assertRaises`는 오류가 발생해야 통과하며, 정상 실행을 확인하는 검사와 방향이 반대다. 테스트용 정해진 ID/시간/경로는 서비스의 실제 고정값이 아니다.
+
+**원본 함수 전체**
+
+```python
+    def test_torn_uncommitted_suffix_is_preserved_and_ignored(self):
+        self.checkpoint(critical=ledger.RECORD_SIZE)
+        (self.run / 'critical.raw').write_bytes(self.raw() + self.raw(seq=2) + b'torn')
+        suffix = ledger.FRAME.pack(9000, 0) + b'torn-json'
+        self.commit(suffix=suffix)
+        before = {path.name:path.read_bytes() for path in self.run.iterdir()}
+        value = self.report()
+        self.assertEqual('RECOVERED', value['status'])
+        self.assertEqual(1, value['durable_unique_events'])
+        self.assertEqual(len(suffix), value['journal']['uncommitted_bytes'])
+        self.assertFalse(value['clean_seal'])
+        self.assertIsNone(value['unknown_future']['count'])
+        self.assertEqual(before, {path.name:path.read_bytes() for path in self.run.iterdir()})
+```
+
+#### test_checkpoint_aggregate_counters_never_create_exact_losses — [test_ledger.py:481–488](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L481-L488)
+
+**정의 위치·목적**: checkpoint aggregate counters never create exact losses의 정상·거부/오류 경로를 코드로 검증한다. 입력으로 준비한 fixture 또는 실제 시험용 경로를 사용한다.
+
+**매개변수/반환 및 실행 관계**: `def test_checkpoint_aggregate_counters_never_create_exact_losses(self):`를 확인한다. `self`는 unittest 인스턴스이며, 인자가 있는 helper는 테스트의 setup/record 생성 시 전달받는다. 명시적 `return`이 없다면 `None`을 반환하고 성공 판단은 예외/단언문으로 한다. 본문에서 관찰되는 호출 이름: `test_checkpoint_aggregate_counters_never_create_exact_losses`, `checkpoint`, `commit`, `report`, `assertEqual`, `assertNotIn`, `assertIsNone`.
+
+**입력·상태 변경 지점(원본)**:
+- [L482](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L482) `self.checkpoint(sequence=10, faults=[3, 0, 0, 0])`
+- [L483](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L483) `self.commit()`
+
+**성공 조건·실패 조건을 표현한 실제 검사식**:
+- [L485](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L485) `self.assertEqual(0, value['exact_userspace_loss_count'])`
+- [L486](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L486) `self.assertNotIn('final_absence', value['tenant_evidence'][0])`
+- [L487](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L487) `self.assertIsNone(value['tenant_evidence'][0]['unknown_tail']['count'])`
+
+**검증 범위와 한계**: 이 함수는 위에 명시한 입력·성공 조건까지 검사한다. 가상 데이터/SQLite/원장 fixture의 통과는 커널 eBPF verifier, 실제 드라이브 전원 장애 또는 타 Linux 버전의 수집 무손실을 검증하지 못한다. `assertRaises`는 오류가 발생해야 통과하며, 정상 실행을 확인하는 검사와 방향이 반대다. 테스트용 정해진 ID/시간/경로는 서비스의 실제 고정값이 아니다.
+
+**원본 함수 전체**
+
+```python
+    def test_checkpoint_aggregate_counters_never_create_exact_losses(self):
+        self.checkpoint(sequence=10, faults=[3, 0, 0, 0])
+        self.commit()
+        value = self.report()
+        self.assertEqual(0, value['exact_userspace_loss_count'])
+        self.assertNotIn('final_absence', value['tenant_evidence'][0])
+        self.assertIsNone(value['tenant_evidence'][0]['unknown_tail']['count'])
+```
+
+#### test_seal_compacts_missing_ids_and_preserves_exact_tombstone_reason — [test_ledger.py:489–500](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L489-L500)
+
+**정의 위치·목적**: seal compacts missing ids and preserves exact tombstone reason의 정상·거부/오류 경로를 코드로 검증한다. 입력으로 준비한 fixture 또는 실제 시험용 경로를 사용한다.
+
+**매개변수/반환 및 실행 관계**: `def test_seal_compacts_missing_ids_and_preserves_exact_tombstone_reason(self):`를 확인한다. `self`는 unittest 인스턴스이며, 인자가 있는 helper는 테스트의 setup/record 생성 시 전달받는다. 명시적 `return`이 없다면 `None`을 반환하고 성공 판단은 예외/단언문으로 한다. 본문에서 관찰되는 호출 이름: `test_seal_compacts_missing_ids_and_preserves_exact_tombstone_reason`, `write_bytes`, `raw`, `loss`, `checkpoint`, `commit`, `report`, `assertTrue`, `assertEqual`.
+
+**입력·상태 변경 지점(원본)**:
+- [L490](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L490) `(self.run / 'critical.raw').write_bytes(self.raw())`
+- [L492](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L492) `self.checkpoint(critical=ledger.RECORD_SIZE, seal=True)`
+- [L493](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L493) `self.commit()`
+
+**성공 조건·실패 조건을 표현한 실제 검사식**:
+- [L495](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L495) `self.assertTrue(value['absence_set_complete'])`
+- [L497](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L497) `self.assertEqual(2, gaps['count'])`
+- [L498](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L498) `self.assertEqual(['QUEUE_OVERFLOW', 'UNKNOWN'], [entry['reason'] for entry in gaps['ranges']])`
+- [L499](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L499) `self.assertEqual(1, value['exact_userspace_loss_count'])`
+
+**검증 범위와 한계**: 이 함수는 위에 명시한 입력·성공 조건까지 검사한다. 가상 데이터/SQLite/원장 fixture의 통과는 커널 eBPF verifier, 실제 드라이브 전원 장애 또는 타 Linux 버전의 수집 무손실을 검증하지 못한다. `assertRaises`는 오류가 발생해야 통과하며, 정상 실행을 확인하는 검사와 방향이 반대다. 테스트용 정해진 ID/시간/경로는 서비스의 실제 고정값이 아니다.
+
+**원본 함수 전체**
+
+```python
+    def test_seal_compacts_missing_ids_and_preserves_exact_tombstone_reason(self):
+        (self.run / 'critical.raw').write_bytes(self.raw())
+        self.loss()
+        self.checkpoint(critical=ledger.RECORD_SIZE, seal=True)
+        self.commit()
+        value = self.report()
+        self.assertTrue(value['absence_set_complete'])
+        gaps = value['tenant_evidence'][0]['final_absence']
+        self.assertEqual(2, gaps['count'])
+        self.assertEqual(['QUEUE_OVERFLOW', 'UNKNOWN'], [entry['reason'] for entry in gaps['ranges']])
+        self.assertEqual(1, value['exact_userspace_loss_count'])
+```
+
+#### test_known_rejection_witness_frontiers_and_ambiguous_truth_binding — [test_ledger.py:501–527](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L501-L527)
+
+**정의 위치·목적**: known rejection witness frontiers and ambiguous truth binding의 정상·거부/오류 경로를 코드로 검증한다. 입력으로 준비한 fixture 또는 실제 시험용 경로를 사용한다.
+
+**매개변수/반환 및 실행 관계**: `def test_known_rejection_witness_frontiers_and_ambiguous_truth_binding(self):`를 확인한다. `self`는 unittest 인스턴스이며, 인자가 있는 helper는 테스트의 setup/record 생성 시 전달받는다. 명시적 `return`이 없다면 `None`을 반환하고 성공 판단은 예외/단언문으로 한다. 본문에서 관찰되는 호출 이름: `test_known_rejection_witness_frontiers_and_ambiguous_truth_binding`, `write_bytes`, `raw`, `loss`, `loss_witness`, `checkpoint`, `commit`, `report`, `assertEqual`, `assertTrue`, `hex`, `match_truth_candidates`.
+
+**입력·상태 변경 지점(원본)**:
+- [L502](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L502) `(self.run / 'critical.raw').write_bytes(self.raw(schema=2, quality=1 << 16))`
+- [L504](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L504) `self.checkpoint(sequence=3, critical=ledger.RECORD_SIZE, seal=True)`
+- [L505](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L505) `self.commit()`
+
+**성공 조건·실패 조건을 표현한 실제 검사식**:
+- [L507](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L507) `self.assertEqual('RECOVERED', value['status'])`
+- [L508](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L508) `self.assertTrue(value['userspace_loss_witness_coverage_complete'])`
+- [L510](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L510) `self.assertEqual((2, 1, 2), (tenant['max_seen_exact_sequence'],`
+- [L512](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L512) `self.assertEqual(['CRITICAL_QUEUE_FULL', 'UNKNOWN'],`
+- [L515](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L515) `self.assertEqual('UNMATCHED', witness['truth_binding'])`
+- [L520](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L520) `self.assertEqual('UNKNOWN', ledger.match_truth_candidates(witness, [truth], 10)['status'])`
+- [L521](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L521) `self.assertEqual(dict(status='UNIQUE_CANDIDATE', truth_seq=17, candidate_count=1),`
+- [L523](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L523) `self.assertEqual('AMBIGUOUS', ledger.match_truth_candidates(`
+- [L525](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L525) `self.assertEqual('UNKNOWN', ledger.match_truth_candidates(`
+
+**검증 범위와 한계**: 이 함수는 위에 명시한 입력·성공 조건까지 검사한다. 가상 데이터/SQLite/원장 fixture의 통과는 커널 eBPF verifier, 실제 드라이브 전원 장애 또는 타 Linux 버전의 수집 무손실을 검증하지 못한다. `assertRaises`는 오류가 발생해야 통과하며, 정상 실행을 확인하는 검사와 방향이 반대다. 테스트용 정해진 ID/시간/경로는 서비스의 실제 고정값이 아니다.
+
+**원본 함수 전체**
+
+```python
+    def test_known_rejection_witness_frontiers_and_ambiguous_truth_binding(self):
+        (self.run / 'critical.raw').write_bytes(self.raw(schema=2, quality=1 << 16))
+        self.loss(seq=2, reason='CRITICAL_QUEUE_FULL', witness=self.loss_witness())
+        self.checkpoint(sequence=3, critical=ledger.RECORD_SIZE, seal=True)
+        self.commit()
+        value = self.report()
+        self.assertEqual('RECOVERED', value['status'])
+        self.assertTrue(value['userspace_loss_witness_coverage_complete'])
+        tenant = value['tenant_evidence'][0]
+        self.assertEqual((2, 1, 2), (tenant['max_seen_exact_sequence'],
+                         tenant['contiguous_raw_frontier'], tenant['accounted_frontier']))
+        self.assertEqual(['CRITICAL_QUEUE_FULL', 'UNKNOWN'],
+                         [row['reason'] for row in tenant['final_absence']['ranges']])
+        witness = value['exact_userspace_loss_witnesses']['entries'][0]
+        self.assertEqual('UNMATCHED', witness['truth_binding'])
+        truth = dict(run_id=self.run.name, boot_id=self.lineage['boot_id'],
+                     clock_domain='NOTEBOOK_MONOTONIC',
+                     cgroup_id=9001, tid=7, kind=2, path_hex=b'/tmp/protected'.hex(),
+                     result=3, monotonic_ns=124, truth_seq=17)
+        self.assertEqual('UNKNOWN', ledger.match_truth_candidates(witness, [truth], 10)['status'])
+        self.assertEqual(dict(status='UNIQUE_CANDIDATE', truth_seq=17, candidate_count=1),
+                         ledger.match_truth_candidates(witness, [truth], 10, candidate_set_complete=True))
+        self.assertEqual('AMBIGUOUS', ledger.match_truth_candidates(
+            witness, [truth, dict(truth, truth_seq=18)], 10, candidate_set_complete=True)['status'])
+        self.assertEqual('UNKNOWN', ledger.match_truth_candidates(
+            witness, [dict(truth, path_hex=b'/other'.hex())], 10, candidate_set_complete=True)['status'])
+```
+
+#### test_legacy_loss_has_no_witness_and_unsealed_tail_is_unknown — [test_ledger.py:528–540](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L528-L540)
+
+**정의 위치·목적**: legacy loss has no witness and unsealed tail is unknown의 정상·거부/오류 경로를 코드로 검증한다. 입력으로 준비한 fixture 또는 실제 시험용 경로를 사용한다.
+
+**매개변수/반환 및 실행 관계**: `def test_legacy_loss_has_no_witness_and_unsealed_tail_is_unknown(self):`를 확인한다. `self`는 unittest 인스턴스이며, 인자가 있는 helper는 테스트의 setup/record 생성 시 전달받는다. 명시적 `return`이 없다면 `None`을 반환하고 성공 판단은 예외/단언문으로 한다. 본문에서 관찰되는 호출 이름: `test_legacy_loss_has_no_witness_and_unsealed_tail_is_unknown`, `write_bytes`, `raw`, `loss`, `checkpoint`, `commit`, `report`, `assertEqual`, `assertFalse`, `assertIsNone`.
+
+**입력·상태 변경 지점(원본)**:
+- [L529](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L529) `(self.run / 'critical.raw').write_bytes(self.raw())`
+- [L531](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L531) `self.checkpoint(sequence=3, critical=ledger.RECORD_SIZE)`
+- [L532](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L532) `self.commit()`
+
+**성공 조건·실패 조건을 표현한 실제 검사식**:
+- [L534](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L534) `self.assertEqual(1, value['exact_userspace_loss_count'])`
+- [L535](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L535) `self.assertEqual(0, value['exact_userspace_loss_witnesses']['count'])`
+- [L536](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L536) `self.assertFalse(value['userspace_loss_witness_coverage_complete'])`
+- [L537](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L537) `self.assertEqual(2, value['tenant_evidence'][0]['accounted_frontier'])`
+- [L538](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L538) `self.assertIsNone(value['tenant_evidence'][0]['unknown_tail']['count'])`
+- [L539](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L539) `self.assertIsNone(value['unknown_future']['count'])`
+
+**검증 범위와 한계**: 이 함수는 위에 명시한 입력·성공 조건까지 검사한다. 가상 데이터/SQLite/원장 fixture의 통과는 커널 eBPF verifier, 실제 드라이브 전원 장애 또는 타 Linux 버전의 수집 무손실을 검증하지 못한다. `assertRaises`는 오류가 발생해야 통과하며, 정상 실행을 확인하는 검사와 방향이 반대다. 테스트용 정해진 ID/시간/경로는 서비스의 실제 고정값이 아니다.
+
+**원본 함수 전체**
+
+```python
+    def test_legacy_loss_has_no_witness_and_unsealed_tail_is_unknown(self):
+        (self.run / 'critical.raw').write_bytes(self.raw())
+        self.loss(seq=2)
+        self.checkpoint(sequence=3, critical=ledger.RECORD_SIZE)
+        self.commit()
+        value = self.report()
+        self.assertEqual(1, value['exact_userspace_loss_count'])
+        self.assertEqual(0, value['exact_userspace_loss_witnesses']['count'])
+        self.assertFalse(value['userspace_loss_witness_coverage_complete'])
+        self.assertEqual(2, value['tenant_evidence'][0]['accounted_frontier'])
+        self.assertIsNone(value['tenant_evidence'][0]['unknown_tail']['count'])
+        self.assertIsNone(value['unknown_future']['count'])
+```
+
+#### test_malformed_loss_witness_cannot_claim_exact_context — [test_ledger.py:541–548](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L541-L548)
+
+**정의 위치·목적**: malformed loss witness cannot claim exact context의 정상·거부/오류 경로를 코드로 검증한다. 입력으로 준비한 fixture 또는 실제 시험용 경로를 사용한다.
+
+**매개변수/반환 및 실행 관계**: `def test_malformed_loss_witness_cannot_claim_exact_context(self):`를 확인한다. `self`는 unittest 인스턴스이며, 인자가 있는 helper는 테스트의 setup/record 생성 시 전달받는다. 명시적 `return`이 없다면 `None`을 반환하고 성공 판단은 예외/단언문으로 한다. 본문에서 관찰되는 호출 이름: `test_malformed_loss_witness_cannot_claim_exact_context`, `loss_witness`, `loss`, `checkpoint`, `commit`, `assertIn`, `report`.
+
+**입력·상태 변경 지점(원본)**:
+- [L545](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L545) `self.checkpoint()`
+- [L546](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L546) `self.commit()`
+
+**성공 조건·실패 조건을 표현한 실제 검사식**:
+- [L547](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L547) `self.assertIn('rule_id/quality mismatch', self.report()['errors'][0])`
+
+**검증 범위와 한계**: 이 함수는 위에 명시한 입력·성공 조건까지 검사한다. 가상 데이터/SQLite/원장 fixture의 통과는 커널 eBPF verifier, 실제 드라이브 전원 장애 또는 타 Linux 버전의 수집 무손실을 검증하지 못한다. `assertRaises`는 오류가 발생해야 통과하며, 정상 실행을 확인하는 검사와 방향이 반대다. 테스트용 정해진 ID/시간/경로는 서비스의 실제 고정값이 아니다.
+
+**원본 함수 전체**
+
+```python
+    def test_malformed_loss_witness_cannot_claim_exact_context(self):
+        witness = self.loss_witness()
+        witness['rule_id'] = 2
+        self.loss(witness=witness)
+        self.checkpoint()
+        self.commit()
+        self.assertIn('rule_id/quality mismatch', self.report()['errors'][0])
+```
+
+#### test_selected_quarantine_sample_rejected_before_durable_raw — [test_ledger.py:549–563](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L549-L563)
+
+**정의 위치·목적**: selected quarantine sample rejected before durable raw의 정상·거부/오류 경로를 코드로 검증한다. 입력으로 준비한 fixture 또는 실제 시험용 경로를 사용한다.
+
+**매개변수/반환 및 실행 관계**: `def test_selected_quarantine_sample_rejected_before_durable_raw(self):`를 확인한다. `self`는 unittest 인스턴스이며, 인자가 있는 helper는 테스트의 setup/record 생성 시 전달받는다. 명시적 `return`이 없다면 `None`을 반환하고 성공 판단은 예외/단언문으로 한다. 본문에서 관찰되는 호출 이름: `test_selected_quarantine_sample_rejected_before_durable_raw`, `loss_witness`, `Q_PERIODIC`, `write_bytes`, `loss`, `checkpoint`, `commit`, `report`, `assertEqual`, `assertFalse`.
+
+**입력·상태 변경 지점(원본)**:
+- [L552](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L552) `(self.run / 'quarantine.raw').write_bytes(b'')`
+- [L554](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L554) `self.checkpoint(sequence=2, seal=True,`
+- [L556](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L556) `self.commit()`
+
+**성공 조건·실패 조건을 표현한 실제 검사식**:
+- [L558](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L558) `self.assertEqual('RECOVERED', value['status'])`
+- [L560](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L560) `self.assertEqual('PERIODIC_SAMPLE', entry['quarantine_selection'])`
+- [L561](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L561) `self.assertFalse(entry['durable_raw'])`
+- [L562](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L562) `self.assertEqual(0, value['durable_unique_events'])`
+
+**검증 범위와 한계**: 이 함수는 위에 명시한 입력·성공 조건까지 검사한다. 가상 데이터/SQLite/원장 fixture의 통과는 커널 eBPF verifier, 실제 드라이브 전원 장애 또는 타 Linux 버전의 수집 무손실을 검증하지 못한다. `assertRaises`는 오류가 발생해야 통과하며, 정상 실행을 확인하는 검사와 방향이 반대다. 테스트용 정해진 ID/시간/경로는 서비스의 실제 고정값이 아니다.
+
+**원본 함수 전체**
+
+```python
+    def test_selected_quarantine_sample_rejected_before_durable_raw(self):
+        witness = self.loss_witness()
+        witness['quality'] |= ledger.Q_QUARANTINE | ledger.Q_PERIODIC
+        (self.run / 'quarantine.raw').write_bytes(b'')
+        self.loss(seq=2, lane='quarantine', reason='Q_QUEUE_FULL', witness=witness)
+        self.checkpoint(sequence=2, seal=True,
+                        durable_offsets=dict(critical=0, general=0, quarantine=0))
+        self.commit()
+        value = self.report()
+        self.assertEqual('RECOVERED', value['status'])
+        entry = value['exact_userspace_loss_witnesses']['entries'][0]
+        self.assertEqual('PERIODIC_SAMPLE', entry['quarantine_selection'])
+        self.assertFalse(entry['durable_raw'])
+        self.assertEqual(0, value['durable_unique_events'])
+```
+
+#### test_failed_seal_remains_unknown_future — [test_ledger.py:564–571](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L564-L571)
+
+**정의 위치·목적**: failed seal remains unknown future의 정상·거부/오류 경로를 코드로 검증한다. 입력으로 준비한 fixture 또는 실제 시험용 경로를 사용한다.
+
+**매개변수/반환 및 실행 관계**: `def test_failed_seal_remains_unknown_future(self):`를 확인한다. `self`는 unittest 인스턴스이며, 인자가 있는 helper는 테스트의 setup/record 생성 시 전달받는다. 명시적 `return`이 없다면 `None`을 반환하고 성공 판단은 예외/단언문으로 한다. 본문에서 관찰되는 호출 이름: `test_failed_seal_remains_unknown_future`, `checkpoint`, `commit`, `report`, `assertFalse`, `assertIsNone`.
+
+**입력·상태 변경 지점(원본)**:
+- [L565](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L565) `self.checkpoint(seal=True, state='FAILED')`
+- [L566](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L566) `self.commit()`
+
+**성공 조건·실패 조건을 표현한 실제 검사식**:
+- [L568](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L568) `self.assertFalse(value['clean_seal'])`
+- [L569](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L569) `self.assertFalse(value['absence_set_complete'])`
+- [L570](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L570) `self.assertIsNone(value['unknown_future']['count'])`
+
+**검증 범위와 한계**: 이 함수는 위에 명시한 입력·성공 조건까지 검사한다. 가상 데이터/SQLite/원장 fixture의 통과는 커널 eBPF verifier, 실제 드라이브 전원 장애 또는 타 Linux 버전의 수집 무손실을 검증하지 못한다. `assertRaises`는 오류가 발생해야 통과하며, 정상 실행을 확인하는 검사와 방향이 반대다. 테스트용 정해진 ID/시간/경로는 서비스의 실제 고정값이 아니다.
+
+**원본 함수 전체**
+
+```python
+    def test_failed_seal_remains_unknown_future(self):
+        self.checkpoint(seal=True, state='FAILED')
+        self.commit()
+        value = self.report()
+        self.assertFalse(value['clean_seal'])
+        self.assertFalse(value['absence_set_complete'])
+        self.assertIsNone(value['unknown_future']['count'])
+```
+
+#### test_clean_seal_unsequenced_faults_remain_separate — [test_ledger.py:572–580](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L572-L580)
+
+**정의 위치·목적**: clean seal unsequenced faults remain separate의 정상·거부/오류 경로를 코드로 검증한다. 입력으로 준비한 fixture 또는 실제 시험용 경로를 사용한다.
+
+**매개변수/반환 및 실행 관계**: `def test_clean_seal_unsequenced_faults_remain_separate(self):`를 확인한다. `self`는 unittest 인스턴스이며, 인자가 있는 helper는 테스트의 setup/record 생성 시 전달받는다. 명시적 `return`이 없다면 `None`을 반환하고 성공 판단은 예외/단언문으로 한다. 본문에서 관찰되는 호출 이름: `test_clean_seal_unsequenced_faults_remain_separate`, `checkpoint`, `commit`, `report`, `assertTrue`, `assertEqual`, `assertIsNone`.
+
+**입력·상태 변경 지점(원본)**:
+- [L573](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L573) `self.checkpoint(seal=True, faults=[1, 7, 0, 0])`
+- [L574](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L574) `self.commit()`
+
+**성공 조건·실패 조건을 표현한 실제 검사식**:
+- [L576](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L576) `self.assertTrue(value['absence_set_complete'])`
+- [L577](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L577) `self.assertEqual(3, value['tenant_evidence'][0]['final_absence']['count'])`
+- [L578](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L578) `self.assertIsNone(value['unsequenced_faults']['affected_event_ids'])`
+- [L579](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L579) `self.assertEqual('UNKNOWN', value['tenant_evidence'][0]['final_absence']['ranges'][0]['reason'])`
+
+**검증 범위와 한계**: 이 함수는 위에 명시한 입력·성공 조건까지 검사한다. 가상 데이터/SQLite/원장 fixture의 통과는 커널 eBPF verifier, 실제 드라이브 전원 장애 또는 타 Linux 버전의 수집 무손실을 검증하지 못한다. `assertRaises`는 오류가 발생해야 통과하며, 정상 실행을 확인하는 검사와 방향이 반대다. 테스트용 정해진 ID/시간/경로는 서비스의 실제 고정값이 아니다.
+
+**원본 함수 전체**
+
+```python
+    def test_clean_seal_unsequenced_faults_remain_separate(self):
+        self.checkpoint(seal=True, faults=[1, 7, 0, 0])
+        self.commit()
+        value = self.report()
+        self.assertTrue(value['absence_set_complete'])
+        self.assertEqual(3, value['tenant_evidence'][0]['final_absence']['count'])
+        self.assertIsNone(value['unsequenced_faults']['affected_event_ids'])
+        self.assertEqual('UNKNOWN', value['tenant_evidence'][0]['final_absence']['ranges'][0]['reason'])
+```
+
+#### test_post_sequence_fault_is_not_classified_as_unsequenced — [test_ledger.py:581–588](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L581-L588)
+
+**정의 위치·목적**: post sequence fault is not classified as unsequenced의 정상·거부/오류 경로를 코드로 검증한다. 입력으로 준비한 fixture 또는 실제 시험용 경로를 사용한다.
+
+**매개변수/반환 및 실행 관계**: `def test_post_sequence_fault_is_not_classified_as_unsequenced(self):`를 확인한다. `self`는 unittest 인스턴스이며, 인자가 있는 helper는 테스트의 setup/record 생성 시 전달받는다. 명시적 `return`이 없다면 `None`을 반환하고 성공 판단은 예외/단언문으로 한다. 본문에서 관찰되는 호출 이름: `test_post_sequence_fault_is_not_classified_as_unsequenced`, `checkpoint`, `commit`, `report`, `assertEqual`, `sum`, `values`.
+
+**입력·상태 변경 지점(원본)**:
+- [L582](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L582) `self.checkpoint(seal=True, faults=[0, 0, 0, 8])`
+- [L583](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L583) `self.commit()`
+
+**성공 조건·실패 조건을 표현한 실제 검사식**:
+- [L585](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L585) `self.assertEqual(0, sum(value['unsequenced_faults']['counters'].values()))`
+- [L586](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L586) `self.assertEqual(8, value['sequenced_aggregate_faults']['counters']['shared_critical_budget_lookup_failed'])`
+- [L587](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L587) `self.assertEqual('UNKNOWN', value['tenant_evidence'][0]['final_absence']['ranges'][0]['reason'])`
+
+**검증 범위와 한계**: 이 함수는 위에 명시한 입력·성공 조건까지 검사한다. 가상 데이터/SQLite/원장 fixture의 통과는 커널 eBPF verifier, 실제 드라이브 전원 장애 또는 타 Linux 버전의 수집 무손실을 검증하지 못한다. `assertRaises`는 오류가 발생해야 통과하며, 정상 실행을 확인하는 검사와 방향이 반대다. 테스트용 정해진 ID/시간/경로는 서비스의 실제 고정값이 아니다.
+
+**원본 함수 전체**
+
+```python
+    def test_post_sequence_fault_is_not_classified_as_unsequenced(self):
+        self.checkpoint(seal=True, faults=[0, 0, 0, 8])
+        self.commit()
+        value = self.report()
+        self.assertEqual(0, sum(value['unsequenced_faults']['counters'].values()))
+        self.assertEqual(8, value['sequenced_aggregate_faults']['counters']['shared_critical_budget_lookup_failed'])
+        self.assertEqual('UNKNOWN', value['tenant_evidence'][0]['final_absence']['ranges'][0]['reason'])
+```
+
+#### test_overflow_degrades_reasons_not_complete_sealed_absence — [test_ledger.py:589–597](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L589-L597)
+
+**정의 위치·목적**: overflow degrades reasons not complete sealed absence의 정상·거부/오류 경로를 코드로 검증한다. 입력으로 준비한 fixture 또는 실제 시험용 경로를 사용한다.
+
+**매개변수/반환 및 실행 관계**: `def test_overflow_degrades_reasons_not_complete_sealed_absence(self):`를 확인한다. `self`는 unittest 인스턴스이며, 인자가 있는 helper는 테스트의 setup/record 생성 시 전달받는다. 명시적 `return`이 없다면 `None`을 반환하고 성공 판단은 예외/단언문으로 한다. 본문에서 관찰되는 호출 이름: `test_overflow_degrades_reasons_not_complete_sealed_absence`, `checkpoint`, `commit`, `report`, `assertTrue`, `assertFalse`, `assertEqual`, `any`.
+
+**입력·상태 변경 지점(원본)**:
+- [L590](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L590) `self.checkpoint(seal=True, metadata_overflow=5, metadata_dropped=5, exact_loss_available=False)`
+- [L591](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L591) `self.commit()`
+
+**성공 조건·실패 조건을 표현한 실제 검사식**:
+- [L593](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L593) `self.assertTrue(value['absence_set_complete'])`
+- [L594](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L594) `self.assertFalse(value['userspace_loss_reason_coverage_complete'])`
+- [L595](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L595) `self.assertEqual(0, value['exact_userspace_loss_count'])`
+- [L596](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L596) `self.assertTrue(any('COVERAGE_DEGRADED' in warning for warning in value['warnings']))`
+
+**검증 범위와 한계**: 이 함수는 위에 명시한 입력·성공 조건까지 검사한다. 가상 데이터/SQLite/원장 fixture의 통과는 커널 eBPF verifier, 실제 드라이브 전원 장애 또는 타 Linux 버전의 수집 무손실을 검증하지 못한다. `assertRaises`는 오류가 발생해야 통과하며, 정상 실행을 확인하는 검사와 방향이 반대다. 테스트용 정해진 ID/시간/경로는 서비스의 실제 고정값이 아니다.
+
+**원본 함수 전체**
+
+```python
+    def test_overflow_degrades_reasons_not_complete_sealed_absence(self):
+        self.checkpoint(seal=True, metadata_overflow=5, metadata_dropped=5, exact_loss_available=False)
+        self.commit()
+        value = self.report()
+        self.assertTrue(value['absence_set_complete'])
+        self.assertFalse(value['userspace_loss_reason_coverage_complete'])
+        self.assertEqual(0, value['exact_userspace_loss_count'])
+        self.assertTrue(any('COVERAGE_DEGRADED' in warning for warning in value['warnings']))
+```
+
+#### test_map_snapshot_incomplete_prevents_exact_absence — [test_ledger.py:598–602](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L598-L602)
+
+**정의 위치·목적**: map snapshot incomplete prevents exact absence의 정상·거부/오류 경로를 코드로 검증한다. 입력으로 준비한 fixture 또는 실제 시험용 경로를 사용한다.
+
+**매개변수/반환 및 실행 관계**: `def test_map_snapshot_incomplete_prevents_exact_absence(self):`를 확인한다. `self`는 unittest 인스턴스이며, 인자가 있는 helper는 테스트의 setup/record 생성 시 전달받는다. 명시적 `return`이 없다면 `None`을 반환하고 성공 판단은 예외/단언문으로 한다. 본문에서 관찰되는 호출 이름: `test_map_snapshot_incomplete_prevents_exact_absence`, `checkpoint`, `commit`, `assertFalse`, `report`.
+
+**입력·상태 변경 지점(원본)**:
+- [L599](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L599) `self.checkpoint(seal=True, sequence_snapshot_complete=False)`
+- [L600](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L600) `self.commit()`
+
+**성공 조건·실패 조건을 표현한 실제 검사식**:
+- [L601](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L601) `self.assertFalse(self.report()['absence_set_complete'])`
+
+**검증 범위와 한계**: 이 함수는 위에 명시한 입력·성공 조건까지 검사한다. 가상 데이터/SQLite/원장 fixture의 통과는 커널 eBPF verifier, 실제 드라이브 전원 장애 또는 타 Linux 버전의 수집 무손실을 검증하지 못한다. `assertRaises`는 오류가 발생해야 통과하며, 정상 실행을 확인하는 검사와 방향이 반대다. 테스트용 정해진 ID/시간/경로는 서비스의 실제 고정값이 아니다.
+
+**원본 함수 전체**
+
+```python
+    def test_map_snapshot_incomplete_prevents_exact_absence(self):
+        self.checkpoint(seal=True, sequence_snapshot_complete=False)
+        self.commit()
+        self.assertFalse(self.report()['absence_set_complete'])
+```
+
+#### test_uint64_sequence_bound_does_not_require_enumeration — [test_ledger.py:603–609](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L603-L609)
+
+**정의 위치·목적**: uint64 sequence bound does not require enumeration의 정상·거부/오류 경로를 코드로 검증한다. 입력으로 준비한 fixture 또는 실제 시험용 경로를 사용한다.
+
+**매개변수/반환 및 실행 관계**: `def test_uint64_sequence_bound_does_not_require_enumeration(self):`를 확인한다. `self`는 unittest 인스턴스이며, 인자가 있는 helper는 테스트의 setup/record 생성 시 전달받는다. 명시적 `return`이 없다면 `None`을 반환하고 성공 판단은 예외/단언문으로 한다. 본문에서 관찰되는 호출 이름: `test_uint64_sequence_bound_does_not_require_enumeration`, `checkpoint`, `commit`, `report`, `assertEqual`.
+
+**입력·상태 변경 지점(원본)**:
+- [L604](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L604) `self.checkpoint(sequence=2**64-1, seal=True)`
+- [L605](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L605) `self.commit()`
+
+**성공 조건·실패 조건을 표현한 실제 검사식**:
+- [L607](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L607) `self.assertEqual(2**64-1, value['count'])`
+- [L608](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L608) `self.assertEqual(1, value['range_count'])`
+
+**검증 범위와 한계**: 이 함수는 위에 명시한 입력·성공 조건까지 검사한다. 가상 데이터/SQLite/원장 fixture의 통과는 커널 eBPF verifier, 실제 드라이브 전원 장애 또는 타 Linux 버전의 수집 무손실을 검증하지 못한다. `assertRaises`는 오류가 발생해야 통과하며, 정상 실행을 확인하는 검사와 방향이 반대다. 테스트용 정해진 ID/시간/경로는 서비스의 실제 고정값이 아니다.
+
+**원본 함수 전체**
+
+```python
+    def test_uint64_sequence_bound_does_not_require_enumeration(self):
+        self.checkpoint(sequence=2**64-1, seal=True)
+        self.commit()
+        value = self.report()['tenant_evidence'][0]['final_absence']
+        self.assertEqual(2**64-1, value['count'])
+        self.assertEqual(1, value['range_count'])
+```
+
+#### test_duplicate_tombstone_is_idempotent_conflict_invalid — [test_ledger.py:610–624](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L610-L624)
+
+**정의 위치·목적**: duplicate tombstone is idempotent conflict invalid의 정상·거부/오류 경로를 코드로 검증한다. 입력으로 준비한 fixture 또는 실제 시험용 경로를 사용한다.
+
+**매개변수/반환 및 실행 관계**: `def test_duplicate_tombstone_is_idempotent_conflict_invalid(self):`를 확인한다. `self`는 unittest 인스턴스이며, 인자가 있는 helper는 테스트의 setup/record 생성 시 전달받는다. 명시적 `return`이 없다면 `None`을 반환하고 성공 판단은 예외/단언문으로 한다. 본문에서 관찰되는 호출 이름: `test_duplicate_tombstone_is_idempotent_conflict_invalid`, `loss`, `checkpoint`, `commit`, `report`, `assertEqual`.
+
+**입력·상태 변경 지점(원본)**:
+- [L613](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L613) `self.checkpoint()`
+- [L614](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L614) `self.commit()`
+- [L621](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L621) `self.checkpoint()`
+- [L622](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L622) `self.commit()`
+
+**성공 조건·실패 조건을 표현한 실제 검사식**:
+- [L616](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L616) `self.assertEqual(1, value['duplicate_loss_records'])`
+- [L617](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L617) `self.assertEqual(1, value['exact_userspace_loss_count'])`
+- [L623](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L623) `self.assertEqual('INVALID', self.report()['status'])`
+
+**검증 범위와 한계**: 이 함수는 위에 명시한 입력·성공 조건까지 검사한다. 가상 데이터/SQLite/원장 fixture의 통과는 커널 eBPF verifier, 실제 드라이브 전원 장애 또는 타 Linux 버전의 수집 무손실을 검증하지 못한다. `assertRaises`는 오류가 발생해야 통과하며, 정상 실행을 확인하는 검사와 방향이 반대다. 테스트용 정해진 ID/시간/경로는 서비스의 실제 고정값이 아니다.
+
+**원본 함수 전체**
+
+```python
+    def test_duplicate_tombstone_is_idempotent_conflict_invalid(self):
+        self.loss()
+        self.loss()
+        self.checkpoint()
+        self.commit()
+        value = self.report()
+        self.assertEqual(1, value['duplicate_loss_records'])
+        self.assertEqual(1, value['exact_userspace_loss_count'])
+        self.frames = []
+        self.loss()
+        self.loss(reason='PERSIST_FAILED')
+        self.checkpoint()
+        self.commit()
+        self.assertEqual('INVALID', self.report()['status'])
+```
+
+#### test_loss_and_durable_same_id_is_conflicting_evidence — [test_ledger.py:625–631](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L625-L631)
+
+**정의 위치·목적**: loss and durable same id is conflicting evidence의 정상·거부/오류 경로를 코드로 검증한다. 입력으로 준비한 fixture 또는 실제 시험용 경로를 사용한다.
+
+**매개변수/반환 및 실행 관계**: `def test_loss_and_durable_same_id_is_conflicting_evidence(self):`를 확인한다. `self`는 unittest 인스턴스이며, 인자가 있는 helper는 테스트의 setup/record 생성 시 전달받는다. 명시적 `return`이 없다면 `None`을 반환하고 성공 판단은 예외/단언문으로 한다. 본문에서 관찰되는 호출 이름: `test_loss_and_durable_same_id_is_conflicting_evidence`, `write_bytes`, `raw`, `loss`, `checkpoint`, `commit`, `assertIn`, `report`.
+
+**입력·상태 변경 지점(원본)**:
+- [L626](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L626) `(self.run / 'critical.raw').write_bytes(self.raw(seq=2))`
+- [L628](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L628) `self.checkpoint(critical=ledger.RECORD_SIZE, seal=True)`
+- [L629](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L629) `self.commit()`
+
+**성공 조건·실패 조건을 표현한 실제 검사식**:
+- [L630](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L630) `self.assertIn('contradicts', self.report()['errors'][0])`
+
+**검증 범위와 한계**: 이 함수는 위에 명시한 입력·성공 조건까지 검사한다. 가상 데이터/SQLite/원장 fixture의 통과는 커널 eBPF verifier, 실제 드라이브 전원 장애 또는 타 Linux 버전의 수집 무손실을 검증하지 못한다. `assertRaises`는 오류가 발생해야 통과하며, 정상 실행을 확인하는 검사와 방향이 반대다. 테스트용 정해진 ID/시간/경로는 서비스의 실제 고정값이 아니다.
+
+**원본 함수 전체**
+
+```python
+    def test_loss_and_durable_same_id_is_conflicting_evidence(self):
+        (self.run / 'critical.raw').write_bytes(self.raw(seq=2))
+        self.loss()
+        self.checkpoint(critical=ledger.RECORD_SIZE, seal=True)
+        self.commit()
+        self.assertIn('contradicts', self.report()['errors'][0])
+```
+
+#### test_committed_crc_or_truncated_frame_is_invalid — [test_ledger.py:632–642](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L632-L642)
+
+**정의 위치·목적**: committed crc or truncated frame is invalid의 정상·거부/오류 경로를 코드로 검증한다. 입력으로 준비한 fixture 또는 실제 시험용 경로를 사용한다.
+
+**매개변수/반환 및 실행 관계**: `def test_committed_crc_or_truncated_frame_is_invalid(self):`를 확인한다. `self`는 unittest 인스턴스이며, 인자가 있는 helper는 테스트의 setup/record 생성 시 전달받는다. 명시적 `return`이 없다면 `None`을 반환하고 성공 판단은 예외/단언문으로 한다. 본문에서 관찰되는 호출 이름: `test_committed_crc_or_truncated_frame_is_invalid`, `checkpoint`, `commit`, `bytearray`, `read_bytes`, `write_bytes`, `assertIn`, `report`.
+
+**입력·상태 변경 지점(원본)**:
+- [L633](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L633) `self.checkpoint()`
+- [L634](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L634) `self.commit()`
+- [L638](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L638) `path.write_bytes(raw)`
+- [L640](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L640) `path.write_bytes(raw[:-1])`
+
+**성공 조건·실패 조건을 표현한 실제 검사식**:
+- [L639](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L639) `self.assertIn('CRC32', self.report()['errors'][0])`
+- [L641](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L641) `self.assertIn('shorter', self.report()['errors'][0])`
+
+**검증 범위와 한계**: 이 함수는 위에 명시한 입력·성공 조건까지 검사한다. 가상 데이터/SQLite/원장 fixture의 통과는 커널 eBPF verifier, 실제 드라이브 전원 장애 또는 타 Linux 버전의 수집 무손실을 검증하지 못한다. `assertRaises`는 오류가 발생해야 통과하며, 정상 실행을 확인하는 검사와 방향이 반대다. 테스트용 정해진 ID/시간/경로는 서비스의 실제 고정값이 아니다.
+
+**원본 함수 전체**
+
+```python
+    def test_committed_crc_or_truncated_frame_is_invalid(self):
+        self.checkpoint()
+        self.commit()
+        path = self.run / 'evidence.meta'
+        raw = bytearray(path.read_bytes())
+        raw[-1] ^= 1
+        path.write_bytes(raw)
+        self.assertIn('CRC32', self.report()['errors'][0])
+        path.write_bytes(raw[:-1])
+        self.assertIn('shorter', self.report()['errors'][0])
+```
+
+#### test_invalid_raw_reports_only_verified_prefix_without_modifying_source — [test_ledger.py:643–660](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L643-L660)
+
+**정의 위치·목적**: invalid raw reports only verified prefix without modifying source의 정상·거부/오류 경로를 코드로 검증한다. 입력으로 준비한 fixture 또는 실제 시험용 경로를 사용한다.
+
+**매개변수/반환 및 실행 관계**: `def test_invalid_raw_reports_only_verified_prefix_without_modifying_source(self):`를 확인한다. `self`는 unittest 인스턴스이며, 인자가 있는 helper는 테스트의 setup/record 생성 시 전달받는다. 명시적 `return`이 없다면 `None`을 반환하고 성공 판단은 예외/단언문으로 한다. 본문에서 관찰되는 호출 이름: `test_invalid_raw_reports_only_verified_prefix_without_modifying_source`, `raw`, `bytearray`, `broken`, `write_bytes`, `checkpoint`, `commit`, `report`, `assertEqual`, `join`, `read_bytes`.
+
+**입력·상태 변경 지점(원본)**:
+- [L644](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L644) `good = self.raw()`
+- [L645](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L645) `broken = bytearray(self.raw(seq=2))`
+- [L648](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L648) `(self.run / 'critical.raw').write_bytes(original)`
+- [L649](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L649) `self.checkpoint(critical=2 * ledger.RECORD_SIZE)`
+- [L650](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L650) `self.commit()`
+
+**성공 조건·실패 조건을 표현한 실제 검사식**:
+- [L652](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L652) `self.assertEqual('INVALID', value['status'])`
+- [L653](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L653) `self.assertEqual('DIAGNOSTIC_ONLY_NOT_PARTIAL_RECOVERY',`
+- [L655](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L655) `self.assertEqual(ledger.RECORD_SIZE,`
+- [L657](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L657) `self.assertEqual(len(b''.join(self.frames)),`
+- [L659](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L659) `self.assertEqual(original, (self.run / 'critical.raw').read_bytes())`
+
+**검증 범위와 한계**: 이 함수는 위에 명시한 입력·성공 조건까지 검사한다. 가상 데이터/SQLite/원장 fixture의 통과는 커널 eBPF verifier, 실제 드라이브 전원 장애 또는 타 Linux 버전의 수집 무손실을 검증하지 못한다. `assertRaises`는 오류가 발생해야 통과하며, 정상 실행을 확인하는 검사와 방향이 반대다. 테스트용 정해진 ID/시간/경로는 서비스의 실제 고정값이 아니다.
+
+**원본 함수 전체**
+
+```python
+    def test_invalid_raw_reports_only_verified_prefix_without_modifying_source(self):
+        good = self.raw()
+        broken = bytearray(self.raw(seq=2))
+        broken[40] ^= 1
+        original = good + broken
+        (self.run / 'critical.raw').write_bytes(original)
+        self.checkpoint(critical=2 * ledger.RECORD_SIZE)
+        self.commit()
+        value = self.report()
+        self.assertEqual('INVALID', value['status'])
+        self.assertEqual('DIAGNOSTIC_ONLY_NOT_PARTIAL_RECOVERY',
+                         value['verification_progress']['scope'])
+        self.assertEqual(ledger.RECORD_SIZE,
+                         value['verification_progress']['raw_verified_prefix_bytes']['critical'])
+        self.assertEqual(len(b''.join(self.frames)),
+                         value['verification_progress']['journal_verified_prefix_bytes'])
+        self.assertEqual(original, (self.run / 'critical.raw').read_bytes())
+```
+
+#### test_invalid_committed_journal_reports_last_verified_frame — [test_ledger.py:661–674](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L661-L674)
+
+**정의 위치·목적**: invalid committed journal reports last verified frame의 정상·거부/오류 경로를 코드로 검증한다. 입력으로 준비한 fixture 또는 실제 시험용 경로를 사용한다.
+
+**매개변수/반환 및 실행 관계**: `def test_invalid_committed_journal_reports_last_verified_frame(self):`를 확인한다. `self`는 unittest 인스턴스이며, 인자가 있는 helper는 테스트의 setup/record 생성 시 전달받는다. 명시적 `return`이 없다면 `None`을 반환하고 성공 판단은 예외/단언문으로 한다. 본문에서 관찰되는 호출 이름: `test_invalid_committed_journal_reports_last_verified_frame`, `checkpoint`, `commit`, `bytearray`, `read_bytes`, `write_bytes`, `report`, `assertEqual`.
+
+**입력·상태 변경 지점(원본)**:
+- [L662](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L662) `self.checkpoint()`
+- [L664](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L664) `self.checkpoint(sequence=4)`
+- [L665](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L665) `self.commit()`
+- [L669](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L669) `journal.write_bytes(broken)`
+
+**성공 조건·실패 조건을 표현한 실제 검사식**:
+- [L671](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L671) `self.assertEqual('INVALID', value['status'])`
+- [L672](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L672) `self.assertEqual(len(first), value['verification_progress']['journal_verified_prefix_bytes'])`
+- [L673](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L673) `self.assertEqual(1, value['verification_progress']['journal_verified_frames'])`
+
+**검증 범위와 한계**: 이 함수는 위에 명시한 입력·성공 조건까지 검사한다. 가상 데이터/SQLite/원장 fixture의 통과는 커널 eBPF verifier, 실제 드라이브 전원 장애 또는 타 Linux 버전의 수집 무손실을 검증하지 못한다. `assertRaises`는 오류가 발생해야 통과하며, 정상 실행을 확인하는 검사와 방향이 반대다. 테스트용 정해진 ID/시간/경로는 서비스의 실제 고정값이 아니다.
+
+**원본 함수 전체**
+
+```python
+    def test_invalid_committed_journal_reports_last_verified_frame(self):
+        self.checkpoint()
+        first = self.frames[0]
+        self.checkpoint(sequence=4)
+        self.commit()
+        journal = self.run / 'evidence.meta'
+        broken = bytearray(journal.read_bytes())
+        broken[-1] ^= 1
+        journal.write_bytes(broken)
+        value = self.report()
+        self.assertEqual('INVALID', value['status'])
+        self.assertEqual(len(first), value['verification_progress']['journal_verified_prefix_bytes'])
+        self.assertEqual(1, value['verification_progress']['journal_verified_frames'])
+```
+
+#### test_fence_sequence_boundary_and_lineage_cannot_be_forged_by_suffix — [test_ledger.py:675–687](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L675-L687)
+
+**정의 위치·목적**: fence sequence boundary and lineage cannot be forged by suffix의 정상·거부/오류 경로를 코드로 검증한다. 입력으로 준비한 fixture 또는 실제 시험용 경로를 사용한다.
+
+**매개변수/반환 및 실행 관계**: `def test_fence_sequence_boundary_and_lineage_cannot_be_forged_by_suffix(self):`를 확인한다. `self`는 unittest 인스턴스이며, 인자가 있는 helper는 테스트의 setup/record 생성 시 전달받는다. 명시적 `return`이 없다면 `None`을 반환하고 성공 판단은 예외/단언문으로 한다. 본문에서 관찰되는 호출 이름: `test_fence_sequence_boundary_and_lineage_cannot_be_forged_by_suffix`, `checkpoint`, `commit`, `loads`, `read_text`, `write_json`, `assertEqual`, `report`, `assertIn`.
+
+**입력·상태 변경 지점(원본)**:
+- [L676](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L676) `self.checkpoint()`
+- [L677](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L677) `self.commit()`
+- [L678](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L678) `fence = json.loads((self.run / 'evidence.meta.commit').read_text())`
+- [L680](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L680) `self.write_json('evidence.meta.commit', fence)`
+- [L682](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L682) `self.commit()`
+- [L683](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L683) `fence = json.loads((self.run / 'evidence.meta.commit').read_text())`
+- [L685](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L685) `self.write_json('evidence.meta.commit', fence)`
+
+**성공 조건·실패 조건을 표현한 실제 검사식**:
+- [L681](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L681) `self.assertEqual('INVALID', self.report()['status'])`
+- [L686](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L686) `self.assertIn('lineage', self.report()['errors'][0])`
+
+**검증 범위와 한계**: 이 함수는 위에 명시한 입력·성공 조건까지 검사한다. 가상 데이터/SQLite/원장 fixture의 통과는 커널 eBPF verifier, 실제 드라이브 전원 장애 또는 타 Linux 버전의 수집 무손실을 검증하지 못한다. `assertRaises`는 오류가 발생해야 통과하며, 정상 실행을 확인하는 검사와 방향이 반대다. 테스트용 정해진 ID/시간/경로는 서비스의 실제 고정값이 아니다.
+
+**원본 함수 전체**
+
+```python
+    def test_fence_sequence_boundary_and_lineage_cannot_be_forged_by_suffix(self):
+        self.checkpoint()
+        self.commit()
+        fence = json.loads((self.run / 'evidence.meta.commit').read_text())
+        fence['journal_seq'] = 2
+        self.write_json('evidence.meta.commit', fence)
+        self.assertEqual('INVALID', self.report()['status'])
+        self.commit()
+        fence = json.loads((self.run / 'evidence.meta.commit').read_text())
+        fence['manifest_sha256'] = 'f' * 64
+        self.write_json('evidence.meta.commit', fence)
+        self.assertIn('lineage', self.report()['errors'][0])
+```
+
+#### test_snapshot_raw_offset_alignment_and_short_file_are_invalid — [test_ledger.py:688–696](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L688-L696)
+
+**정의 위치·목적**: snapshot raw offset alignment and short file are invalid의 정상·거부/오류 경로를 코드로 검증한다. 입력으로 준비한 fixture 또는 실제 시험용 경로를 사용한다.
+
+**매개변수/반환 및 실행 관계**: `def test_snapshot_raw_offset_alignment_and_short_file_are_invalid(self):`를 확인한다. `self`는 unittest 인스턴스이며, 인자가 있는 helper는 테스트의 setup/record 생성 시 전달받는다. 명시적 `return`이 없다면 `None`을 반환하고 성공 판단은 예외/단언문으로 한다. 본문에서 관찰되는 호출 이름: `test_snapshot_raw_offset_alignment_and_short_file_are_invalid`, `checkpoint`, `commit`, `assertIn`, `report`.
+
+**입력·상태 변경 지점(원본)**:
+- [L689](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L689) `self.checkpoint(critical=1)`
+- [L690](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L690) `self.commit()`
+- [L693](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L693) `self.checkpoint(critical=ledger.RECORD_SIZE)`
+- [L694](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L694) `self.commit()`
+
+**성공 조건·실패 조건을 표현한 실제 검사식**:
+- [L691](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L691) `self.assertIn('aligned', self.report()['errors'][0])`
+- [L695](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L695) `self.assertIn('shorter', self.report()['errors'][0])`
+
+**검증 범위와 한계**: 이 함수는 위에 명시한 입력·성공 조건까지 검사한다. 가상 데이터/SQLite/원장 fixture의 통과는 커널 eBPF verifier, 실제 드라이브 전원 장애 또는 타 Linux 버전의 수집 무손실을 검증하지 못한다. `assertRaises`는 오류가 발생해야 통과하며, 정상 실행을 확인하는 검사와 방향이 반대다. 테스트용 정해진 ID/시간/경로는 서비스의 실제 고정값이 아니다.
+
+**원본 함수 전체**
+
+```python
+    def test_snapshot_raw_offset_alignment_and_short_file_are_invalid(self):
+        self.checkpoint(critical=1)
+        self.commit()
+        self.assertIn('aligned', self.report()['errors'][0])
+        self.frames = []
+        self.checkpoint(critical=ledger.RECORD_SIZE)
+        self.commit()
+        self.assertIn('shorter', self.report()['errors'][0])
+```
+
+#### test_records_after_seal_and_regressed_offsets_are_invalid — [test_ledger.py:697–707](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L697-L707)
+
+**정의 위치·목적**: records after seal and regressed offsets are invalid의 정상·거부/오류 경로를 코드로 검증한다. 입력으로 준비한 fixture 또는 실제 시험용 경로를 사용한다.
+
+**매개변수/반환 및 실행 관계**: `def test_records_after_seal_and_regressed_offsets_are_invalid(self):`를 확인한다. `self`는 unittest 인스턴스이며, 인자가 있는 helper는 테스트의 setup/record 생성 시 전달받는다. 명시적 `return`이 없다면 `None`을 반환하고 성공 판단은 예외/단언문으로 한다. 본문에서 관찰되는 호출 이름: `test_records_after_seal_and_regressed_offsets_are_invalid`, `checkpoint`, `loss`, `commit`, `assertIn`, `report`.
+
+**입력·상태 변경 지점(원본)**:
+- [L698](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L698) `self.checkpoint(seal=True)`
+- [L700](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L700) `self.commit()`
+- [L703](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L703) `self.checkpoint(critical=ledger.RECORD_SIZE)`
+- [L704](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L704) `self.checkpoint(critical=0)`
+- [L705](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L705) `self.commit()`
+
+**성공 조건·실패 조건을 표현한 실제 검사식**:
+- [L701](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L701) `self.assertIn('terminal seal', self.report()['errors'][0])`
+- [L706](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L706) `self.assertIn('regressed', self.report()['errors'][0])`
+
+**검증 범위와 한계**: 이 함수는 위에 명시한 입력·성공 조건까지 검사한다. 가상 데이터/SQLite/원장 fixture의 통과는 커널 eBPF verifier, 실제 드라이브 전원 장애 또는 타 Linux 버전의 수집 무손실을 검증하지 못한다. `assertRaises`는 오류가 발생해야 통과하며, 정상 실행을 확인하는 검사와 방향이 반대다. 테스트용 정해진 ID/시간/경로는 서비스의 실제 고정값이 아니다.
+
+**원본 함수 전체**
+
+```python
+    def test_records_after_seal_and_regressed_offsets_are_invalid(self):
+        self.checkpoint(seal=True)
+        self.loss()
+        self.commit()
+        self.assertIn('terminal seal', self.report()['errors'][0])
+        self.frames = []
+        self.checkpoint(critical=ledger.RECORD_SIZE)
+        self.checkpoint(critical=0)
+        self.commit()
+        self.assertIn('regressed', self.report()['errors'][0])
+```
+
+#### test_final_snapshot_cannot_omit_or_underbound_durable_tenant — [test_ledger.py:708–713](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L708-L713)
+
+**정의 위치·목적**: final snapshot cannot omit or underbound durable tenant의 정상·거부/오류 경로를 코드로 검증한다. 입력으로 준비한 fixture 또는 실제 시험용 경로를 사용한다.
+
+**매개변수/반환 및 실행 관계**: `def test_final_snapshot_cannot_omit_or_underbound_durable_tenant(self):`를 확인한다. `self`는 unittest 인스턴스이며, 인자가 있는 helper는 테스트의 setup/record 생성 시 전달받는다. 명시적 `return`이 없다면 `None`을 반환하고 성공 판단은 예외/단언문으로 한다. 본문에서 관찰되는 호출 이름: `test_final_snapshot_cannot_omit_or_underbound_durable_tenant`, `write_bytes`, `raw`, `checkpoint`, `commit`, `assertIn`, `report`.
+
+**입력·상태 변경 지점(원본)**:
+- [L709](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L709) `(self.run / 'critical.raw').write_bytes(self.raw(seq=5))`
+- [L710](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L710) `self.checkpoint(sequence=3, critical=ledger.RECORD_SIZE, seal=True)`
+- [L711](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L711) `self.commit()`
+
+**성공 조건·실패 조건을 표현한 실제 검사식**:
+- [L712](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L712) `self.assertIn('exceeds final', self.report()['errors'][0])`
+
+**검증 범위와 한계**: 이 함수는 위에 명시한 입력·성공 조건까지 검사한다. 가상 데이터/SQLite/원장 fixture의 통과는 커널 eBPF verifier, 실제 드라이브 전원 장애 또는 타 Linux 버전의 수집 무손실을 검증하지 못한다. `assertRaises`는 오류가 발생해야 통과하며, 정상 실행을 확인하는 검사와 방향이 반대다. 테스트용 정해진 ID/시간/경로는 서비스의 실제 고정값이 아니다.
+
+**원본 함수 전체**
+
+```python
+    def test_final_snapshot_cannot_omit_or_underbound_durable_tenant(self):
+        (self.run / 'critical.raw').write_bytes(self.raw(seq=5))
+        self.checkpoint(sequence=3, critical=ledger.RECORD_SIZE, seal=True)
+        self.commit()
+        self.assertIn('exceeds final', self.report()['errors'][0])
+```
+
+#### test_output_refuses_source_mutation_and_existing_report — [test_ledger.py:714–724](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L714-L724)
+
+**정의 위치·목적**: output refuses source mutation and existing report의 정상·거부/오류 경로를 코드로 검증한다. 입력으로 준비한 fixture 또는 실제 시험용 경로를 사용한다.
+
+**매개변수/반환 및 실행 관계**: `def test_output_refuses_source_mutation_and_existing_report(self):`를 확인한다. `self`는 unittest 인스턴스이며, 인자가 있는 helper는 테스트의 setup/record 생성 시 전달받는다. 명시적 `return`이 없다면 `None`을 반환하고 성공 판단은 예외/단언문으로 한다. 본문에서 관찰되는 호출 이름: `test_output_refuses_source_mutation_and_existing_report`, `checkpoint`, `commit`, `assertRaises`, `recover`.
+
+**입력·상태 변경 지점(원본)**:
+- [L715](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L715) `self.checkpoint()`
+- [L716](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L716) `self.commit()`
+- [L718](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L718) `ledger.recover(self.run, self.run / 'recovery.json')`
+- [L719](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L719) `path = self.root / 'recovery.json'`
+
+**성공 조건·실패 조건을 표현한 실제 검사식**:
+- [L717](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L717) `with self.assertRaises(ledger.LedgerError):`
+- [L721](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_ledger.py#L721) `with self.assertRaises(FileExistsError):`
+
+**검증 범위와 한계**: 이 함수는 위에 명시한 입력·성공 조건까지 검사한다. 가상 데이터/SQLite/원장 fixture의 통과는 커널 eBPF verifier, 실제 드라이브 전원 장애 또는 타 Linux 버전의 수집 무손실을 검증하지 못한다. `assertRaises`는 오류가 발생해야 통과하며, 정상 실행을 확인하는 검사와 방향이 반대다. 테스트용 정해진 ID/시간/경로는 서비스의 실제 고정값이 아니다.
+
+**원본 함수 전체**
+
+```python
+    def test_output_refuses_source_mutation_and_existing_report(self):
+        self.checkpoint()
+        self.commit()
+        with self.assertRaises(ledger.LedgerError):
+            ledger.recover(self.run, self.run / 'recovery.json')
+        path = self.root / 'recovery.json'
+        ledger.recover(self.run, path)
+        with self.assertRaises(FileExistsError):
+            ledger.recover(self.run, path)
+```
+
+## test_live.py — 실제 eBPF 수집 파이프라인 통합 smoke
+
+[원본 전체](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_live.py); 추출한 메서드·함수 2개. 다음 각 테스트 함수는 **코드 전체**와 검증 표현식을 같이 싣는다.
+
+
+#### main — [test_live.py:16–93](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_live.py#L16-L93)
+
+**정의 위치·목적**: 실제 커널 smoke 테스트의 명령·assert·종료 경로를 순서대로 실행한다. 입력으로 준비한 fixture 또는 실제 시험용 경로를 사용한다.
+
+**매개변수/반환 및 실행 관계**: `def main():`를 확인한다. `self`는 unittest 인스턴스이며, 인자가 있는 helper는 테스트의 setup/record 생성 시 전달받는다. 명시적 `return`이 없다면 `None`을 반환하고 성공 판단은 예외/단언문으로 한다. 본문에서 관찰되는 호출 이름: `main`, `current`, `alive`, `read_json`, `get`, `RuntimeError`, `cli`, `run`, `uname`, `open`, `close`, `sleep`, `status`, `pidfd_open`, `pidfd_send_signal`, `sum`, `values`, `update`, `loads`, `identity`, `sysconf`, `any`, `abs`.
+
+**입력·상태 변경 지점(원본)**:
+- [L18](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_live.py#L18) `if existing and eq.alive(eq.read_json(existing / 'service.json', {}).get('supervisor')):`
+- [L22](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_live.py#L22) `value = subprocess.run(command + [action], capture_output=True, text=True, timeout=25)`
+- [L28](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_live.py#L28) `report = dict(run_id=run.name, kernel=os.uname().release)`
+- [L33](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_live.py#L33) `cfg = eq.read_json(run / 'config.json')`
+- [L36](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_live.py#L36) `fd = os.open(cfg['protected_path'], os.O_RDONLY | os.O_NONBLOCK)`
+- [L37](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_live.py#L37) `os.close(fd)`
+- [L40](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_live.py#L40) `subprocess.run(['/usr/bin/true'], check=True)`
+- [L46](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_live.py#L46) `service = eq.read_json(run / 'service.json')`
+- [L48](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_live.py#L48) `fd = os.pidfd_open(service['indexer']['pid'])`
+- [L53](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_live.py#L53) `os.close(fd)`
+- [L55](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_live.py#L55) `subprocess.run(['/usr/bin/id'], check=True, stdout=subprocess.DEVNULL)`
+- [L75](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_live.py#L75) `critical = json.loads(cli('critical').stdout)['records']`
+- [L77](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_live.py#L77) `ticks = os.sysconf('SC_CLK_TCK')`
+- [L79](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_live.py#L79) `assert any(e['path'] == cfg['protected_path'] and e['comm'] == 'python3' and`
+- [L90](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_live.py#L90) `eq.atomic_json(run / 'test-report.json', report)`
+- [L91](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_live.py#L91) `print(json.dumps(report, indent=2))`
+
+**성공 조건·실패 조건을 표현한 실제 검사식**:
+- [L19](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_live.py#L19) `raise RuntimeError('기존 수집이 실행 중입니다. 테스트가 중지시키지 않습니다.')`
+- [L24](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_live.py#L24) `raise RuntimeError(value.stderr)`
+- [L31](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_live.py#L31) `assert duplicate.returncode != 0`
+- [L43](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_live.py#L43) `assert state['state'] == 'RUNNING', state`
+- [L44](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_live.py#L44) `assert state['collector']['durable']['critical.raw'] >= 240`
+- [L47](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_live.py#L47) `assert eq.alive(service['indexer'])`
+- [L50](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_live.py#L50) `assert eq.alive(service['indexer'])`
+- [L58](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_live.py#L58) `assert state['state'] == 'RUNNING'`
+- [L59](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_live.py#L59) `assert sum(state['collector']['durable'].values()) > before`
+- [L60](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_live.py#L60) `assert state['index']['state'] == 'UNAVAILABLE'`
+- [L65](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_live.py#L65) `assert final['state'] == 'STOPPED', final`
+- [L68](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_live.py#L68) `assert final['index']['lag_bytes'] == 0, final`
+- [L71](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_live.py#L71) `assert eq.status(run)['index']['indexed_records'] == count`
+- [L79](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_live.py#L79) `assert any(e['path'] == cfg['protected_path'] and e['comm'] == 'python3' and`
+- [L87](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_live.py#L87) `assert collector_records == 0`
+
+**검증 범위와 한계**: 이 함수는 위에 명시한 입력·성공 조건까지 검사한다. 가상 데이터/SQLite/원장 fixture의 통과는 커널 eBPF verifier, 실제 드라이브 전원 장애 또는 타 Linux 버전의 수집 무손실을 검증하지 못한다. `assertRaises`는 오류가 발생해야 통과하며, 정상 실행을 확인하는 검사와 방향이 반대다. 테스트용 정해진 ID/시간/경로는 서비스의 실제 고정값이 아니다.
+
+**원본 함수 전체**
+
+```python
+def main():
+    existing = eq.current()
+    if existing and eq.alive(eq.read_json(existing / 'service.json', {}).get('supervisor')):
+        raise RuntimeError('기존 수집이 실행 중입니다. 테스트가 중지시키지 않습니다.')
+    command = [sys.executable, str(eq.ROOT / 'manage.py')]
+    def cli(action, check=True):
+        value = subprocess.run(command + [action], capture_output=True, text=True, timeout=25)
+        if check and value.returncode:
+            raise RuntimeError(value.stderr)
+        return value
+    cli('start')
+    run = eq.current()
+    report = dict(run_id=run.name, kernel=os.uname().release)
+    try:
+        duplicate = cli('start', check=False)
+        assert duplicate.returncode != 0
+        report['duplicate_start_rejected'] = True
+        cfg = eq.read_json(run / 'config.json')
+        # A read-only attempt to the configured path is critical even if absent.
+        try:
+            fd = os.open(cfg['protected_path'], os.O_RDONLY | os.O_NONBLOCK)
+            os.close(fd)
+        except OSError:
+            pass
+        subprocess.run(['/usr/bin/true'], check=True)
+        time.sleep(2)
+        state = eq.status(run)
+        assert state['state'] == 'RUNNING', state
+        assert state['collector']['durable']['critical.raw'] >= 240
+        report['critical_capture'] = True
+        service = eq.read_json(run / 'service.json')
+        assert eq.alive(service['indexer'])
+        fd = os.pidfd_open(service['indexer']['pid'])
+        try:
+            assert eq.alive(service['indexer'])
+            signal.pidfd_send_signal(fd, signal.SIGTERM)
+        finally:
+            os.close(fd)
+        before = sum(state['collector']['durable'].values())
+        subprocess.run(['/usr/bin/id'], check=True, stdout=subprocess.DEVNULL)
+        time.sleep(2)
+        state = eq.status(run)
+        assert state['state'] == 'RUNNING'
+        assert sum(state['collector']['durable'].values()) > before
+        assert state['index']['state'] == 'UNAVAILABLE'
+        report['indexer_failure_raw_continues'] = True
+    finally:
+        cli('stop')
+    final = eq.status(run)
+    assert final['state'] == 'STOPPED', final
+    cli('index')
+    final = eq.status(run)
+    assert final['index']['lag_bytes'] == 0, final
+    count = final['index']['indexed_records']
+    cli('index')
+    assert eq.status(run)['index']['indexed_records'] == count
+    report.update(index_resume_no_duplicates=True, indexed_records=count,
+                  received=final['collector']['received'], durable=final['collector']['durable'],
+                  cpu_seconds=final['collector']['cpu_seconds'], max_rss_kib=final['collector']['max_rss_kib'])
+    critical = json.loads(cli('critical').stdout)['records']
+    own_start = int(eq.identity()['start'])
+    ticks = os.sysconf('SC_CLK_TCK')
+    # Event PIDs belong to the host namespace, not this WSL namespace.
+    assert any(e['path'] == cfg['protected_path'] and e['comm'] == 'python3' and
+               abs(e['process_start_ns'] * ticks // 1000000000 - own_start) <= 1 for e in critical)
+    report['critical_query'] = True
+    collector_records = 0
+    for lane in eq.LANES:
+        with (run / lane).open('rb') as file:
+            for raw in iter(lambda: file.read(eq.RECORD_SIZE), b''):
+                if eq.decode_record(raw)['comm'] == 'collector': collector_records += 1
+    assert collector_records == 0
+    report['collector_self_exclusion'] = True
+    report['final_state'] = final['state']
+    eq.atomic_json(run / 'test-report.json', report)
+    print(json.dumps(report, indent=2))
+```
+
+#### cli — [test_live.py:21–25](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_live.py#L21-L25)
+
+**정의 위치·목적**: 테스트 fixture의 입력·출력을 구성한다. 입력으로 준비한 fixture 또는 실제 시험용 경로를 사용한다.
+
+**매개변수/반환 및 실행 관계**: `def cli(action, check=True):`를 확인한다. `self`는 unittest 인스턴스이며, 인자가 있는 helper는 테스트의 setup/record 생성 시 전달받는다. 명시적 `return`이 없다면 `None`을 반환하고 성공 판단은 예외/단언문으로 한다. 본문에서 관찰되는 호출 이름: `cli`, `run`, `RuntimeError`.
+
+**입력·상태 변경 지점(원본)**:
+- [L22](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_live.py#L22) `value = subprocess.run(command + [action], capture_output=True, text=True, timeout=25)`
+
+**성공 조건·실패 조건을 표현한 실제 검사식**:
+- [L24](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_live.py#L24) `raise RuntimeError(value.stderr)`
+
+**검증 범위와 한계**: 이 함수는 위에 명시한 입력·성공 조건까지 검사한다. 가상 데이터/SQLite/원장 fixture의 통과는 커널 eBPF verifier, 실제 드라이브 전원 장애 또는 타 Linux 버전의 수집 무손실을 검증하지 못한다. `assertRaises`는 오류가 발생해야 통과하며, 정상 실행을 확인하는 검사와 방향이 반대다. 테스트용 정해진 ID/시간/경로는 서비스의 실제 고정값이 아니다.
+
+**원본 함수 전체**
+
+```python
+    def cli(action, check=True):
+        value = subprocess.run(command + [action], capture_output=True, text=True, timeout=25)
+        if check and value.returncode:
+            raise RuntimeError(value.stderr)
+        return value
+```
+
+## test_budget.py — 작은 cgroup BULK 예산에서 커널 suppression 검증
+
+[원본 전체](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_budget.py); 추출한 메서드·함수 2개. 다음 각 테스트 함수는 **코드 전체**와 검증 표현식을 같이 싣는다.
+
+
+#### main — [test_budget.py:12–50](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_budget.py#L12-L50)
+
+**정의 위치·목적**: 실제 커널 smoke 테스트의 명령·assert·종료 경로를 순서대로 실행한다. 입력으로 준비한 fixture 또는 실제 시험용 경로를 사용한다.
+
+**매개변수/반환 및 실행 관계**: `def main():`를 확인한다. `self`는 unittest 인스턴스이며, 인자가 있는 helper는 테스트의 setup/record 생성 시 전달받는다. 명시적 `return`이 없다면 `None`을 반환하고 성공 판단은 예외/단언문으로 한다. 본문에서 관찰되는 호출 이름: `main`, `current`, `alive`, `read_json`, `get`, `RuntimeError`, `config`, `TemporaryDirectory`, `Path`, `write_text`, `dumps`, `run`, `attempt`, `open`, `close`, `sleep`, `query`, `sysconf`, `identity`, `next`, `abs`, `status`, `atomic_json`.
+
+**입력·상태 변경 지점(원본)**:
+- [L14](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_budget.py#L14) `if run and eq.alive(eq.read_json(run / 'service.json', {}).get('supervisor')):`
+- [L17](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_budget.py#L17) `cfg = dict(eq.config(eq.ROOT / 'config.json'), bulk_rate=1, bulk_burst=1)`
+- [L18](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_budget.py#L18) `with tempfile.TemporaryDirectory(prefix='eq-budget-test-') as folder:`
+- [L19](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_budget.py#L19) `cfg_path = Path(folder) / 'config.json'`
+- [L20](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_budget.py#L20) `cfg_path.write_text(json.dumps(cfg))`
+- [L21](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_budget.py#L21) `subprocess.run(cmd + ['start', '--config', str(cfg_path)], check=True, stdout=subprocess.DEVNULL)`
+- [L26](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_budget.py#L26) `fd = os.open(path, os.O_RDONLY | os.O_NONBLOCK); os.close(fd)`
+- [L29](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_budget.py#L29) `attempt(cfg['protected_path'])`
+- [L32](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_budget.py#L32) `ticks = os.sysconf('SC_CLK_TCK')`
+- [L38](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_budget.py#L38) `attempt(str(Path(folder) / f'absent-{i}'))`
+- [L46](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_budget.py#L46) `subprocess.run(cmd + ['stop'], check=True, stdout=subprocess.DEVNULL)`
+- [L47](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_budget.py#L47) `eq.atomic_json(run / 'budget-test-report.json', report)`
+- [L48](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_budget.py#L48) `print(json.dumps(report, indent=2))`
+
+**성공 조건·실패 조건을 표현한 실제 검사식**:
+- [L15](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_budget.py#L15) `raise RuntimeError('실행 중 수집을 변경하지 않습니다.')`
+- [L41](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_budget.py#L41) `assert after - before >= 3, (before, after)`
+
+**검증 범위와 한계**: 이 함수는 위에 명시한 입력·성공 조건까지 검사한다. 가상 데이터/SQLite/원장 fixture의 통과는 커널 eBPF verifier, 실제 드라이브 전원 장애 또는 타 Linux 버전의 수집 무손실을 검증하지 못한다. `assertRaises`는 오류가 발생해야 통과하며, 정상 실행을 확인하는 검사와 방향이 반대다. 테스트용 정해진 ID/시간/경로는 서비스의 실제 고정값이 아니다.
+
+**원본 함수 전체**
+
+```python
+def main():
+    run = eq.current()
+    if run and eq.alive(eq.read_json(run / 'service.json', {}).get('supervisor')):
+        raise RuntimeError('실행 중 수집을 변경하지 않습니다.')
+    cmd = [sys.executable, str(eq.ROOT / 'manage.py')]
+    cfg = dict(eq.config(eq.ROOT / 'config.json'), bulk_rate=1, bulk_burst=1)
+    with tempfile.TemporaryDirectory(prefix='eq-budget-test-') as folder:
+        cfg_path = Path(folder) / 'config.json'
+        cfg_path.write_text(json.dumps(cfg))
+        subprocess.run(cmd + ['start', '--config', str(cfg_path)], check=True, stdout=subprocess.DEVNULL)
+        run = eq.current()
+        try:
+            def attempt(path):
+                try:
+                    fd = os.open(path, os.O_RDONLY | os.O_NONBLOCK); os.close(fd)
+                except OSError:
+                    pass
+            attempt(cfg['protected_path'])
+            time.sleep(1.2)
+            critical = eq.query(run, critical=True)['records']
+            ticks = os.sysconf('SC_CLK_TCK')
+            start = int(eq.identity()['start'])
+            event = next(e for e in critical if abs(e['process_start_ns'] * ticks // 1000000000 - start) <= 1)
+            cg = event['cgroup_id']
+            before = next(t for t in eq.status(run)['collector']['tenants'] if t['cgroup_id'] == cg)['budget_suppress']
+            for i in range(4):
+                attempt(str(Path(folder) / f'absent-{i}'))
+            time.sleep(1.2)
+            after = next(t for t in eq.status(run)['collector']['tenants'] if t['cgroup_id'] == cg)['budget_suppress']
+            assert after - before >= 3, (before, after)
+            report = dict(run_id=run.name, cgroup_id=cg, test_rate=1, test_burst=1,
+                          test_failed_opens=4, observed_suppression_delta=after-before,
+                          note='Delta may include unrelated same-cgroup opens; not an exact loss benchmark.')
+        finally:
+            subprocess.run(cmd + ['stop'], check=True, stdout=subprocess.DEVNULL)
+        eq.atomic_json(run / 'budget-test-report.json', report)
+        print(json.dumps(report, indent=2))
+```
+
+#### attempt — [test_budget.py:24–28](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_budget.py#L24-L28)
+
+**정의 위치·목적**: 테스트 fixture의 입력·출력을 구성한다. 입력으로 준비한 fixture 또는 실제 시험용 경로를 사용한다.
+
+**매개변수/반환 및 실행 관계**: `def attempt(path):`를 확인한다. `self`는 unittest 인스턴스이며, 인자가 있는 helper는 테스트의 setup/record 생성 시 전달받는다. 명시적 `return`이 없다면 `None`을 반환하고 성공 판단은 예외/단언문으로 한다. 본문에서 관찰되는 호출 이름: `attempt`, `open`, `close`.
+
+**입력·상태 변경 지점(원본)**:
+- [L26](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_budget.py#L26) `fd = os.open(path, os.O_RDONLY | os.O_NONBLOCK); os.close(fd)`
+
+**성공 조건·실패 조건을 표현한 실제 검사식**:
+- 직접 `assert`하지 않는 fixture helper다. 이를 호출하는 개별 `test_*` 메서드의 검사식을 봐야 한다.
+
+**검증 범위와 한계**: 이 함수는 위에 명시한 입력·성공 조건까지 검사한다. 가상 데이터/SQLite/원장 fixture의 통과는 커널 eBPF verifier, 실제 드라이브 전원 장애 또는 타 Linux 버전의 수집 무손실을 검증하지 못한다. `assertRaises`는 오류가 발생해야 통과하며, 정상 실행을 확인하는 검사와 방향이 반대다. 테스트용 정해진 ID/시간/경로는 서비스의 실제 고정값이 아니다.
+
+**원본 함수 전체**
+
+```python
+            def attempt(path):
+                try:
+                    fd = os.open(path, os.O_RDONLY | os.O_NONBLOCK); os.close(fd)
+                except OSError:
+                    pass
+```
+
+## test_writer.c — C 시험 코드 전체
+
+[test_writer.c 소스](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L1-L336) — 336줄. C 테스트는 컴파일 시 메인 및 작은 fixture/검증 함수와 매크로 호출을 하나의 번역 단위로 조합한다. 테스트 코드는 생략하지 않고 **원문 파일 전체**를 싣는다.
+
+### 실제 정의된 함수·메인 진입점
+
+| 함수 선언·시작 줄 | 어떻게 읽는가 |
+|---|---|
+| [`static void setup(size_t capacity) {`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L16) | 입력·예상값을 초기화한 뒤 `assert`/반환값 분기를 확인. C `main`은 별도 실행파일의 시험 진입점. |
+| [`static void reset(void) {`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L26) | 입력·예상값을 초기화한 뒤 `assert`/반환값 분기를 확인. C `main`은 별도 실행파일의 시험 진입점. |
+| [`static void start_writers(pthread_t workers[LANE_COUNT]) {`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L37) | 입력·예상값을 초기화한 뒤 `assert`/반환값 분기를 확인. C `main`은 별도 실행파일의 시험 진입점. |
+| [`static void finish_writers(pthread_t workers[LANE_COUNT]) {`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L40) | 입력·예상값을 초기화한 뒤 `assert`/반환값 분기를 확인. C `main`은 별도 실행파일의 시험 진입점. |
+| [`static void expect_record(int lane, uint64_t sequence) {`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L44) | 입력·예상값을 초기화한 뒤 `assert`/반환값 분기를 확인. C `main`은 별도 실행파일의 시험 진입점. |
+| [`static void test_overflow_order_shutdown(void) {`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L50) | 입력·예상값을 초기화한 뒤 `assert`/반환값 분기를 확인. C `main`은 별도 실행파일의 시험 진입점. |
+| [`static void test_quota_includes_pending(void) {`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L68) | 입력·예상값을 초기화한 뒤 `assert`/반환값 분기를 확인. C `main`은 별도 실행파일의 시험 진입점. |
+| [`static void *produce_one(void *ctx) {`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L85) | 입력·예상값을 초기화한 뒤 `assert`/반환값 분기를 확인. C `main`은 별도 실행파일의 시험 진입점. |
+| [`static void test_atomic_quota(void) {`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L92) | 입력·예상값을 초기화한 뒤 `assert`/반환값 분기를 확인. C `main`은 별도 실행파일의 시험 진입점. |
+| [`static void test_invalid_event(void) {`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L108) | 입력·예상값을 초기화한 뒤 `assert`/반환값 분기를 확인. C `main`은 별도 실행파일의 시험 진입점. |
+| [`static void test_persist_failure(void) {`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L118) | 입력·예상값을 초기화한 뒤 `assert`/반환값 분기를 확인. C `main`은 별도 실행파일의 시험 진입점. |
+| [`static void test_independent_writers_and_sync_failure(void) {`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L130) | 입력·예상값을 초기화한 뒤 `assert`/반환값 분기를 확인. C `main`은 별도 실행파일의 시험 진입점. |
+| [`static void test_quarantine_limits_preserve_critical(void) {`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L170) | 입력·예상값을 초기화한 뒤 `assert`/반환값 분기를 확인. C `main`은 별도 실행파일의 시험 진입점. |
+| [`static void test_quarantine_counts_sync_boundary(void) {`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L195) | 입력·예상값을 초기화한 뒤 `assert`/반환값 분기를 확인. C `main`은 별도 실행파일의 시험 진입점. |
+| [`static void test_rule_identity_and_durable_counts(void) {`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L210) | 입력·예상값을 초기화한 뒤 `assert`/반환값 분기를 확인. C `main`은 별도 실행파일의 시험 진입점. |
+| [`static unsigned occurrences(const char *text, const char *needle) {`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L232) | 입력·예상값을 초기화한 뒤 `assert`/반환값 분기를 확인. C `main`은 별도 실행파일의 시험 진입점. |
+| [`static void test_metadata_fence_crc_and_overflow(void) {`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L238) | 입력·예상값을 초기화한 뒤 `assert`/반환값 분기를 확인. C `main`은 별도 실행파일의 시험 진입점. |
+| [`int main(void) {`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L322) | 입력·예상값을 초기화한 뒤 `assert`/반환값 분기를 확인. C `main`은 별도 실행파일의 시험 진입점. |
+
+### assert·검사 호출 및 검증할 값
+
+- [L17](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L17): `assert(!failed());` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L23](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L23): `assert(lanes[i].file && !queue_init(&lanes[i], capacity));` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L38](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L38): `for (int i = 0; i < LANE_COUNT; i++) assert(!pthread_create(&workers[i], NULL, write_lane, &lanes[i]));` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L42](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L42): `for (int i = 0; i < LANE_COUNT; i++) assert(!pthread_join(workers[i], NULL));` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L46](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L46): `assert(fread(&record, sizeof(record), 1, lanes[lane].file) == 1);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L47](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L47): `assert(record.event.sequence == sequence && !record.reserved);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L48](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L48): `assert(record.crc32 == crc32(0, (void *)&record.event, sizeof(record.event)));` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L50](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L50): `static void test_overflow_order_shutdown(void) {` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L54](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L54): `assert(!save_event(&lanes[0], &event, sizeof(event)));` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L56](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L56): `assert(lanes[0].observed == 3 && lanes[0].admitted == 2);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L57](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L57): `assert(lanes[0].queue_overflow == 1 && lanes[0].high_water == 2);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L58](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L58): `assert(lanes[0].received == 0 && lanes[0].durable == 0);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L60](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L60): `assert(!failed() && lanes[0].received == 2 && lanes[0].durable == 480);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L61](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L61): `assert(!lanes[0].count && !lanes[0].in_flight && lanes[0].closed);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L63](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L63): `assert(fgetc(lanes[0].file) == EOF);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L65](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L65): `assert(save_event(&lanes[0], &event, sizeof(event)) == -EPIPE);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L68](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L68): `static void test_quota_includes_pending(void) {` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L72](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L72): `assert(!save_event(&lanes[1], &general, sizeof(general)));` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L73](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L73): `assert(!save_event(&lanes[1], &general, sizeof(general)));` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L74](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L74): `assert(general_quota_drop == 1 && lanes[1].admitted == 1 && lanes[1].observed == 2);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L75](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L75): `assert(!save_event(&lanes[0], &critical, sizeof(critical)));` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L77](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L77): `assert(!save_event(&lanes[0], &critical, sizeof(critical)));` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L78](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L78): `assert(save_event(&lanes[0], &critical, sizeof(critical)) == -EFBIG);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L79](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L79): `assert(persist_failed == 1 && lanes[0].received == 0 && lanes[1].received == 0);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L81](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L81): `assert(lanes[0].durable == 480 && lanes[1].durable == 240);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L92](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L92): `static void test_atomic_quota(void) {` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L96](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L96): `assert(!pthread_barrier_init(&barrier, NULL, 2));` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L99](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L99): `for (int i = 0; i < 2; i++) assert(!pthread_create(&threads[i], NULL, produce_one, &producers[i]));` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L100](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L100): `for (int i = 0; i < 2; i++) assert(!pthread_join(threads[i], NULL));` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L101](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L101): `assert(lanes[0].admitted + lanes[1].admitted == 1);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L102](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L102): `assert((producers[0].result == 0 && producers[1].result == -EFBIG) ||` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L104](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L104): `assert(persist_failed == 1);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L108](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L108): `static void test_invalid_event(void) {` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L111](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L111): `assert(save_event(&lanes[1], &event, sizeof(event)) == -EPROTO);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L112](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L112): `assert(!lanes[1].observed && !lanes[1].admitted);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L115](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L115): `assert(save_event(&lanes[1], &event, sizeof(event)) == -EPROTO);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L118](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L118): `static void test_persist_failure(void) {` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L121](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L121): `assert(lanes[1].file);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L123](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L123): `assert(!save_event(&lanes[1], &event, sizeof(event)));` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L125](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L125): `assert(failed() && persist_failed >= 1 && lanes[1].durable == 0);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L130](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L130): `static void test_independent_writers_and_sync_failure(void) {` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L132](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L132): `int pipefd[2]; assert(!pipe(pipefd));` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L134](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L134): `assert(flags >= 0 && !fcntl(pipefd[1], F_SETFL, flags | O_NONBLOCK));` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L138](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L138): `assert(errno == EAGAIN && filled && !fcntl(pipefd[1], F_SETFL, flags));` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L140](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L140): `assert(lanes[1].file && !setvbuf(lanes[1].file, NULL, _IONBF, 0));` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L142](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L142): `assert(!save_event(&lanes[1], &general, sizeof(general)));` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L144](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L144): `assert(!pthread_create(&workers[1], NULL, write_lane, &lanes[1]));` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L152](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L152): `assert(blocked);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L153](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L153): `assert(!save_event(&lanes[0], &critical, sizeof(critical)));` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L154](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L154): `assert(!pthread_create(&workers[0], NULL, write_lane, &lanes[0]));` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L156](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L156): `assert(!pthread_join(workers[0], NULL));` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L158](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L158): `assert(lanes[0].durable == 240 && lanes[1].received == 0 && lanes[1].durable == 0);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L162](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L162): `assert(count > 0); filled -= count;` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L164](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L164): `assert(!pthread_join(workers[1], NULL));` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L165](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L165): `assert(failed() == EINVAL && persist_failed == 1);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L166](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L166): `assert(lanes[1].received == 1 && lanes[1].durable == 0);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L170](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L170): `static void test_quarantine_limits_preserve_critical(void) {` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L174](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L174): `assert(!save_event(&lanes[2], &sample, sizeof(sample)));` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L176](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L176): `assert(!save_event(&lanes[2], &sample, sizeof(sample)));` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L177](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L177): `assert(!failed() && quarantine_storage_drop == 1 && lanes[2].admitted == 1);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L178](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L178): `assert(!save_event(&lanes[0], &critical, sizeof(critical)));` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L180](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L180): `assert(!failed() && lanes[0].durable == 240 && lanes[2].durable == 240);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L182](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L182): `assert(storage->storage_rejected[1] == 1 && storage->durable[2] == 1 && storage->durable[0] == 1);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L186](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L186): `assert(!save_event(&lanes[2], &sample, sizeof(sample)));` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L188](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L188): `assert(!save_event(&lanes[2], &sample, sizeof(sample)));` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L189](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L189): `assert(lanes[2].queue_overflow == 1 && !failed());` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L190](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L190): `assert(!save_event(&lanes[0], &critical, sizeof(critical)));` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L192](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L192): `assert(lanes[0].durable == 240 && lanes[2].durable == 240 && !failed());` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L195](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L195): `static void test_quarantine_counts_sync_boundary(void) {` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L200](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L200): `assert(!save_event(&lanes[2], &initial, sizeof(initial)));` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L201](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L201): `assert(!save_event(&lanes[2], &sample, sizeof(sample)));` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L203](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L203): `assert(!storage->appended[1] && !storage->durable[1] && !storage->durable[2]);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L205](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L205): `assert(storage->appended[1] == 1 && storage->appended[2] == 1);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L206](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L206): `assert(storage->durable[1] == 1 && storage->durable[2] == 1 && lanes[2].durable == 480);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L210](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L210): `static void test_rule_identity_and_durable_counts(void) {` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L216](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L216): `assert(!save_event(&lanes[1], &normal, sizeof(normal)));` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L217](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L217): `assert(!save_event(&lanes[0], &critical, sizeof(critical)));` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L218](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L218): `assert(rule_storage[7].observed[1] == 1 && rule_storage[1].observed[0] == 1);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L220](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L220): `assert(rule_storage[7].appended[1] == 1 && rule_storage[7].durable[1] == 1);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L221](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L221): `assert(rule_storage[1].appended[0] == 1 && rule_storage[1].durable[0] == 1);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L226](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L226): `assert(save_event(&lanes[0], &critical, sizeof(critical)) == -EPROTO);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L238](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L238): `static void test_metadata_fence_crc_and_overflow(void) {` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L241](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L241): `assert(mkdtemp(path));` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L243](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L243): `assert(previous >= 0 && !chdir(path));` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L244](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L244): `dirfd_ = open(".", O_DIRECTORY | O_RDONLY); assert(dirfd_ >= 0);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L250](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L250): `assert(fd >= 0 && !meta_init(8 * 1024 * 1024, fd));` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L253](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L253): `assert(!meta_write(&loss) && !meta_sync());` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L254](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L254): `assert(metadata.committed == metadata.written && metadata.committed_seq == 1);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L255](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L255): `FILE *input = fopen("evidence.meta", "rb"); assert(input);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L256](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L256): `unsigned char header[8]; assert(fread(header, 8, 1, input) == 1);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L258](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L258): `assert(length > 0 && length <= META_FRAME_MAX);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L259](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L259): `char *json = calloc(length + 1, 1); assert(json && fread(json, length, 1, input) == 1);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L260](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L260): `assert(checksum == crc32(0, (void *)json, length));` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L261](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L261): `assert(strstr(json, "\"seq\":42") && strstr(json, "Q_STORAGE_LIMIT") && strstr(json, manifest_sha256));` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L263](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L263): `input = fopen("evidence.meta.commit", "rb"); assert(input);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L264](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L264): `char fence[1024] = {}; assert(fread(fence, 1, sizeof(fence) - 1, input) > 0); fclose(input);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L265](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L265): `assert(strstr(fence, "\"journal_seq\":1") && strstr(fence, run_id));` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L271](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L271): `assert(seal_length > 0 && (size_t)seal_length < sizeof(seal));` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L272](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L272): `assert(!publish_snapshot(strdup(seal), strlen(seal), 1, 1));` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L273](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L273): `assert(metadata.count == 1 && metadata.queue[metadata.head].terminal);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L274](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L274): `assert(access("health.json", F_OK) && errno == ENOENT);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L275](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L275): `assert(access("health.json.tmp", F_OK) && errno == ENOENT);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L283](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L283): `assert(!save_control(NULL, &control, sizeof(control)));` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L284](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L284): `assert(metadata.count == 1 && metadata.committed == control_offset);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L287](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L287): `assert(!meta_write(&control_item) && !meta_sync() && metadata.committed_seq == 2);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L288](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L288): `input = fopen("evidence.meta", "rb"); assert(input && !fseek(input, control_offset, SEEK_SET));` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L289](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L289): `assert(fread(header, 8, 1, input) == 1); length = little_u32(header); checksum = little_u32(header + 4);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L290](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L290): `json = calloc(length + 1, 1); assert(json && fread(json, length, 1, input) == 1);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L291](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L291): `assert(checksum == crc32(0, (void *)json, length) && strstr(json, "quarantine_enter") && strstr(json, "HIGH_RATE"));` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L294](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L294): `assert(!meta_enqueue(strdup(checkpoint), strlen(checkpoint), 0));` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L295](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L295): `assert(!meta_enqueue(strdup(checkpoint), strlen(checkpoint), 0));` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L296](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L296): `assert(metadata.checkpoint_pending == 1 && metadata.checkpoint_coalesced == 1 && metadata.count == 1);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L300](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L300): `assert(metadata.count == META_QUEUE_CAP && metadata.overflow == 1 && metadata.dropped == 1);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L303](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L303): `assert(!meta_write(&loss) && metadata.written == before && metadata.dropped == 2);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L305](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L305): `assert(!meta_write(&terminal) && !meta_sync() && metadata.committed_seq == 3);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L306](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L306): `input = fopen("evidence.meta", "rb"); assert(input && !fseek(input, before, SEEK_SET));` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L307](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L307): `assert(fread(header, 8, 1, input) == 1); length = little_u32(header); checksum = little_u32(header + 4);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L308](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L308): `json = calloc(length + 1, 1); assert(json && fread(json, length, 1, input) == 1);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L309](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L309): `assert(checksum == crc32(0, (void *)json, length));` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L310](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L310): `assert(occurrences(json, "\"config_sha256\":") == 1);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L311](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L311): `assert(strstr(json, config_sha256));` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L314](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L314): `assert(!publish_snapshot(strdup(seal), strlen(seal), 0, 1));` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L315](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L315): `assert(!access("health.json", F_OK));` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L316](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L316): `assert(!unlink("health.json"));` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L317](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L317): `assert(!unlink("evidence.meta") && !unlink("evidence.meta.commit"));` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L319](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L319): `assert(!fchdir(previous)); close(previous); assert(!rmdir(path));` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L323](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L323): `test_overflow_order_shutdown();` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L324](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L324): `test_quota_includes_pending();` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L325](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L325): `test_atomic_quota();` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L326](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L326): `test_invalid_event();` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L327](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L327): `test_persist_failure();` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L328](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L328): `test_independent_writers_and_sync_failure();` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L329](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L329): `test_quarantine_limits_preserve_critical();` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L330](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L330): `test_quarantine_counts_sync_boundary();` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L331](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L331): `test_rule_identity_and_durable_counts();` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L332](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_writer.c#L332): `test_metadata_fence_crc_and_overflow();` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+
+### 원본 파일 전체
+
+```c
+/* Synthetic userspace queue/writer tests. Never loads BPF or emits workloads. */
+#define main collector_program_main
+#include "collector.c"
+#undef main
+#include <assert.h>
+
+static struct eq_event event_for(int lane, uint64_t sequence) {
+    struct eq_event event = {.magic = EQ_MAGIC, .schema = EQ_SCHEMA, .kind = EQ_OPEN,
+        .priority = lane == 1 ? EQ_NORMAL : EQ_CRITICAL, .sequence = sequence,
+        .quality = EQ_RULE_VERSION_V1 | EQ_POLICY_VERSION_V1 |
+            (lane == 1 ? 0 : (1u << EQ_RULE_SHIFT) |
+             (EQ_POLICY_QUARANTINE << EQ_CONFIGURED_POLICY_SHIFT))};
+    if (lane == 2) event.quality |= EQ_QUARANTINED | EQ_Q_PERIODIC;
+    return event;
+}
+static void setup(size_t capacity) {
+    assert(!failed());
+    max_bytes = 1024 * 1024;
+    general_limit = max_bytes - 240;
+    quarantine_limit = general_limit;
+    for (int i = 0; i < LANE_COUNT; i++) {
+        lanes[i].file = tmpfile();
+        assert(lanes[i].file && !queue_init(&lanes[i], capacity));
+    }
+}
+static void reset(void) {
+    for (int i = 0; i < LANE_COUNT; i++) {
+        queue_destroy(&lanes[i]);
+        if (lanes[i].file) fclose(lanes[i].file);
+    }
+    memset(lanes, 0, sizeof(lanes));
+    failure = input_done = 0;
+    persist_failed = general_quota_drop = 0;
+    quarantine_storage_drop = stream_storage_overflow = 0; quarantine_limit = 0; stream_storage_complete = 1; memset(stream_storage, 0, sizeof(stream_storage)); memset(&fallback_storage, 0, sizeof(fallback_storage));
+    memset(rule_storage, 0, sizeof(rule_storage));
+}
+static void start_writers(pthread_t workers[LANE_COUNT]) {
+    for (int i = 0; i < LANE_COUNT; i++) assert(!pthread_create(&workers[i], NULL, write_lane, &lanes[i]));
+}
+static void finish_writers(pthread_t workers[LANE_COUNT]) {
+    queues_close();
+    for (int i = 0; i < LANE_COUNT; i++) assert(!pthread_join(workers[i], NULL));
+}
+static void expect_record(int lane, uint64_t sequence) {
+    struct eq_record record;
+    assert(fread(&record, sizeof(record), 1, lanes[lane].file) == 1);
+    assert(record.event.sequence == sequence && !record.reserved);
+    assert(record.crc32 == crc32(0, (void *)&record.event, sizeof(record.event)));
+}
+static void test_overflow_order_shutdown(void) {
+    setup(2);
+    for (uint64_t seq = 1; seq <= 3; seq++) {
+        struct eq_event event = event_for(0, seq);
+        assert(!save_event(&lanes[0], &event, sizeof(event)));
+    }
+    assert(lanes[0].observed == 3 && lanes[0].admitted == 2);
+    assert(lanes[0].queue_overflow == 1 && lanes[0].high_water == 2);
+    assert(lanes[0].received == 0 && lanes[0].durable == 0);
+    pthread_t workers[LANE_COUNT]; start_writers(workers); finish_writers(workers);
+    assert(!failed() && lanes[0].received == 2 && lanes[0].durable == 480);
+    assert(!lanes[0].count && !lanes[0].in_flight && lanes[0].closed);
+    rewind(lanes[0].file); expect_record(0, 1); expect_record(0, 2);
+    assert(fgetc(lanes[0].file) == EOF);
+    struct eq_event event = event_for(0, 4);
+    assert(save_event(&lanes[0], &event, sizeof(event)) == -EPIPE);
+    reset();
+}
+static void test_quota_includes_pending(void) {
+    setup(8);
+    general_limit = 240; max_bytes = 720;
+    struct eq_event general = event_for(1, 1), critical = event_for(0, 2);
+    assert(!save_event(&lanes[1], &general, sizeof(general)));
+    assert(!save_event(&lanes[1], &general, sizeof(general)));
+    assert(general_quota_drop == 1 && lanes[1].admitted == 1 && lanes[1].observed == 2);
+    assert(!save_event(&lanes[0], &critical, sizeof(critical)));
+    critical.sequence++;
+    assert(!save_event(&lanes[0], &critical, sizeof(critical)));
+    assert(save_event(&lanes[0], &critical, sizeof(critical)) == -EFBIG);
+    assert(persist_failed == 1 && lanes[0].received == 0 && lanes[1].received == 0);
+    pthread_t workers[LANE_COUNT]; start_writers(workers); finish_writers(workers);
+    assert(lanes[0].durable == 480 && lanes[1].durable == 240);
+    reset();
+}
+struct producer { int lane, result; pthread_barrier_t *barrier; };
+static void *produce_one(void *ctx) {
+    struct producer *producer = ctx;
+    struct eq_event event = event_for(producer->lane, 1);
+    pthread_barrier_wait(producer->barrier);
+    producer->result = save_event(&lanes[producer->lane], &event, sizeof(event));
+    return NULL;
+}
+static void test_atomic_quota(void) {
+    setup(2);
+    max_bytes = general_limit = 240;
+    pthread_barrier_t barrier;
+    assert(!pthread_barrier_init(&barrier, NULL, 2));
+    struct producer producers[2] = {{.lane = 0, .barrier = &barrier}, {.lane = 1, .barrier = &barrier}};
+    pthread_t threads[2];
+    for (int i = 0; i < 2; i++) assert(!pthread_create(&threads[i], NULL, produce_one, &producers[i]));
+    for (int i = 0; i < 2; i++) assert(!pthread_join(threads[i], NULL));
+    assert(lanes[0].admitted + lanes[1].admitted == 1);
+    assert((producers[0].result == 0 && producers[1].result == -EFBIG) ||
+           (producers[1].result == 0 && producers[0].result == -EFBIG));
+    assert(persist_failed == 1);
+    pthread_barrier_destroy(&barrier);
+    reset();
+}
+static void test_invalid_event(void) {
+    setup(2);
+    struct eq_event event = event_for(0, 1);
+    assert(save_event(&lanes[1], &event, sizeof(event)) == -EPROTO);
+    assert(!lanes[1].observed && !lanes[1].admitted);
+    reset();
+    setup(2); event = event_for(1, 1); event.kind = 99;
+    assert(save_event(&lanes[1], &event, sizeof(event)) == -EPROTO);
+    reset();
+}
+static void test_persist_failure(void) {
+    setup(2);
+    fclose(lanes[1].file); lanes[1].file = fopen("/dev/full", "wb");
+    assert(lanes[1].file);
+    struct eq_event event = event_for(1, 1);
+    assert(!save_event(&lanes[1], &event, sizeof(event)));
+    pthread_t workers[LANE_COUNT]; start_writers(workers); finish_writers(workers);
+    assert(failed() && persist_failed >= 1 && lanes[1].durable == 0);
+    reset();
+}
+/* A full pipe blocks the general fwrite. Critical still drains and fdatasyncs
+ * its own file. Pipe fdatasync then fails explicitly, exercising sync accounting. */
+static void test_independent_writers_and_sync_failure(void) {
+    setup(2);
+    int pipefd[2]; assert(!pipe(pipefd));
+    int flags = fcntl(pipefd[1], F_GETFL);
+    assert(flags >= 0 && !fcntl(pipefd[1], F_SETFL, flags | O_NONBLOCK));
+    char bytes[4096] = {};
+    ssize_t written; size_t filled = 0;
+    while ((written = write(pipefd[1], bytes, sizeof(bytes))) > 0) filled += written;
+    assert(errno == EAGAIN && filled && !fcntl(pipefd[1], F_SETFL, flags));
+    fclose(lanes[1].file); lanes[1].file = fdopen(pipefd[1], "wb");
+    assert(lanes[1].file && !setvbuf(lanes[1].file, NULL, _IONBF, 0));
+    struct eq_event general = event_for(1, 1), critical = event_for(0, 2);
+    assert(!save_event(&lanes[1], &general, sizeof(general)));
+    pthread_t workers[LANE_COUNT];
+    assert(!pthread_create(&workers[1], NULL, write_lane, &lanes[1]));
+    int blocked = 0;
+    for (int retry = 0; retry < 1000 && !blocked; retry++) {
+        pthread_mutex_lock(&state_lock);
+        blocked = lanes[1].in_flight;
+        pthread_mutex_unlock(&state_lock);
+        if (!blocked) usleep(1000);
+    }
+    assert(blocked);
+    assert(!save_event(&lanes[0], &critical, sizeof(critical)));
+    assert(!pthread_create(&workers[0], NULL, write_lane, &lanes[0]));
+    queues_close();
+    assert(!pthread_join(workers[0], NULL));
+    pthread_mutex_lock(&state_lock);
+    assert(lanes[0].durable == 240 && lanes[1].received == 0 && lanes[1].durable == 0);
+    pthread_mutex_unlock(&state_lock);
+    while (filled) {
+        ssize_t count = read(pipefd[0], bytes, filled < sizeof(bytes) ? filled : sizeof(bytes));
+        assert(count > 0); filled -= count;
+    }
+    assert(!pthread_join(workers[1], NULL));
+    assert(failed() == EINVAL && persist_failed == 1);
+    assert(lanes[1].received == 1 && lanes[1].durable == 0);
+    close(pipefd[0]);
+    reset();
+}
+static void test_quarantine_limits_preserve_critical(void) {
+    setup(2); max_bytes = 4096; general_limit = 240; quarantine_limit = 240;
+    struct eq_event sample = event_for(2, 1), critical = event_for(0, 10);
+    sample.cgroup_id = critical.cgroup_id = 7;
+    assert(!save_event(&lanes[2], &sample, sizeof(sample)));
+    sample.sequence++;
+    assert(!save_event(&lanes[2], &sample, sizeof(sample)));
+    assert(!failed() && quarantine_storage_drop == 1 && lanes[2].admitted == 1);
+    assert(!save_event(&lanes[0], &critical, sizeof(critical)));
+    pthread_t workers[LANE_COUNT]; start_writers(workers); finish_writers(workers);
+    assert(!failed() && lanes[0].durable == 240 && lanes[2].durable == 240);
+    struct stream_storage *storage = storage_for(&sample);
+    assert(storage->storage_rejected[1] == 1 && storage->durable[2] == 1 && storage->durable[0] == 1);
+    reset();
+    setup(1);
+    sample = event_for(2, 1); critical = event_for(0, 10);
+    assert(!save_event(&lanes[2], &sample, sizeof(sample)));
+    sample.sequence++;
+    assert(!save_event(&lanes[2], &sample, sizeof(sample)));
+    assert(lanes[2].queue_overflow == 1 && !failed());
+    assert(!save_event(&lanes[0], &critical, sizeof(critical)));
+    start_writers(workers); finish_writers(workers);
+    assert(lanes[0].durable == 240 && lanes[2].durable == 240 && !failed());
+    reset();
+}
+static void test_quarantine_counts_sync_boundary(void) {
+    setup(4);
+    struct eq_event initial = event_for(2, 1), sample = event_for(2, 2);
+    initial.quality &= ~EQ_Q_PERIODIC; initial.quality |= EQ_Q_INITIAL;
+    initial.cgroup_id = sample.cgroup_id = 42;
+    assert(!save_event(&lanes[2], &initial, sizeof(initial)));
+    assert(!save_event(&lanes[2], &sample, sizeof(sample)));
+    struct stream_storage *storage = storage_for(&initial);
+    assert(!storage->appended[1] && !storage->durable[1] && !storage->durable[2]);
+    pthread_t workers[LANE_COUNT]; start_writers(workers); finish_writers(workers);
+    assert(storage->appended[1] == 1 && storage->appended[2] == 1);
+    assert(storage->durable[1] == 1 && storage->durable[2] == 1 && lanes[2].durable == 480);
+    rewind(lanes[2].file); expect_record(2, 1); expect_record(2, 2);
+    reset();
+}
+static void test_rule_identity_and_durable_counts(void) {
+    setup(4);
+    struct eq_event normal = event_for(1, 1);
+    normal.quality |= 7u << EQ_RULE_SHIFT;
+    struct eq_event critical = event_for(0, 2);
+    critical.quality &= ~EQ_CONFIGURED_POLICY_MASK;
+    assert(!save_event(&lanes[1], &normal, sizeof(normal)));
+    assert(!save_event(&lanes[0], &critical, sizeof(critical)));
+    assert(rule_storage[7].observed[1] == 1 && rule_storage[1].observed[0] == 1);
+    pthread_t workers[LANE_COUNT]; start_writers(workers); finish_writers(workers);
+    assert(rule_storage[7].appended[1] == 1 && rule_storage[7].durable[1] == 1);
+    assert(rule_storage[1].appended[0] == 1 && rule_storage[1].durable[0] == 1);
+    reset();
+    setup(2);
+    critical = event_for(0, 1);
+    critical.quality &= ~EQ_RULE_VERSION_MASK;
+    assert(save_event(&lanes[0], &critical, sizeof(critical)) == -EPROTO);
+    reset();
+}
+static uint32_t little_u32(const unsigned char *bytes) {
+    return (uint32_t)bytes[0] | (uint32_t)bytes[1] << 8 | (uint32_t)bytes[2] << 16 | (uint32_t)bytes[3] << 24;
+}
+static unsigned occurrences(const char *text, const char *needle) {
+    unsigned count = 0;
+    size_t length = strlen(needle);
+    while ((text = strstr(text, needle))) { count++; text += length; }
+    return count;
+}
+static void test_metadata_fence_crc_and_overflow(void) {
+    setup(2);
+    char path[] = "/tmp/mglogwh-meta-XXXXXX";
+    assert(mkdtemp(path));
+    int previous = open(".", O_DIRECTORY | O_RDONLY);
+    assert(previous >= 0 && !chdir(path));
+    dirfd_ = open(".", O_DIRECTORY | O_RDONLY); assert(dirfd_ >= 0);
+    strcpy(run_id, "00000000-0000-0000-0000-000000000001");
+    memset(manifest_sha256, 'a', 64); manifest_sha256[64] = 0;
+    memset(config_sha256, 'b', 64); config_sha256[64] = 0;
+    strcpy(boot_id, "00000000-0000-0000-0000-000000000002");
+    int fd = open("evidence.meta", O_CREAT | O_EXCL | O_WRONLY, 0600);
+    assert(fd >= 0 && !meta_init(8 * 1024 * 1024, fd));
+    struct eq_event event = event_for(0, 42); event.cgroup_id = 7; event.monotonic_ns = 123;
+    struct meta_item loss = {.loss = 1, .event = event, .reason = Q_STORAGE_LIMIT, .lane = 2};
+    assert(!meta_write(&loss) && !meta_sync());
+    assert(metadata.committed == metadata.written && metadata.committed_seq == 1);
+    FILE *input = fopen("evidence.meta", "rb"); assert(input);
+    unsigned char header[8]; assert(fread(header, 8, 1, input) == 1);
+    uint32_t length = little_u32(header), checksum = little_u32(header + 4);
+    assert(length > 0 && length <= META_FRAME_MAX);
+    char *json = calloc(length + 1, 1); assert(json && fread(json, length, 1, input) == 1);
+    assert(checksum == crc32(0, (void *)json, length));
+    assert(strstr(json, "\"seq\":42") && strstr(json, "Q_STORAGE_LIMIT") && strstr(json, manifest_sha256));
+    free(json); fclose(input);
+    input = fopen("evidence.meta.commit", "rb"); assert(input);
+    char fence[1024] = {}; assert(fread(fence, 1, sizeof(fence) - 1, input) > 0); fclose(input);
+    assert(strstr(fence, "\"journal_seq\":1") && strstr(fence, run_id));
+    char seal[512];
+    int seal_length = snprintf(seal, sizeof(seal),
+        "{\"record_type\":\"seal\",\"state\":\"STOPPED\",\"config_sha256\":\"%s\","
+        "\"durable_offsets\":{\"critical\":0,\"general\":0},\"tenants\":[],\"sequence_snapshot_complete\":true}",
+        config_sha256);
+    assert(seal_length > 0 && (size_t)seal_length < sizeof(seal));
+    assert(!publish_snapshot(strdup(seal), strlen(seal), 1, 1));
+    assert(metadata.count == 1 && metadata.queue[metadata.head].terminal);
+    assert(access("health.json", F_OK) && errno == ENOENT);
+    assert(access("health.json.tmp", F_OK) && errno == ENOENT);
+    free(metadata.queue[metadata.head].payload);
+    memset(&metadata.queue[metadata.head], 0, sizeof(*metadata.queue)); metadata.count = 0;
+    uint64_t control_offset = metadata.committed;
+    struct eq_quarantine_control control = {.key = {.cgroup_id = 7, .rule_id = 1, .kind = EQ_OPEN},
+        .transition = EQ_Q_ENTER, .reason = EQ_Q_HIGH_RATE, .monotonic_ns = 123,
+        .transition_sequence = 42, .threshold_eps = 10000, .observed_eps = 20000, .duration_ms = 3000,
+        .episode = {.episode_id = 1, .first_sequence = 42, .last_sequence = 42, .tracking_complete = 1}};
+    assert(!save_control(NULL, &control, sizeof(control)));
+    assert(metadata.count == 1 && metadata.committed == control_offset);
+    struct meta_item control_item = metadata.queue[metadata.head];
+    memset(&metadata.queue[metadata.head], 0, sizeof(*metadata.queue)); metadata.count = 0;
+    assert(!meta_write(&control_item) && !meta_sync() && metadata.committed_seq == 2);
+    input = fopen("evidence.meta", "rb"); assert(input && !fseek(input, control_offset, SEEK_SET));
+    assert(fread(header, 8, 1, input) == 1); length = little_u32(header); checksum = little_u32(header + 4);
+    json = calloc(length + 1, 1); assert(json && fread(json, length, 1, input) == 1);
+    assert(checksum == crc32(0, (void *)json, length) && strstr(json, "quarantine_enter") && strstr(json, "HIGH_RATE"));
+    free(json); fclose(input);
+    const char *checkpoint = "{\"record_type\":\"checkpoint\",\"durable_offsets\":{\"critical\":0,\"general\":0}}";
+    assert(!meta_enqueue(strdup(checkpoint), strlen(checkpoint), 0));
+    assert(!meta_enqueue(strdup(checkpoint), strlen(checkpoint), 0));
+    assert(metadata.checkpoint_pending == 1 && metadata.checkpoint_coalesced == 1 && metadata.count == 1);
+    pthread_mutex_lock(&state_lock);
+    for (unsigned n = 0; n < META_QUEUE_CAP; n++) loss_locked(&event, Q_STORAGE_LIMIT, 2);
+    pthread_mutex_unlock(&state_lock);
+    assert(metadata.count == META_QUEUE_CAP && metadata.overflow == 1 && metadata.dropped == 1);
+    uint64_t before = metadata.written;
+    metadata.max_bytes = META_FRAME_MAX + 8;
+    assert(!meta_write(&loss) && metadata.written == before && metadata.dropped == 2);
+    struct meta_item terminal = {.payload = (char *)seal, .length = strlen(seal), .terminal = 1};
+    assert(!meta_write(&terminal) && !meta_sync() && metadata.committed_seq == 3);
+    input = fopen("evidence.meta", "rb"); assert(input && !fseek(input, before, SEEK_SET));
+    assert(fread(header, 8, 1, input) == 1); length = little_u32(header); checksum = little_u32(header + 4);
+    json = calloc(length + 1, 1); assert(json && fread(json, length, 1, input) == 1);
+    assert(checksum == crc32(0, (void *)json, length));
+    assert(occurrences(json, "\"config_sha256\":") == 1);
+    assert(strstr(json, config_sha256));
+    free(json); fclose(input);
+    meta_destroy(); memset(&metadata, 0, sizeof(metadata));
+    assert(!publish_snapshot(strdup(seal), strlen(seal), 0, 1));
+    assert(!access("health.json", F_OK));
+    assert(!unlink("health.json"));
+    assert(!unlink("evidence.meta") && !unlink("evidence.meta.commit"));
+    close(dirfd_); dirfd_ = -1;
+    assert(!fchdir(previous)); close(previous); assert(!rmdir(path));
+    reset();
+}
+int main(void) {
+    test_overflow_order_shutdown();
+    test_quota_includes_pending();
+    test_atomic_quota();
+    test_invalid_event();
+    test_persist_failure();
+    test_independent_writers_and_sync_failure();
+    test_quarantine_limits_preserve_critical();
+    test_quarantine_counts_sync_boundary();
+    test_rule_identity_and_durable_counts();
+    test_metadata_fence_crc_and_overflow();
+    puts("writer FIFO/quotas/quarantine isolation/durability/control CRC/fence/overflow checks: OK");
+    return 0;
+}
+```
+
+**이 C 테스트의 검증 한계**: 독립 C evaluator/격리 정책/저장처리 fixture가 맞는지 보는 것이며, 동시에 발생하는 모든 eBPF probe와 고부하 저장소를 자동으로 시험한 것은 아니다. 프로그램 운영 run과 독립된 테스트 바이너리를 사용한다.
+
+
+## test_rules.c — C 시험 코드 전체
+
+[test_rules.c 소스](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_rules.c#L1-L212) — 212줄. C 테스트는 컴파일 시 메인 및 작은 fixture/검증 함수와 매크로 호출을 하나의 번역 단위로 조합한다. 테스트 코드는 생략하지 않고 **원문 파일 전체**를 싣는다.
+
+### 실제 정의된 함수·메인 진입점
+
+| 함수 선언·시작 줄 | 어떻게 읽는가 |
+|---|---|
+| [`static unsigned check(struct eq_rule_program *program, struct eq_rule_input *input,`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_rules.c#L21) | 입력·예상값을 초기화한 뒤 `assert`/반환값 분기를 확인. C `main`은 별도 실행파일의 시험 진입점. |
+| [`static void test_numeric_and_event_fields(void) {`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_rules.c#L28) | 입력·예상값을 초기화한 뒤 `assert`/반환값 분기를 확인. C `main`은 별도 실행파일의 시험 진입점. |
+| [`static void test_strings_and_uncertainty(void) {`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_rules.c#L66) | 입력·예상값을 초기화한 뒤 `assert`/반환값 분기를 확인. C `main`은 별도 실행파일의 시험 진입점. |
+| [`static void test_logic_and_conflicts(void) {`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_rules.c#L122) | 입력·예상값을 초기화한 뒤 `assert`/반환값 분기를 확인. C `main`은 별도 실행파일의 시험 진입점. |
+| [`int main(void) {`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_rules.c#L202) | 입력·예상값을 초기화한 뒤 `assert`/반환값 분기를 확인. C `main`은 별도 실행파일의 시험 진입점. |
+
+### assert·검사 호출 및 검증할 값
+
+- [L21](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_rules.c#L21): `static unsigned check(struct eq_rule_program *program, struct eq_rule_input *input,` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L28](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_rules.c#L28): `static void test_numeric_and_event_fields(void) {` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L32](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_rules.c#L32): `assert(check(&program, &input, predicate(EQ_FIELD_KIND, EQ_OP_EQ, EQ_OPEN)) == EQ_TRUE);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L33](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_rules.c#L33): `assert(check(&program, &input, predicate(EQ_FIELD_SUCCESS, EQ_OP_EQ, 1)) == EQ_TRUE);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L34](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_rules.c#L34): `assert(check(&program, &input, predicate(EQ_FIELD_RESULT, EQ_OP_GT, 6)) == EQ_TRUE);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L35](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_rules.c#L35): `assert(check(&program, &input, predicate(EQ_FIELD_RESULT, EQ_OP_GE, 7)) == EQ_TRUE);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L36](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_rules.c#L36): `assert(check(&program, &input, predicate(EQ_FIELD_RESULT, EQ_OP_LT, 8)) == EQ_TRUE);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L37](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_rules.c#L37): `assert(check(&program, &input, predicate(EQ_FIELD_RESULT, EQ_OP_LE, 7)) == EQ_TRUE);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L38](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_rules.c#L38): `assert(check(&program, &input, predicate(EQ_FIELD_RESULT, EQ_OP_NE, -1)) == EQ_TRUE);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L39](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_rules.c#L39): `assert(check(&program, &input, predicate(EQ_FIELD_ACCESS_MODE, EQ_OP_EQ, 2)) == EQ_TRUE);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L40](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_rules.c#L40): `assert(check(&program, &input, predicate(EQ_FIELD_WRITE_ACCESS, EQ_OP_EQ, 1)) == EQ_TRUE);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L41](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_rules.c#L41): `assert(check(&program, &input, predicate(EQ_FIELD_CREATE, EQ_OP_EQ, 1)) == EQ_TRUE);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L42](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_rules.c#L42): `assert(check(&program, &input, predicate(EQ_FIELD_TRUNCATE, EQ_OP_EQ, 1)) == EQ_TRUE);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L43](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_rules.c#L43): `assert(check(&program, &input, predicate(EQ_FIELD_ROOT, EQ_OP_EQ, 0)) == EQ_TRUE);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L44](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_rules.c#L44): `assert(check(&program, &input, predicate(EQ_FIELD_UID, EQ_OP_EQ, 1000)) == EQ_TRUE);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L45](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_rules.c#L45): `assert(check(&program, &input, predicate(EQ_FIELD_PID, EQ_OP_EQ, 42)) == EQ_TRUE);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L46](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_rules.c#L46): `assert(check(&program, &input, predicate(EQ_FIELD_CGROUP, EQ_OP_EQ, 55)) == EQ_TRUE);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L51](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_rules.c#L51): `assert(check(&program, &input, list) == EQ_TRUE);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L53](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_rules.c#L53): `assert(check(&program, &input, list) == EQ_FALSE);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L55](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_rules.c#L55): `assert(check(&program, &input, list) == EQ_TRUE);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L57](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_rules.c#L57): `assert(check(&program, &input, predicate(EQ_FIELD_SUCCESS, EQ_OP_EQ, 0)) == EQ_TRUE);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L58](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_rules.c#L58): `assert(check(&program, &input, predicate(EQ_FIELD_RESULT, EQ_OP_LT, 0)) == EQ_TRUE);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L60](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_rules.c#L60): `assert(check(&program, &input, predicate(EQ_FIELD_ACCESS_MODE, EQ_OP_EQ, 0)) == EQ_UNKNOWN);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L61](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_rules.c#L61): `assert(check(&program, &input, predicate(EQ_FIELD_WRITE_ACCESS, EQ_OP_EQ, 0)) == EQ_UNKNOWN);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L63](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_rules.c#L63): `assert(check(&program, &input, predicate(EQ_FIELD_CREATE, EQ_OP_EQ, 0)) == EQ_UNKNOWN);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L66](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_rules.c#L66): `static void test_strings_and_uncertainty(void) {` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L75](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_rules.c#L75): `assert(check(&program, &input, predicate(EQ_FIELD_PATH, EQ_OP_EQ,` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L77](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_rules.c#L77): `assert(check(&program, &input, predicate(EQ_FIELD_PATH, EQ_OP_NE,` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L82](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_rules.c#L82): `assert(check(&program, &input, list) == EQ_TRUE);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L84](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_rules.c#L84): `assert(check(&program, &input, list) == EQ_FALSE);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L87](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_rules.c#L87): `assert(check(&program, &input, predicate(EQ_FIELD_PATH, EQ_OP_PREFIX, string_value(0, 5))) == EQ_TRUE);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L89](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_rules.c#L89): `assert(check(&program, &input, predicate(EQ_FIELD_PATH, EQ_OP_PREFIX, string_value(0, 5))) == EQ_FALSE);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L91](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_rules.c#L91): `assert(check(&program, &input, predicate(EQ_FIELD_PATH, EQ_OP_NE, string_value(0, 5))) == EQ_UNKNOWN);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L93](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_rules.c#L93): `assert(check(&program, &input, predicate(EQ_FIELD_PATH, EQ_OP_NOT_IN, string_value(0, 5))) == EQ_UNKNOWN);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L95](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_rules.c#L95): `assert(check(&program, &input, predicate(EQ_FIELD_PATH, EQ_OP_PREFIX, string_value(0, 5))) == EQ_UNKNOWN);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L101](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_rules.c#L101): `assert(check(&program, &input, list) == EQ_TRUE);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L103](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_rules.c#L103): `assert(check(&program, &input, list) == EQ_TRUE);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L105](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_rules.c#L105): `assert(check(&program, &input, list) == EQ_FALSE);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L107](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_rules.c#L107): `assert(check(&program, &input, list) == EQ_TRUE);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L114](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_rules.c#L114): `assert(short_path);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L117](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_rules.c#L117): `assert(check(&program, &input, predicate(EQ_FIELD_PATH, EQ_OP_EQ,` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L122](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_rules.c#L122): `static void test_logic_and_conflicts(void) {` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L138](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_rules.c#L138): `assert(eq_rule_evaluate(&program, &input) == EQ_TRUE);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L140](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_rules.c#L140): `assert(eq_rule_evaluate(&program, &input) == EQ_FALSE);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L142](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_rules.c#L142): `assert(eq_rule_evaluate(&program, &input) == EQ_FALSE);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L144](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_rules.c#L144): `assert(eq_rule_evaluate(&program, &input) == EQ_UNKNOWN);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L152](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_rules.c#L152): `assert(eq_rule_evaluate(&program, &input) == EQ_TRUE);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L154](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_rules.c#L154): `assert(eq_rule_evaluate(&program, &input) == EQ_FALSE);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L165](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_rules.c#L165): `assert(eq_rule_evaluate(&rules[0], &input) == EQ_TRUE);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L166](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_rules.c#L166): `assert(eq_rule_evaluate(&rules[1], &input) == EQ_TRUE);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L167](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_rules.c#L167): `assert(eq_rule_evaluate(&rules[2], &input) == EQ_TRUE);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L168](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_rules.c#L168): `assert(eq_rule_better(&rules[2], &rules[1]));` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L170](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_rules.c#L170): `assert(eq_rule_better(&rules[1], &rules[2]));` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L174](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_rules.c#L174): `assert(eq_rule_better(&rules[2], &rules[1]));` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L176](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_rules.c#L176): `assert(eq_rule_better(&rules[2], &rules[1])); /* smaller ID wins */` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L203](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_rules.c#L203): `test_numeric_and_event_fields();` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L204](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_rules.c#L204): `test_strings_and_uncertainty();` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L205](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_rules.c#L205): `test_logic_and_conflicts();` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+
+### 원본 파일 전체
+
+```c
+/* SPDX-License-Identifier: BSD-3-Clause */
+/* Portable matcher tests and a userspace cost proxy; this does not load BPF. */
+#include <assert.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
+#include "rules.h"
+
+static struct eq_rule_token predicate(unsigned field, unsigned comparison,
+                                      long long value) {
+    struct eq_rule_token token = {.opcode = EQ_TEST, .field = field,
+        .comparison = comparison, .value_count = 1};
+    token.values[0] = value;
+    return token;
+}
+static long long string_value(unsigned offset, unsigned length) {
+    return ((long long)length << 32) | offset;
+}
+
+static unsigned check(struct eq_rule_program *program, struct eq_rule_input *input,
+                      struct eq_rule_token token) {
+    program->token_count = 1;
+    program->tokens[0] = token;
+    return eq_rule_evaluate(program, input);
+}
+
+static void test_numeric_and_event_fields(void) {
+    struct eq_rule_program program = {};
+    struct eq_rule_input input = {.kind = EQ_OPEN, .result = 7, .flags = 2 | 0100 | 01000,
+        .uid = 1000, .pid = 42, .cgroup_id = 55};
+    assert(check(&program, &input, predicate(EQ_FIELD_KIND, EQ_OP_EQ, EQ_OPEN)) == EQ_TRUE);
+    assert(check(&program, &input, predicate(EQ_FIELD_SUCCESS, EQ_OP_EQ, 1)) == EQ_TRUE);
+    assert(check(&program, &input, predicate(EQ_FIELD_RESULT, EQ_OP_GT, 6)) == EQ_TRUE);
+    assert(check(&program, &input, predicate(EQ_FIELD_RESULT, EQ_OP_GE, 7)) == EQ_TRUE);
+    assert(check(&program, &input, predicate(EQ_FIELD_RESULT, EQ_OP_LT, 8)) == EQ_TRUE);
+    assert(check(&program, &input, predicate(EQ_FIELD_RESULT, EQ_OP_LE, 7)) == EQ_TRUE);
+    assert(check(&program, &input, predicate(EQ_FIELD_RESULT, EQ_OP_NE, -1)) == EQ_TRUE);
+    assert(check(&program, &input, predicate(EQ_FIELD_ACCESS_MODE, EQ_OP_EQ, 2)) == EQ_TRUE);
+    assert(check(&program, &input, predicate(EQ_FIELD_WRITE_ACCESS, EQ_OP_EQ, 1)) == EQ_TRUE);
+    assert(check(&program, &input, predicate(EQ_FIELD_CREATE, EQ_OP_EQ, 1)) == EQ_TRUE);
+    assert(check(&program, &input, predicate(EQ_FIELD_TRUNCATE, EQ_OP_EQ, 1)) == EQ_TRUE);
+    assert(check(&program, &input, predicate(EQ_FIELD_ROOT, EQ_OP_EQ, 0)) == EQ_TRUE);
+    assert(check(&program, &input, predicate(EQ_FIELD_UID, EQ_OP_EQ, 1000)) == EQ_TRUE);
+    assert(check(&program, &input, predicate(EQ_FIELD_PID, EQ_OP_EQ, 42)) == EQ_TRUE);
+    assert(check(&program, &input, predicate(EQ_FIELD_CGROUP, EQ_OP_EQ, 55)) == EQ_TRUE);
+
+    struct eq_rule_token list = predicate(EQ_FIELD_UID, EQ_OP_IN, 0);
+    list.value_count = 3;
+    list.values[1] = 1000; list.values[2] = 2000;
+    assert(check(&program, &input, list) == EQ_TRUE);
+    list.comparison = EQ_OP_NOT_IN;
+    assert(check(&program, &input, list) == EQ_FALSE);
+    list.values[1] = 1001;
+    assert(check(&program, &input, list) == EQ_TRUE);
+    input.result = -13;
+    assert(check(&program, &input, predicate(EQ_FIELD_SUCCESS, EQ_OP_EQ, 0)) == EQ_TRUE);
+    assert(check(&program, &input, predicate(EQ_FIELD_RESULT, EQ_OP_LT, 0)) == EQ_TRUE);
+    input.flags = EQ_OPEN_PATH_ONLY;
+    assert(check(&program, &input, predicate(EQ_FIELD_ACCESS_MODE, EQ_OP_EQ, 0)) == EQ_UNKNOWN);
+    assert(check(&program, &input, predicate(EQ_FIELD_WRITE_ACCESS, EQ_OP_EQ, 0)) == EQ_UNKNOWN);
+    input.kind = EQ_EXEC;
+    assert(check(&program, &input, predicate(EQ_FIELD_CREATE, EQ_OP_EQ, 0)) == EQ_UNKNOWN);
+}
+
+static void test_strings_and_uncertainty(void) {
+    struct eq_rule_program program = {};
+    struct eq_rule_input input = {.kind = EQ_OPEN, .path = "/etc/shadow", .comm = "bash"};
+    const char first[] = "/etc/shadow";
+    const char second[] = "/etc/passwd";
+    unsigned second_offset = sizeof(first);
+    memcpy(program.strings, first, sizeof(first));
+    memcpy(program.strings + second_offset, second, sizeof(second));
+    program.string_bytes = sizeof(first) + sizeof(second);
+    assert(check(&program, &input, predicate(EQ_FIELD_PATH, EQ_OP_EQ,
+                                            string_value(0, sizeof(first) - 1))) == EQ_TRUE);
+    assert(check(&program, &input, predicate(EQ_FIELD_PATH, EQ_OP_NE,
+                                            string_value(second_offset, sizeof(second) - 1))) == EQ_TRUE);
+    struct eq_rule_token list = predicate(EQ_FIELD_PATH, EQ_OP_IN,
+                                          string_value(0, sizeof(first) - 1));
+    list.value_count = 2; list.values[1] = string_value(second_offset, sizeof(second) - 1);
+    assert(check(&program, &input, list) == EQ_TRUE);
+    list.comparison = EQ_OP_NOT_IN;
+    assert(check(&program, &input, list) == EQ_FALSE);
+    memcpy(program.strings, "/etc/", 6);
+    program.string_bytes = 6;
+    assert(check(&program, &input, predicate(EQ_FIELD_PATH, EQ_OP_PREFIX, string_value(0, 5))) == EQ_TRUE);
+    input.path = "/etc2/shadow";
+    assert(check(&program, &input, predicate(EQ_FIELD_PATH, EQ_OP_PREFIX, string_value(0, 5))) == EQ_FALSE);
+    input.path = "etc/shadow";
+    assert(check(&program, &input, predicate(EQ_FIELD_PATH, EQ_OP_NE, string_value(0, 5))) == EQ_UNKNOWN);
+    input.path = "/etc/shadow"; input.path_quality = EQ_TRUNCATED;
+    assert(check(&program, &input, predicate(EQ_FIELD_PATH, EQ_OP_NOT_IN, string_value(0, 5))) == EQ_UNKNOWN);
+    input.path_quality = EQ_READ_ERROR;
+    assert(check(&program, &input, predicate(EQ_FIELD_PATH, EQ_OP_PREFIX, string_value(0, 5))) == EQ_UNKNOWN);
+    input.path_quality = 0;
+    memcpy(program.strings, "bash\0python3", 13);
+    program.string_bytes = 13;
+    list = predicate(EQ_FIELD_COMM, EQ_OP_IN, string_value(0, 4));
+    list.value_count = 2; list.values[1] = string_value(5, 7);
+    assert(check(&program, &input, list) == EQ_TRUE);
+    input.comm = "python3";
+    assert(check(&program, &input, list) == EQ_TRUE);
+    list.comparison = EQ_OP_NOT_IN;
+    assert(check(&program, &input, list) == EQ_FALSE);
+    input.comm = "ssh";
+    assert(check(&program, &input, list) == EQ_TRUE);
+
+    /* A userspace path may occupy only two bytes, including its NUL. The
+     * reference evaluator must stop there, even for a longer rule string. */
+    memcpy(program.strings, "/123456", 8);
+    program.string_bytes = 8;
+    char *short_path = malloc(2);
+    assert(short_path);
+    short_path[0] = '/'; short_path[1] = 0;
+    input.path = short_path;
+    assert(check(&program, &input, predicate(EQ_FIELD_PATH, EQ_OP_EQ,
+                                            string_value(0, 7))) == EQ_FALSE);
+    free(short_path);
+}
+
+static void test_logic_and_conflicts(void) {
+    struct eq_rule_program program = {};
+    memcpy(program.strings, "/etc/", 6);
+    program.string_bytes = 6;
+    program.token_count = 9;
+    program.tokens[0] = predicate(EQ_FIELD_KIND, EQ_OP_EQ, EQ_OPEN);
+    program.tokens[1] = predicate(EQ_FIELD_PATH, EQ_OP_PREFIX, string_value(0, 5));
+    program.tokens[2].opcode = EQ_ALL;
+    program.tokens[3] = predicate(EQ_FIELD_ROOT, EQ_OP_EQ, 0);
+    program.tokens[4].opcode = EQ_ALL;
+    program.tokens[5] = predicate(EQ_FIELD_WRITE_ACCESS, EQ_OP_EQ, 1);
+    program.tokens[6].opcode = EQ_ALL;
+    program.tokens[7] = predicate(EQ_FIELD_SUCCESS, EQ_OP_EQ, 1);
+    program.tokens[8].opcode = EQ_ALL;
+    struct eq_rule_input input = {.kind = EQ_OPEN, .path = "/etc/hosts",
+        .flags = 1, .uid = 1000, .result = 3};
+    assert(eq_rule_evaluate(&program, &input) == EQ_TRUE);
+    input.uid = 0;
+    assert(eq_rule_evaluate(&program, &input) == EQ_FALSE);
+    input.uid = 1000; input.result = -13;
+    assert(eq_rule_evaluate(&program, &input) == EQ_FALSE);
+    input.result = 3; input.path_quality = EQ_TRUNCATED;
+    assert(eq_rule_evaluate(&program, &input) == EQ_UNKNOWN);
+
+    program.token_count = 4;
+    program.tokens[0] = predicate(EQ_FIELD_UID, EQ_OP_EQ, 0);
+    program.tokens[1].opcode = EQ_NOT;
+    program.tokens[2] = predicate(EQ_FIELD_PID, EQ_OP_EQ, 42);
+    program.tokens[3].opcode = EQ_ANY;
+    input.path_quality = 0; input.pid = 42;
+    assert(eq_rule_evaluate(&program, &input) == EQ_TRUE);
+    input.uid = 0; input.pid = 7;
+    assert(eq_rule_evaluate(&program, &input) == EQ_FALSE);
+
+    struct eq_rule_program rules[3] = {};
+    for (unsigned i = 0; i < 3; i++) {
+        rules[i].enabled = 1; rules[i].id = 30 - i * 10;
+        rules[i].token_count = 1;
+        rules[i].tokens[0] = predicate(EQ_FIELD_KIND, EQ_OP_EQ, EQ_OPEN);
+    }
+    rules[0].precedence = 10; rules[0].priority = EQ_NORMAL;
+    rules[1].precedence = 10; rules[1].priority = EQ_CRITICAL;
+    rules[2].precedence = 20; rules[2].priority = EQ_BULK;
+    assert(eq_rule_evaluate(&rules[0], &input) == EQ_TRUE);
+    assert(eq_rule_evaluate(&rules[1], &input) == EQ_TRUE);
+    assert(eq_rule_evaluate(&rules[2], &input) == EQ_TRUE);
+    assert(eq_rule_better(&rules[2], &rules[1]));
+    rules[2].precedence = 10;
+    assert(eq_rule_better(&rules[1], &rules[2]));
+    rules[2].priority = EQ_CRITICAL;
+    rules[1].overload_policy = EQ_POLICY_EXEMPT;
+    rules[2].overload_policy = EQ_POLICY_QUARANTINE;
+    assert(eq_rule_better(&rules[2], &rules[1]));
+    rules[2].overload_policy = EQ_POLICY_EXEMPT;
+    assert(eq_rule_better(&rules[2], &rules[1])); /* smaller ID wins */
+}
+
+static volatile unsigned long long benchmark_sink;
+static unsigned long long elapsed_ns(struct timespec start, struct timespec end) {
+    return (unsigned long long)(end.tv_sec - start.tv_sec) * 1000000000ULL +
+           (unsigned long long)(end.tv_nsec - start.tv_nsec);
+}
+static unsigned long long benchmark(unsigned rule_count) {
+    struct eq_rule_program programs[EQ_RULES] = {};
+    struct eq_rule_input input = {.kind = EQ_OPEN};
+    for (unsigned rule = 0; rule < rule_count; rule++) {
+        programs[rule].token_count = 1;
+        programs[rule].tokens[0] = predicate(EQ_FIELD_PID, EQ_OP_GE, 0);
+    }
+    struct timespec start, end;
+    clock_gettime(CLOCK_MONOTONIC, &start);
+    for (unsigned event = 0; event < 100000; event++) {
+        input.pid = event;
+        for (unsigned rule = 0; rule < rule_count; rule++)
+            benchmark_sink += eq_rule_evaluate(&programs[rule], &input);
+    }
+    clock_gettime(CLOCK_MONOTONIC, &end);
+    return elapsed_ns(start, end);
+}
+
+int main(void) {
+    test_numeric_and_event_fields();
+    test_strings_and_uncertainty();
+    test_logic_and_conflicts();
+    unsigned long long one = benchmark(1), four = benchmark(4),
+                       eight = benchmark(EQ_RULES);
+    printf("rule matcher cases: OK; 100000 events: 1 rule %llu ns, 4 rules %llu ns, %u rules %llu ns (userspace proxy)\n",
+           one, four, EQ_RULES, eight);
+    return 0;
+}
+```
+
+**이 C 테스트의 검증 한계**: 독립 C evaluator/격리 정책/저장처리 fixture가 맞는지 보는 것이며, 동시에 발생하는 모든 eBPF probe와 고부하 저장소를 자동으로 시험한 것은 아니다. 프로그램 운영 run과 독립된 테스트 바이너리를 사용한다.
+
+
+## test_quarantine.c — C 시험 코드 전체
+
+[test_quarantine.c 소스](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_quarantine.c#L1-L202) — 202줄. C 테스트는 컴파일 시 메인 및 작은 fixture/검증 함수와 매크로 호출을 하나의 번역 단위로 조합한다. 테스트 코드는 생략하지 않고 **원문 파일 전체**를 싣는다.
+
+### 실제 정의된 함수·메인 진입점
+
+| 함수 선언·시작 줄 | 어떻게 읽는가 |
+|---|---|
+| [`static unsigned observe(struct fixture *f, unsigned long long now, int submitted) {`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_quarantine.c#L23) | 입력·예상값을 초기화한 뒤 `assert`/반환값 분기를 확인. C `main`은 별도 실행파일의 시험 진입점. |
+| [`static void window(struct fixture *f, unsigned second, unsigned count) {`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_quarantine.c#L37) | 입력·예상값을 초기화한 뒤 `assert`/반환값 분기를 확인. C `main`은 별도 실행파일의 시험 진입점. |
+| [`static void enter(struct fixture *f, int submitted) {`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_quarantine.c#L41) | 입력·예상값을 초기화한 뒤 `assert`/반환값 분기를 확인. C `main`은 별도 실행파일의 시험 진입점. |
+| [`static void test_low_rate_stays_critical(void) {`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_quarantine.c#L47) | 입력·예상값을 초기화한 뒤 `assert`/반환값 분기를 확인. C `main`은 별도 실행파일의 시험 진입점. |
+| [`static void test_spike_without_duration(void) {`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_quarantine.c#L54) | 입력·예상값을 초기화한 뒤 `assert`/반환값 분기를 확인. C `main`은 별도 실행파일의 시험 진입점. |
+| [`static void test_threshold_and_duration_enter(void) {`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_quarantine.c#L62) | 입력·예상값을 초기화한 뒤 `assert`/반환값 분기를 확인. C `main`은 별도 실행파일의 시험 진입점. |
+| [`static void test_stream_isolation(void) {`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_quarantine.c#L87) | 입력·예상값을 초기화한 뒤 `assert`/반환값 분기를 확인. C `main`은 별도 실행파일의 시험 진입점. |
+| [`static void test_protected_rule_bypasses(void) {`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_quarantine.c#L100) | 입력·예상값을 초기화한 뒤 `assert`/반환값 분기를 확인. C `main`은 별도 실행파일의 시험 진입점. |
+| [`static void test_low_cooldown_exit(void) {`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_quarantine.c#L108) | 입력·예상값을 초기화한 뒤 `assert`/반환값 분기를 확인. C `main`은 별도 실행파일의 시험 진입점. |
+| [`static void test_sampling_reconciliation(void) {`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_quarantine.c#L124) | 입력·예상값을 초기화한 뒤 `assert`/반환값 분기를 확인. C `main`은 별도 실행파일의 시험 진입점. |
+| [`static void test_control_metadata_accuracy(void) {`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_quarantine.c#L141) | 입력·예상값을 초기화한 뒤 `assert`/반환값 분기를 확인. C `main`은 별도 실행파일의 시험 진입점. |
+| [`static void test_volatile_rule_config(void) {`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_quarantine.c#L169) | 입력·예상값을 초기화한 뒤 `assert`/반환값 분기를 확인. C `main`은 별도 실행파일의 시험 진입점. |
+| [`int main(void) {`](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_quarantine.c#L189) | 입력·예상값을 초기화한 뒤 `assert`/반환값 분기를 확인. C `main`은 별도 실행파일의 시험 진입점. |
+
+### assert·검사 호출 및 검증할 값
+
+- [L43](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_quarantine.c#L43): `assert(observe(f, 3 * EQ_Q_SECOND_NS, submitted) == EQ_Q_FULL);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L44](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_quarantine.c#L44): `assert(f->engine.quarantined && f->transitions == 1);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L47](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_quarantine.c#L47): `static void test_low_rate_stays_critical(void) {` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L50](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_quarantine.c#L50): `assert(!f.engine.quarantined && !f.transitions && f.normal == f.seen);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L51](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_quarantine.c#L51): `assert(f.engine.current_rate_eps == 10);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L54](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_quarantine.c#L54): `static void test_spike_without_duration(void) {` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L58](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_quarantine.c#L58): `assert(!f.engine.quarantined && !f.transitions && f.normal == f.seen);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L59](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_quarantine.c#L59): `assert(!f.engine.high_windows);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L62](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_quarantine.c#L62): `static void test_threshold_and_duration_enter(void) {` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L64](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_quarantine.c#L64): `assert(f.entered.transition == EQ_Q_ENTER && f.entered.reason == EQ_Q_HIGH_RATE);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L65](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_quarantine.c#L65): `assert(f.entered.observed_eps == 10000 && f.entered.threshold_eps == 10000);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L66](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_quarantine.c#L66): `assert(f.entered.duration_ms == 3000 && f.entered.episode.start_ns == 3 * EQ_Q_SECOND_NS);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L67](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_quarantine.c#L67): `assert(f.entered.episode.burst_start_ns == 0 && f.entered.episode.high_rate_duration_ms == 3000);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L68](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_quarantine.c#L68): `assert(f.engine.current.full_selected == 1 && f.engine.current.full_submitted == 1);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L73](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_quarantine.c#L73): `assert(observe(&custom, 2 * EQ_Q_SECOND_NS, 1) == EQ_Q_FULL);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L74](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_quarantine.c#L74): `assert(custom.entered.threshold_eps == 50 && custom.entered.duration_ms == 2000);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L82](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_quarantine.c#L82): `assert(delayed.route == EQ_Q_FULL);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L83](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_quarantine.c#L83): `assert(f.engine.current.last_sequence < f.engine.current.first_sequence);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L84](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_quarantine.c#L84): `assert(f.engine.current.last_event_ns > f.engine.current.start_ns);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L87](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_quarantine.c#L87): `static void test_stream_isolation(void) {` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L93](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_quarantine.c#L93): `assert(flood.engine.quarantined);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L94](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_quarantine.c#L94): `assert(!other_rule.engine.quarantined && !other_tenant.engine.quarantined);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L95](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_quarantine.c#L95): `assert(!other_rule.transitions && !other_tenant.transitions);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L96](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_quarantine.c#L96): `assert(other_rule.normal == other_rule.seen && other_tenant.normal == other_tenant.seen);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L97](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_quarantine.c#L97): `assert(flood.entered.key.cgroup_id == 100 && flood.entered.key.rule_id == 1);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L100](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_quarantine.c#L100): `static void test_protected_rule_bypasses(void) {` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L104](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_quarantine.c#L104): `assert(!f.engine.quarantined && !f.transitions && f.normal == f.seen);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L105](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_quarantine.c#L105): `assert(f.engine.current_rate_eps == 10001 && f.engine.peak_rate_eps == 10001);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L108](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_quarantine.c#L108): `static void test_low_cooldown_exit(void) {` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L113](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_quarantine.c#L113): `assert(f.engine.quarantined && f.transitions == 1);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L115](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_quarantine.c#L115): `assert(observe(&f, 13 * EQ_Q_SECOND_NS, 1) == EQ_Q_NORMAL);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L116](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_quarantine.c#L116): `assert(!f.engine.quarantined && f.exited.reason == EQ_Q_LOW_RATE);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L117](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_quarantine.c#L117): `assert(f.exited.observed_eps == 2000 && f.exited.duration_ms == 10000);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L118](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_quarantine.c#L118): `assert(f.exited.episode.last_sequence == last && f.exited.transition_sequence > last);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L120](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_quarantine.c#L120): `assert(observe(&idle, 14 * EQ_Q_SECOND_NS, 1) == EQ_Q_NORMAL);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L121](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_quarantine.c#L121): `assert(idle.exited.transition == EQ_Q_EXIT && idle.exited.observed_eps == 0);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L124](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_quarantine.c#L124): `static void test_sampling_reconciliation(void) {` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L127](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_quarantine.c#L127): `assert(observe(&f, 3 * EQ_Q_SECOND_NS + n * EQ_Q_MS_NS, n != 7) == EQ_Q_FULL);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L129](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_quarantine.c#L129): `assert(observe(&f, 3 * EQ_Q_SECOND_NS + (8 + n) * EQ_Q_MS_NS, 1) == EQ_Q_SUMMARIZE);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L130](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_quarantine.c#L130): `assert(observe(&f, 3 * EQ_Q_SECOND_NS + 107 * EQ_Q_MS_NS, 1) == EQ_Q_SAMPLE);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L131](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_quarantine.c#L131): `assert(observe(&f, 3 * EQ_Q_SECOND_NS + 108 * EQ_Q_MS_NS, 1) == EQ_Q_SUMMARIZE);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L132](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_quarantine.c#L132): `assert(observe(&f, 3 * EQ_Q_SECOND_NS + 207 * EQ_Q_MS_NS, 0) == EQ_Q_SAMPLE);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L134](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_quarantine.c#L134): `assert(e->full_selected == 8 && e->sample_selected == 2 && e->summarized == 51);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L135](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_quarantine.c#L135): `assert(e->seen == e->full_selected + e->sample_selected + e->summarized);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L136](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_quarantine.c#L136): `assert(e->full_selected + e->sample_selected == e->full_submitted + e->sample_submitted + e->ring_failed);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L137](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_quarantine.c#L137): `assert(e->full_submitted == 7 && e->sample_submitted == 1 && e->ring_failed == 2);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L138](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_quarantine.c#L138): `assert(f.engine.q_seen == e->seen && f.engine.summarized == e->summarized);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L141](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_quarantine.c#L141): `static void test_control_metadata_accuracy(void) {` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L143](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_quarantine.c#L143): `assert(f.entered.episode.seen == 1 && f.entered.episode.ring_failed == 1);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L148](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_quarantine.c#L148): `assert(observe(&f, 14 * EQ_Q_SECOND_NS, 1) == EQ_Q_NORMAL);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L151](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_quarantine.c#L151): `assert(c->key.cgroup_id == 100 && c->key.rule_id == 77 && c->key.kind == EQ_OPEN);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L152](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_quarantine.c#L152): `assert(c->transition == EQ_Q_EXIT && c->reason == EQ_Q_LOW_RATE);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L153](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_quarantine.c#L153): `assert(c->threshold_eps == 2000 && c->duration_ms == 10000);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L154](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_quarantine.c#L154): `assert(e->episode_id == e->first_sequence && e->first_sequence == 30001);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L155](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_quarantine.c#L155): `assert(e->last_sequence == 30010 && c->transition_sequence == 30011);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L156](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_quarantine.c#L156): `assert(e->start_ns == 3 * EQ_Q_SECOND_NS && e->end_ns == 14 * EQ_Q_SECOND_NS);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L157](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_quarantine.c#L157): `assert(e->last_event_ns == 3 * EQ_Q_SECOND_NS + 108 * EQ_Q_MS_NS);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L158](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_quarantine.c#L158): `assert(e->seen == 10 && e->full_selected == 8 && e->sample_selected == 1 && e->summarized == 1);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L159](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_quarantine.c#L159): `assert(e->full_submitted == 7 && e->sample_submitted == 0 && e->ring_failed == 2);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L160](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_quarantine.c#L160): `assert(e->first_pid == 10 && e->last_pid == 11 && e->first_uid == 0 && e->last_uid == 1);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L161](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_quarantine.c#L161): `assert(e->unique_pid_lower_bound == 2 && e->unique_uid_lower_bound == 2);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L162](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_quarantine.c#L162): `assert(e->tracking_complete && e->threshold_eps == 10000 && e->duration_ms == 3000);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L164](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_quarantine.c#L164): `assert((quality & EQ_CAPTURE_QUALITY_MASK) == EQ_TRUNCATED);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L165](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_quarantine.c#L165): `assert(((quality & EQ_RULE_MASK) >> EQ_RULE_SHIFT) == 77 && EQ_SCHEMA == 3);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L169](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_quarantine.c#L169): `static void test_volatile_rule_config(void) {` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L179](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_quarantine.c#L179): `assert(decision.route == EQ_Q_NORMAL);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L182](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_quarantine.c#L182): `assert(!engine.quarantined && !engine.high_windows);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L187](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_quarantine.c#L187): `assert(control.threshold_eps == 1000000 && control.duration_ms == 3000);` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L190](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_quarantine.c#L190): `test_low_rate_stays_critical();` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L191](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_quarantine.c#L191): `test_spike_without_duration();` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L192](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_quarantine.c#L192): `test_threshold_and_duration_enter();` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L193](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_quarantine.c#L193): `test_stream_isolation();` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L194](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_quarantine.c#L194): `test_protected_rule_bypasses();` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L195](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_quarantine.c#L195): `test_low_cooldown_exit();` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L196](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_quarantine.c#L196): `test_sampling_reconciliation();` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L197](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_quarantine.c#L197): `test_control_metadata_accuracy();` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+- [L198](https://github.com/habang2222/MGlogWH/blob/e6ff2b9922086d2167fe0483a0616adda55d3a50/test_quarantine.c#L198): `test_volatile_rule_config();` — 비교식이 참이면 검증 성공, 거짓이면 해당 시험 실패/오류 종료다. fixture의 기대값·경계는 아래 문맥을 함께 읽는다.
+
+### 원본 파일 전체
+
+```c
+/* SPDX-License-Identifier: BSD-3-Clause */
+/* Authored virtual-time tests. This binary is compiled, never run by Codex. */
+#include <assert.h>
+#include <stdio.h>
+#include <string.h>
+#include "quarantine.h"
+
+_Static_assert(sizeof(struct eq_event) == 232, "schema 2 preserves event size");
+_Static_assert(sizeof(struct eq_record) == 240, "schema 2 preserves raw frame size");
+struct fixture {
+    struct eq_quarantine_key key;
+    struct eq_quarantine_config config;
+    struct eq_quarantine_engine engine;
+    struct eq_quarantine_control entered, exited;
+    unsigned long long seen, sequence, normal;
+    unsigned pid, uid, transitions;
+    int protected_rule;
+};
+static struct fixture fixture(unsigned long long cgroup, unsigned rule) {
+    return (struct fixture){.key = {cgroup, rule, EQ_OPEN},
+        .config = {10000, 3000, 2000, 10000, 8, 100}, .pid = 10, .uid = 0};
+}
+static unsigned observe(struct fixture *f, unsigned long long now, int submitted) {
+    struct eq_q_decision decision;
+    f->seen++; f->sequence++;
+    eq_q_step(&f->engine, &f->config, now, f->sequence, f->pid, f->uid,
+              f->seen, 0, f->protected_rule, &decision);
+    eq_q_note_submission(&f->engine, decision.route, submitted);
+    if (decision.route == EQ_Q_NORMAL) f->normal++;
+    if (decision.transition) {
+        struct eq_quarantine_control *control = decision.transition == EQ_Q_ENTER ? &f->entered : &f->exited;
+        eq_q_make_control(control, &f->key, &f->engine, &f->config, &decision);
+        f->transitions++;
+    }
+    return decision.route;
+}
+static void window(struct fixture *f, unsigned second, unsigned count) {
+    for (unsigned n = 0; n < count; n++)
+        observe(f, second * EQ_Q_SECOND_NS + (unsigned long long)n * EQ_Q_SECOND_NS / count, 1);
+}
+static void enter(struct fixture *f, int submitted) {
+    for (unsigned second = 0; second < 3; second++) window(f, second, 10000);
+    assert(observe(f, 3 * EQ_Q_SECOND_NS, submitted) == EQ_Q_FULL);
+    assert(f->engine.quarantined && f->transitions == 1);
+}
+/* 1. A low stream keeps the original critical route. */
+static void test_low_rate_stays_critical(void) {
+    struct fixture f = fixture(1, 1);
+    for (unsigned second = 0; second < 20; second++) window(&f, second, 10);
+    assert(!f.engine.quarantined && !f.transitions && f.normal == f.seen);
+    assert(f.engine.current_rate_eps == 10);
+}
+/* 2. A spike shorter than the configured duration does not quarantine. */
+static void test_spike_without_duration(void) {
+    struct fixture f = fixture(1, 1);
+    window(&f, 0, 10001); window(&f, 1, 10001);
+    window(&f, 2, 10); window(&f, 3, 10);
+    assert(!f.engine.quarantined && !f.transitions && f.normal == f.seen);
+    assert(!f.engine.high_windows);
+}
+/* 3. The threshold plus three completed seconds produces one enter. */
+static void test_threshold_and_duration_enter(void) {
+    struct fixture f = fixture(1, 1); enter(&f, 1);
+    assert(f.entered.transition == EQ_Q_ENTER && f.entered.reason == EQ_Q_HIGH_RATE);
+    assert(f.entered.observed_eps == 10000 && f.entered.threshold_eps == 10000);
+    assert(f.entered.duration_ms == 3000 && f.entered.episode.start_ns == 3 * EQ_Q_SECOND_NS);
+    assert(f.entered.episode.burst_start_ns == 0 && f.entered.episode.high_rate_duration_ms == 3000);
+    assert(f.engine.current.full_selected == 1 && f.engine.current.full_submitted == 1);
+    /* Policy values are configurable, not folded into the engine. */
+    struct fixture custom = fixture(2, 2); custom.config.threshold_eps = 50;
+    custom.config.recovery_eps = 10; custom.config.duration_ms = 2000;
+    window(&custom, 0, 50); window(&custom, 1, 50);
+    assert(observe(&custom, 2 * EQ_Q_SECOND_NS, 1) == EQ_Q_FULL);
+    assert(custom.entered.threshold_eps == 50 && custom.entered.duration_ms == 2000);
+    /* Allocation of cgroup IDs precedes policy ownership. A delayed handler
+     * can have a smaller ID than the episode's first policy observation. */
+    struct eq_q_decision delayed;
+    f.seen++;
+    eq_q_step(&f.engine, &f.config, 3 * EQ_Q_SECOND_NS + EQ_Q_MS_NS,
+              f.engine.current.first_sequence - 1, f.pid, f.uid, f.seen, 0, 0, &delayed);
+    eq_q_note_submission(&f.engine, delayed.route, 1);
+    assert(delayed.route == EQ_Q_FULL);
+    assert(f.engine.current.last_sequence < f.engine.current.first_sequence);
+    assert(f.engine.current.last_event_ns > f.engine.current.start_ns);
+}
+/* 4. Both rule identity and cgroup identity isolate the state machine. */
+static void test_stream_isolation(void) {
+    struct fixture flood = fixture(100, 1), other_rule = fixture(100, 2), other_tenant = fixture(200, 1);
+    enter(&flood, 1);
+    for (unsigned second = 0; second < 5; second++) {
+        window(&other_rule, second, 10); window(&other_tenant, second, 10);
+    }
+    assert(flood.engine.quarantined);
+    assert(!other_rule.engine.quarantined && !other_tenant.engine.quarantined);
+    assert(!other_rule.transitions && !other_tenant.transitions);
+    assert(other_rule.normal == other_rule.seen && other_tenant.normal == other_tenant.seen);
+    assert(flood.entered.key.cgroup_id == 100 && flood.entered.key.rule_id == 1);
+}
+/* 5. An explicitly protected rule retains critical capture during a flood. */
+static void test_protected_rule_bypasses(void) {
+    struct fixture f = fixture(1, 1); f.protected_rule = 1;
+    for (unsigned second = 0; second < 5; second++) window(&f, second, 10001);
+    observe(&f, 5 * EQ_Q_SECOND_NS, 1);
+    assert(!f.engine.quarantined && !f.transitions && f.normal == f.seen);
+    assert(f.engine.current_rate_eps == 10001 && f.engine.peak_rate_eps == 10001);
+}
+/* 6. Recovery includes exactly the low threshold, and idle recovery is event driven. */
+static void test_low_cooldown_exit(void) {
+    struct fixture f = fixture(1, 1); enter(&f, 1);
+    for (unsigned n = 1; n < 2000; n++)
+        observe(&f, 3 * EQ_Q_SECOND_NS + (unsigned long long)n * EQ_Q_SECOND_NS / 2000, 1);
+    for (unsigned second = 4; second < 13; second++) window(&f, second, 2000);
+    assert(f.engine.quarantined && f.transitions == 1);
+    unsigned long long last = f.engine.current.last_sequence;
+    assert(observe(&f, 13 * EQ_Q_SECOND_NS, 1) == EQ_Q_NORMAL);
+    assert(!f.engine.quarantined && f.exited.reason == EQ_Q_LOW_RATE);
+    assert(f.exited.observed_eps == 2000 && f.exited.duration_ms == 10000);
+    assert(f.exited.episode.last_sequence == last && f.exited.transition_sequence > last);
+    struct fixture idle = fixture(2, 1); enter(&idle, 1);
+    assert(observe(&idle, 14 * EQ_Q_SECOND_NS, 1) == EQ_Q_NORMAL);
+    assert(idle.exited.transition == EQ_Q_EXIT && idle.exited.observed_eps == 0);
+}
+/* 7. Selection, summarization and ring outcomes reconcile without claiming durability. */
+static void test_sampling_reconciliation(void) {
+    struct fixture f = fixture(1, 1); enter(&f, 1);
+    for (unsigned n = 1; n < 8; n++)
+        assert(observe(&f, 3 * EQ_Q_SECOND_NS + n * EQ_Q_MS_NS, n != 7) == EQ_Q_FULL);
+    for (unsigned n = 0; n < 50; n++)
+        assert(observe(&f, 3 * EQ_Q_SECOND_NS + (8 + n) * EQ_Q_MS_NS, 1) == EQ_Q_SUMMARIZE);
+    assert(observe(&f, 3 * EQ_Q_SECOND_NS + 107 * EQ_Q_MS_NS, 1) == EQ_Q_SAMPLE);
+    assert(observe(&f, 3 * EQ_Q_SECOND_NS + 108 * EQ_Q_MS_NS, 1) == EQ_Q_SUMMARIZE);
+    assert(observe(&f, 3 * EQ_Q_SECOND_NS + 207 * EQ_Q_MS_NS, 0) == EQ_Q_SAMPLE);
+    const struct eq_quarantine_episode *e = &f.engine.current;
+    assert(e->full_selected == 8 && e->sample_selected == 2 && e->summarized == 51);
+    assert(e->seen == e->full_selected + e->sample_selected + e->summarized);
+    assert(e->full_selected + e->sample_selected == e->full_submitted + e->sample_submitted + e->ring_failed);
+    assert(e->full_submitted == 7 && e->sample_submitted == 1 && e->ring_failed == 2);
+    assert(f.engine.q_seen == e->seen && f.engine.summarized == e->summarized);
+}
+/* 8. Enter/exit controls preserve policy, sequence bounds, identity and storage outcomes. */
+static void test_control_metadata_accuracy(void) {
+    struct fixture f = fixture(100, 77); enter(&f, 0);
+    assert(f.entered.episode.seen == 1 && f.entered.episode.ring_failed == 1);
+    for (unsigned n = 1; n < 8; n++) observe(&f, 3 * EQ_Q_SECOND_NS + n * EQ_Q_MS_NS, 1);
+    observe(&f, 3 * EQ_Q_SECOND_NS + 107 * EQ_Q_MS_NS, 0);
+    f.pid = 11; f.uid = 1;
+    observe(&f, 3 * EQ_Q_SECOND_NS + 108 * EQ_Q_MS_NS, 1);
+    assert(observe(&f, 14 * EQ_Q_SECOND_NS, 1) == EQ_Q_NORMAL);
+    const struct eq_quarantine_control *c = &f.exited;
+    const struct eq_quarantine_episode *e = &c->episode;
+    assert(c->key.cgroup_id == 100 && c->key.rule_id == 77 && c->key.kind == EQ_OPEN);
+    assert(c->transition == EQ_Q_EXIT && c->reason == EQ_Q_LOW_RATE);
+    assert(c->threshold_eps == 2000 && c->duration_ms == 10000);
+    assert(e->episode_id == e->first_sequence && e->first_sequence == 30001);
+    assert(e->last_sequence == 30010 && c->transition_sequence == 30011);
+    assert(e->start_ns == 3 * EQ_Q_SECOND_NS && e->end_ns == 14 * EQ_Q_SECOND_NS);
+    assert(e->last_event_ns == 3 * EQ_Q_SECOND_NS + 108 * EQ_Q_MS_NS);
+    assert(e->seen == 10 && e->full_selected == 8 && e->sample_selected == 1 && e->summarized == 1);
+    assert(e->full_submitted == 7 && e->sample_submitted == 0 && e->ring_failed == 2);
+    assert(e->first_pid == 10 && e->last_pid == 11 && e->first_uid == 0 && e->last_uid == 1);
+    assert(e->unique_pid_lower_bound == 2 && e->unique_uid_lower_bound == 2);
+    assert(e->tracking_complete && e->threshold_eps == 10000 && e->duration_ms == 3000);
+    unsigned quality = EQ_TRUNCATED | EQ_QUARANTINED | EQ_Q_INITIAL | (77u << EQ_RULE_SHIFT);
+    assert((quality & EQ_CAPTURE_QUALITY_MASK) == EQ_TRUNCATED);
+    assert(((quality & EQ_RULE_MASK) >> EQ_RULE_SHIFT) == 77 && EQ_SCHEMA == 3);
+}
+/* BPF rule programs live in volatile rodata. Losing that qualifier lets Clang
+ * fold their zero initializer into the policy instead of reading loaded rules. */
+static void test_volatile_rule_config(void) {
+    const volatile struct eq_quarantine_config config = {1000000, 3000, 2000, 10000, 8, 100};
+    struct eq_quarantine_engine engine = {};
+    struct eq_q_decision decision = {};
+    unsigned long long seen = 0;
+    for (unsigned second = 0; second < 5; second++) {
+        for (unsigned event = 0; event < 100; event++) {
+            unsigned long long now = second * EQ_Q_SECOND_NS + event * (EQ_Q_SECOND_NS / 100);
+            seen++;
+            eq_q_step(&engine, &config, now, seen, 1, 1, seen, 0, 0, &decision);
+            assert(decision.route == EQ_Q_NORMAL);
+        }
+    }
+    assert(!engine.quarantined && !engine.high_windows);
+    struct eq_quarantine_key key = {1, 1, EQ_OPEN};
+    struct eq_quarantine_control control;
+    decision.transition = EQ_Q_ENTER;
+    eq_q_make_control(&control, &key, &engine, &config, &decision);
+    assert(control.threshold_eps == 1000000 && control.duration_ms == 3000);
+}
+int main(void) {
+    test_low_rate_stays_critical();
+    test_spike_without_duration();
+    test_threshold_and_duration_enter();
+    test_stream_isolation();
+    test_protected_rule_bypasses();
+    test_low_cooldown_exit();
+    test_sampling_reconciliation();
+    test_control_metadata_accuracy();
+    test_volatile_rule_config();
+    puts("9 virtual-time Critical Quarantine cases: OK");
+    return 0;
+}
+```
+
+**이 C 테스트의 검증 한계**: 독립 C evaluator/격리 정책/저장처리 fixture가 맞는지 보는 것이며, 동시에 발생하는 모든 eBPF probe와 고부하 저장소를 자동으로 시험한 것은 아니다. 프로그램 운영 run과 독립된 테스트 바이너리를 사용한다.
+
+
+## 11.8 테스트 실행 경로와 비포함 항목
+
+`Makefile:test`에는 C의 `test_writer`, `test_quarantine`, `test_rules`, Python의 `test_manage`/`test_ledger` 및 `validation/2026-10-14/test_benchmark_portable.py`가 들어 있다. `test_live.py`와 `test_budget.py`는 위 `make test` 타깃에 포함되지 않는다. 이 두 파일은 기존 실제 센서와 충돌하지 않도록 활성 수집기 확인·정지 절차를 가진다. 이번 문서 생성 과정에서 어느 테스트도 실행하지 않았다.
+
+
 
 # PART 12. 코드 기준 보안성·한계
 
