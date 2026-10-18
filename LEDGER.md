@@ -66,11 +66,6 @@ clean STOPPED 및 완전한 stream/storage/tracking snapshot에서 전체 Q seen
 
 ## 검증 상태
 
-Python 단위 시험과 C fixture, WSL의 실제 BPF 로드·이벤트 수집을 수행했습니다. 수집을 중지하거나 기존 run을 수정하지 않고 격리된 검증 run을 사용했습니다. 같은 환경에서 다시 검증하려면 아래 명령을 실행합니다.
+과거 검증에서 Python 단위 시험과 C fixture, WSL의 실제 BPF 로드·이벤트 수집을 수행했습니다. 수집을 중지하거나 기존 run을 수정하지 않고 격리된 검증 run을 사용했습니다. 이 결과는 당시 소스와 환경에 한정되며, 현재 저장소에는 당시 fixture가 포함되지 않습니다.
 
-```bash
-python3 -m py_compile ledger.py test_ledger.py
-python3 -m unittest -v test_ledger.py
-```
-
-작성한 fixture는 fence 부재·잘린 uncommitted suffix·committed CRC/순번/lineage 오류·raw 경계·crash tail·clean/failed seal·aggregate 원인 배분 금지·metadata overflow·uint64 상한·tombstone 중복/충돌·원본 보존·출력 덮어쓰기 거부를 다룹니다.
+당시 fixture는 fence 부재·잘린 uncommitted suffix·committed CRC/순번/lineage 오류·raw 경계·crash tail·clean/failed seal·aggregate 원인 배분 금지·metadata overflow·uint64 상한·tombstone 중복/충돌·원본 보존·출력 덮어쓰기 거부를 다뤘습니다.

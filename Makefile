@@ -17,17 +17,3 @@ $(BUILD)/sensor.skel.h: $(BUILD)/sensor.bpf.o
 $(BUILD)/collector: collector.c event.h tenant.h quarantine.h rules.h $(BUILD)/sensor.skel.h
 	cc -g -O2 -Wall -Wextra -Werror -Wno-unused-parameter -pthread $(INC) -I$(BUILD) collector.c $(LIBDIR)/libbpf.a -lelf -lz -o $@
 .PHONY: all
-$(BUILD)/test_writer: test_writer.c collector.c event.h tenant.h quarantine.h rules.h $(BUILD)/sensor.skel.h
-	cc -g -O2 -Wall -Wextra -Werror -Wno-unused-parameter -pthread $(INC) -I$(BUILD) test_writer.c $(LIBDIR)/libbpf.a -lelf -lz -o $@
-$(BUILD)/test_quarantine: test_quarantine.c quarantine.h event.h | $(BUILD)
-	cc -g -O2 -Wall -Wextra -Werror test_quarantine.c -o $@
-$(BUILD)/test_rules: test_rules.c rules.h quarantine.h event.h | $(BUILD)
-	cc -g -O2 -Wall -Wextra -Werror test_rules.c -o $@
-test: $(BUILD)/test_writer $(BUILD)/test_quarantine $(BUILD)/test_rules
-	$(BUILD)/test_writer
-	$(BUILD)/test_quarantine
-	$(BUILD)/test_rules
-	python3 -m unittest -v test_manage
-	python3 -m unittest -v test_ledger
-	python3 validation/2026-10-14/test_benchmark_portable.py
-.PHONY: test

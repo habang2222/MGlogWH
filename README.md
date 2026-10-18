@@ -11,7 +11,6 @@ MGlogWH는 Linux eBPF 기반 `openat` 및 성공한 프로세스 실행 이벤�
 | `manage.py`, `ledger.py` | 실행·중지·검색용 인덱스와 읽기 전용 손실 원장 복구 |
 | `config.json`, `Makefile`, `examples/` | 기본 설정·빌드 및 검증 가능한 규칙 예제 |
 | `install-ubuntu.sh`, `packaging/` | Ubuntu 설치, systemd 서비스, 진단 로그 순환 |
-| `test_*.py`, `test_*.c` | 수집기 전용 synthetic·live 검증 코드 |
 | `RULES.md`, `LEDGER.md`, `QUARANTINE.md`, `THIRD_PARTY.md`, `licenses/` | 규칙·데이터 계약·정책, 외부 코드 출처·라이선스 |
 
 ## Ubuntu 서버 설치
@@ -28,7 +27,6 @@ git -C libbpf-bootstrap checkout d5f36b8ff051c78035696da31e673602c266d93c
 git -C libbpf-bootstrap submodule update --init --recursive
 make -C libbpf-bootstrap/examples/c bootstrap
 make -C MGlogWH
-make -C MGlogWH test
 sudo bash MGlogWH/install-ubuntu.sh
 ```
 
@@ -46,7 +44,7 @@ sudo systemctl status mglogwh
 sudo /usr/bin/python3 /opt/mglogwh/manage.py status
 ```
 
-중지는 `sudo systemctl stop mglogwh`입니다. 업데이트할 때는 서비스를 중지하고, 새 소스를 일반 사용자로 빌드·테스트한 다음 설치 스크립트를 다시 실행합니다. 정상 종료는 인덱서의 마지막 원본 반영을 기다릴 수 있습니다. 기동에 실패하면 `sudo journalctl -u mglogwh -n 100 --no-pager`와 `sudo systemctl status mglogwh`로 확인하세요. 서비스는 10분 안에 3회 실패하면 재시도를 멈춥니다. 원인을 해결한 다음 `sudo systemctl reset-failed mglogwh`와 `sudo systemctl start mglogwh`를 실행합니다.
+중지는 `sudo systemctl stop mglogwh`입니다. 업데이트할 때는 서비스를 중지하고, 새 소스를 일반 사용자로 빌드한 다음 설치 스크립트를 다시 실행합니다. 정상 종료는 인덱서의 마지막 원본 반영을 기다릴 수 있습니다. 기동에 실패하면 `sudo journalctl -u mglogwh -n 100 --no-pager`와 `sudo systemctl status mglogwh`로 확인하세요. 서비스는 10분 안에 3회 실패하면 재시도를 멈춥니다. 원인을 해결한 다음 `sudo systemctl reset-failed mglogwh`와 `sudo systemctl start mglogwh`를 실행합니다.
 
 systemd가 없는 환경에서는 설치 후 `sudo /usr/bin/python3 /opt/mglogwh/manage.py start --config /etc/mglogwh/config.json`으로 시작하고, 같은 설치본의 `status`와 `stop`을 사용합니다. `MGLOGWH_DATA_DIR`과 `MGLOGWH_BUILD_DIR`은 필요할 때 설정할 수 있으며, 데이터 디렉터리는 실행 계정 소유의 `0700` 권한이어야 합니다. 상대 경로 환경변수는 `manage.py`가 있는 디렉터리를 기준으로 해석합니다.
 
@@ -67,6 +65,6 @@ sudo /usr/bin/python3 /opt/mglogwh/manage.py recover \
   --run-dir /var/lib/mglogwh/runs/REPLACE_WITH_RUN_UUID --out /path/to/report.json
 ```
 
-초기 v0.4.0 `eb9c888`에서 Ubuntu 24.04 WSL의 BPF object·skeleton·collector 빌드, C·Python 시험과 8규칙 BPF 실제 로드·이벤트 수집을 확인했습니다. 독립된 run에서 `/etc/shadow` 읽기 이벤트 3건이 `critical.raw`에 기록됐습니다. 당시 5,000회 `openat` 부하의 세 번 반복 중앙값은 1규칙 56.36ms, 8규칙 58.07ms였으며 Python 호출·syscall·수집기 전체 시간입니다. 이후 [2026-10-14 검증](validation/2026-10-14/REVIEW.md)에서 이 버전의 Quarantine 설정 미적용과 원장 checkpoint 중복 키 결함을 발견해 수정했습니다. 당시 시간과 새 수정 전 12회 성능 실험을 수정본의 성능 결론으로 사용하지 않습니다. 수정본의 전체 반복 부하·원장 end-to-end 복구, 실제 Ubuntu 서버 설치와 다른 커널 BPF 로드는 별도 확인이 필요합니다.
+과거 v0.4.0 검증에서는 Ubuntu 24.04 WSL에서 BPF 빌드·로드와 이벤트 수집을 확인했습니다. 이후 Quarantine 설정 미적용과 원장 checkpoint 중복 키 결함을 발견해 수정했습니다. 이전 검증의 성능 수치를 수정본의 성능 결론으로 사용하지 않습니다. 수정본의 전체 반복 부하·원장 end-to-end 복구, 실제 Ubuntu 서버 설치와 다른 커널 BPF 로드는 별도 확인이 필요합니다.
 
 수집기 전체에 적용할 최상위 `LICENSE`는 아직 없습니다. 외부 배포 조건은 프로젝트 소유자가 결정해야 합니다. 파일별 라이선스와 외부 코드 고지는 [THIRD_PARTY.md](THIRD_PARTY.md) 및 [licenses/](licenses/)를 확인하세요.

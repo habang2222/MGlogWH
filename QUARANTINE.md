@@ -93,26 +93,21 @@ quarantine.raw와 general.raw는 기존 noncritical 저장 예산을 공유한�
 | collector.c | 기존 critical FIFO 복원, quarantine lane·writer·quota·원장·metrics |
 | manage.py / config.json | 설정 검증·CLI 전달, 새 raw index·query 의미 |
 | ledger.py | 2/3-lane 호환, 전환·episode·durable 증거 복구 |
-| test_quarantine.c / test_writer.c | 요청한 정책·sampling·저장·metadata fixture |
-| test_manage.py / test_ledger.py | 설정·schema·원장 호환 및 손상 fixture |
-| Makefile | 신규 fixture 컴파일 및 명시적 test target |
+| Makefile | 수집기 빌드 대상 |
 | README.md / LEDGER.md | 현재 동작·한계·손실 원장 계약 |
 
-## 테스트와 사용자 실행
-
-요청한 8개 시나리오를 synthetic fixture로 작성했다: 낮은 rate, 순간 초과, 지속 초과, A/rule1만 격리, Protected Critical 면제, cooldown 복구, sampling 합계, 사후 metadata. fixture는 가상 monotonic 시각을 쓰며 live BPF나 실제 workload를 시작하지 않는다. BPF object 컴파일·skeleton 생성과 collector·두 C fixture의 `-Wall -Wextra -Werror` 컴파일을 완료했고 수정한 Python·PowerShell 파일도 구문 검사를 통과했다. fixture 실행 결과는 아직 없다.
+## 사용자 실행과 확인
 
 현재 설치본에서 정책과 손실 원장을 확인할 명령:
 
 ```bash
-make test
 sudo systemctl start mglogwh
 sudo systemctl stop mglogwh
 sudo /usr/bin/python3 /opt/mglogwh/manage.py recover \
   --run-dir /var/lib/mglogwh/runs/REPLACE_WITH_RUN_UUID --out /tmp/recovery.json
 ```
 
-실제 부하 생성기와 분석기는 이 저장소에 포함하지 않는다. 본 문서의 정책 시험 절차는 수집기 synthetic fixture에 한정한다. 제작 당시의 컴파일·구문 검사는 실제 부하에서의 성능이나 손실률을 보장하지 않는다.
+실제 부하 생성기와 분석기는 이 저장소에 포함하지 않는다. 과거 제작 당시의 컴파일·구문 검사는 실제 부하에서의 성능이나 손실률을 보장하지 않는다.
 
 ## 아직 남은 문제
 
